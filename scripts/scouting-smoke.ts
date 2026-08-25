@@ -13,6 +13,7 @@ import { scoutingProvider } from '../src/lib/ports/scouting'
  */
 
 const url = process.argv[2] ?? 'https://www.instagram.com/nasa'
+const plataforma = url.includes('tiktok.com') ? 'TIKTOK' : 'INSTAGRAM'
 
 const provider = scoutingProvider()
 if (!provider.configured) {
@@ -20,10 +21,10 @@ if (!provider.configured) {
   process.exit(1)
 }
 
-console.log(`Proveedor: ${provider.name} · costo estimado: US$ ${provider.unitCostUsd('INSTAGRAM').toFixed(4)}`)
+console.log(`Proveedor: ${provider.name} · costo estimado: US$ ${provider.unitCostUsd(plataforma).toFixed(4)}`)
 console.log(`Pidiendo: ${url}`)
 
-const job = await provider.startEnrich({ platform: 'INSTAGRAM', urls: [url] })
+const job = await provider.startEnrich({ platform: plataforma, urls: [url] })
 console.log(`Trabajo: ${job.jobId}`)
 
 const inicio = Date.now()

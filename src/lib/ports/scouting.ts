@@ -2,6 +2,7 @@ import 'server-only'
 import type { Platform } from '@/generated/prisma/enums'
 import { env } from '@/lib/env'
 import { parseFollowers, parseProfileUrl } from '@/lib/domain/normalize'
+import { ApifyScoutingProvider } from './scouting-apify'
 
 /**
  * Proveedor de scouting.
@@ -116,7 +117,20 @@ type BrightDataDatasets = {
   instagramDiscover?: string
   tiktokProfiles?: string
   tiktokDiscover?: string
+  youtubeProfiles?: string
+  youtubeDiscover?: string
 }
+
+/**
+ * Cómo descubre cada red, que no es lo mismo en las tres.
+ *
+ * - YouTube devuelve CANALES: perfiles con suscriptores, un solo paso.
+ * - TikTok devuelve POSTS, pero cada uno trae el perfil de quien lo publicó,
+ *   con seguidores incluidos. Alcanza para armar el perfil sin pagar de nuevo.
+ * - Instagram no tiene búsqueda de perfiles por palabra clave. Antes que
+ *   inventar un rodeo caro, la aplicación lo dice.
+ */
+type FormaDeDescubrimiento = 'PERFILES' | 'POSTS_CON_AUTOR'
 
 /** Lee un número de un registro sin importar cómo lo llame el proveedor. */
 function pickNumber(row: Record<string, unknown>, keys: string[]): number | null {
@@ -184,6 +198,28 @@ function explicarRechazo(status: number, detalle: string): string {
   return `El proveedor rechazó el pedido (${status}). ${texto}`
 }
 
+
+/**
+ * Un creador, una fila.
+ *
+ * Descubrir en TikTok devuelve posts, y varios pueden ser del mismo creador: si
+ * no se unifican, la misma persona aparece cinco veces en los resultados. Se
+ * conserva la versión más completa de cada perfil, no la primera que llegó.
+ */
+function unificarPorPerfil(registros: ScoutingRecord[]): ScoutingRecord[] {
+  const completitud = (r: ScoutingRecord): number =>
+    [r.followers, r.engagementRate, r.bio, r.profileImageUrl, r.displayName, r.country].filter(
+      (valor) => valor !== null && valor !== undefined,
+    ).length
+
+  const porPerfil = new Map<string, ScoutingRecord>()
+  for (const registro of registros) {
+    const existente = porPerfil.get(registro.urlNormalized)
+    if (!existente || completitud(registro) > completitud(existente)) porPerfil.set(registro.urlNormalized, registro)
+  }
+  return [...porPerfil.values()]
+}
+
 class BrightDataProvider implements ScoutingProvider {
   readonly name = 'brightdata'
   readonly configured = true
@@ -203,13 +239,18 @@ class BrightDataProvider implements ScoutingProvider {
   }
 
   private datasetFor(platform: Platform, mode: 'DISCOVER' | 'ENRICH'): string | null {
-    if (platform === 'INSTAGRAM') {
-      return (mode === 'DISCOVER' ? this.datasets.instagramDiscover : this.datasets.instagramProfiles) ?? null
+    const porRed: Partial<Record<Platform, { discover?: string; enrich?: string }>> = {
+      INSTAGRAM: { discover: this.datasets.instagramDiscover, enrich: this.datasets.instagramProfiles },
+      TIKTOK: { discover: this.datasets.tiktokDiscover, enrich: this.datasets.tiktokProfiles },
+      YOUTUBE: { discover: this.datasets.youtubeDiscover, enrich: this.datasets.youtubeProfiles },
     }
-    if (platform === 'TIKTOK') {
-      return (mode === 'DISCOVER' ? this.datasets.tiktokDiscover : this.datasets.tiktokProfiles) ?? null
-    }
-    return null
+    const entrada = porRed[platform]
+    return (mode === 'DISCOVER' ? entrada?.discover : entrada?.enrich) ?? null
+  }
+
+  /** Qué devuelve el descubrimiento de esta red. */
+  private formaDe(platform: Platform): FormaDeDescubrimiento {
+    return platform === 'YOUTUBE' ? 'PERFILES' : 'POSTS_CON_AUTOR'
   }
 
   private async request(path: string, init: RequestInit = {}): Promise<Response> {
@@ -230,9 +271,15 @@ class BrightDataProvider implements ScoutingProvider {
     }
   }
 
-  private async trigger(datasetId: string, payload: unknown[], extraQuery = ''): Promise<JobHandle> {
+  private async trigger(
+    datasetId: string,
+    payload: unknown[],
+    extraQuery = '',
+    limitPerInput?: number,
+  ): Promise<JobHandle> {
+    const tope = limitPerInput ? `&limit_per_input=${limitPerInput}` : ''
     const response = await this.request(
-      `/trigger?dataset_id=${encodeURIComponent(datasetId)}&include_errors=true${extraQuery}`,
+      `/trigger?dataset_id=${encodeURIComponent(datasetId)}&include_errors=true${tope}${extraQuery}`,
       { method: 'POST', body: JSON.stringify(payload) },
     )
     if (!response.ok) {
@@ -247,15 +294,47 @@ class BrightDataProvider implements ScoutingProvider {
   async startDiscover(params: DiscoverParams): Promise<JobHandle> {
     const datasetId = this.datasetFor(params.platform, 'DISCOVER')
     if (!datasetId) {
-      throw new ScoutingUnavailableError(`No hay dataset configurado para descubrir perfiles en ${params.platform}.`)
+      throw new ScoutingUnavailableError(
+        params.platform === 'INSTAGRAM'
+          ? 'Instagram no permite buscar perfiles por palabra clave. Se puede actualizar métricas de perfiles que ya tengas, o descubrir en TikTok y YouTube.'
+          : `No hay dataset configurado para descubrir perfiles en ${params.platform}.`,
+      )
     }
-    const payload = params.keywords.map((keyword) => ({
-      search_keyword: keyword,
-      keyword,
-      country: params.country ?? '',
-      num_of_posts: params.limit,
-    }))
-    return this.trigger(datasetId, payload, '&type=discover_new&discover_by=keyword')
+
+    /*
+     * `limit_per_input` NO es opcional.
+     *
+     * Sin él, una sola palabra clave devolvió 387 registros en una prueba: casi
+     * sesenta centavos por una búsqueda que se pidió "chica". Se cobra por
+     * registro entregado, así que sin tope el número que le mostramos a quien
+     * ejecuta antes de gastar deja de ser una promesa.
+     */
+    const tope = Math.max(1, Math.min(500, params.limit))
+    const porPalabra = Math.max(1, Math.ceil(tope / Math.max(1, params.keywords.length)))
+
+    if (this.formaDe(params.platform) === 'PERFILES') {
+      // YouTube: la palabra clave devuelve canales directamente. No acepta
+      // país -- lo rechaza con un error de validación -- así que el filtro
+      // geográfico se aplica después, sobre lo que devuelve.
+      return this.trigger(
+        datasetId,
+        params.keywords.map((keyword) => ({ keyword })),
+        '&type=discover_new&discover_by=keyword',
+        porPalabra,
+      )
+    }
+
+    // TikTok: devuelve posts, y cada uno trae el perfil de su autor.
+    return this.trigger(
+      datasetId,
+      params.keywords.map((keyword) => ({
+        search_keyword: keyword,
+        num_of_posts: porPalabra,
+        country: params.country ?? '',
+      })),
+      '&type=discover_new&discover_by=keyword',
+      porPalabra,
+    )
   }
 
   async startEnrich(params: EnrichParams): Promise<JobHandle> {
@@ -286,19 +365,36 @@ class BrightDataProvider implements ScoutingProvider {
     const rows = (await snapshot.json()) as unknown
     if (!Array.isArray(rows)) return { status: 'FAILED', message: 'El proveedor devolvió un formato inesperado.' }
 
-    return { status: 'READY', records: rows.map((row) => this.toRecord(row as Record<string, unknown>)).filter(isRecord) }
+    const registros = rows.map((row) => this.toRecord(row as Record<string, unknown>)).filter(isRecord)
+    return { status: 'READY', records: unificarPorPerfil(registros) }
   }
 
   async cancel(job: JobHandle): Promise<void> {
     await this.request(`/snapshot/${encodeURIComponent(job.jobId)}/cancel`, { method: 'POST' }).catch(() => undefined)
   }
 
+  /**
+   * Lleva un registro del proveedor a nuestro modelo.
+   *
+   * Vienen en tres formas distintas y hay que reconocerlas por sus campos, no
+   * por la red: un perfil de Instagram, un canal de YouTube, y un post de
+   * TikTok que trae adentro el perfil de quien lo publicó. Esa última es la que
+   * hace que descubrir en TikTok no cueste dos veces.
+   *
+   * Devuelve null cuando no se puede armar un perfil identificable. Preferimos
+   * perder un registro antes que inventar uno.
+   */
   private toRecord(row: Record<string, unknown>): ScoutingRecord | null {
-    const rawUrl =
-      pickString(row, ['url', 'profile_url', 'input_url', 'account_url', 'user_profile_url']) ??
-      (pickString(row, ['account', 'username', 'user_name'])
-        ? `https://www.instagram.com/${pickString(row, ['account', 'username', 'user_name'])}`
-        : null)
+    // Un post de TikTok: el perfil está en las columnas `profile_*`.
+    const urlDeAutor = pickString(row, ['profile_url'])
+    const esPostConAutor = Boolean(urlDeAutor) && Boolean(pickString(row, ['post_id', 'video_url', 'post_type']))
+
+    const rawUrl = esPostConAutor
+      ? urlDeAutor
+      : (pickString(row, ['url', 'profile_url', 'input_url', 'account_url', 'user_profile_url']) ??
+        (pickString(row, ['account', 'username', 'user_name'])
+          ? `https://www.instagram.com/${pickString(row, ['account', 'username', 'user_name'])}`
+          : null))
     if (!rawUrl) return null
 
     const parsed = parseProfileUrl(rawUrl)
@@ -308,13 +404,34 @@ class BrightDataProvider implements ScoutingProvider {
       platform: parsed.value.platform,
       url: parsed.value.url,
       urlNormalized: parsed.value.urlNormalized,
-      handle: parsed.value.handle ?? pickString(row, ['account', 'username', 'user_name']),
-      displayName: pickString(row, ['full_name', 'name', 'nickname', 'display_name']),
-      followers: pickNumber(row, ['followers', 'followers_count', 'follower_count', 'edge_followed_by']),
+      handle:
+        parsed.value.handle ?? pickString(row, ['handle', 'account', 'username', 'user_name', 'account_id']),
+      displayName: esPostConAutor
+        ? pickString(row, ['profile_username', 'account_id'])
+        : pickString(row, ['full_name', 'name', 'nickname', 'display_name']),
+      followers: pickNumber(row, [
+        'followers',
+        'followers_count',
+        'follower_count',
+        'edge_followed_by',
+        // TikTok, dentro de un post.
+        'profile_followers',
+        // YouTube llama distinto a lo mismo.
+        'subscribers',
+      ]),
       engagementRate: pickRate(row, ['engagement_rate', 'avg_engagement', 'engagement']),
-      country: pickString(row, ['country', 'country_code', 'business_address_country']),
-      bio: pickString(row, ['biography', 'bio', 'description', 'signature']),
-      profileImageUrl: pickString(row, ['profile_image_link', 'profile_pic_url', 'avatar', 'profile_image_url']),
+      country: pickString(row, ['country', 'country_code', 'business_address_country', 'region']),
+      bio: esPostConAutor
+        ? pickString(row, ['profile_biography'])
+        : pickString(row, ['biography', 'bio', 'description', 'signature']),
+      profileImageUrl: pickString(row, [
+        'profile_image_link',
+        'profile_pic_url',
+        'avatar',
+        'profile_image_url',
+        'profile_avatar',
+        'profile_image',
+      ]),
       raw: row,
     }
   }
@@ -351,6 +468,28 @@ let cached: ScoutingProvider | null = null
 export function scoutingProvider(): ScoutingProvider {
   if (cached) return cached
   const config = env()
+
+  if (config.SCOUTING_PROVIDER === 'apify') {
+    const apifyToken = config.APIFY_TOKEN ?? config.APIFY_API_TOKEN
+    if (!apifyToken) {
+      cached = new UnconfiguredScoutingProvider()
+      return cached
+    }
+    cached = new ApifyScoutingProvider(
+      apifyToken,
+      {
+        instagramProfiles: config.APIFY_ACTOR_INSTAGRAM_PROFILES,
+        instagramDiscover: config.APIFY_ACTOR_INSTAGRAM_DISCOVER,
+        tiktokProfiles: config.APIFY_ACTOR_TIKTOK_PROFILES,
+        tiktokDiscover: config.APIFY_ACTOR_TIKTOK_DISCOVER,
+        youtubeProfiles: config.APIFY_ACTOR_YOUTUBE_PROFILES,
+        youtubeDiscover: config.APIFY_ACTOR_YOUTUBE_DISCOVER,
+      },
+      config.APIFY_COST_PER_RECORD_USD,
+    )
+    return cached
+  }
+
   if (!config.BRIGHTDATA_API_TOKEN) {
     cached = new UnconfiguredScoutingProvider()
     return cached
@@ -362,6 +501,8 @@ export function scoutingProvider(): ScoutingProvider {
       instagramDiscover: config.BRIGHTDATA_DATASET_INSTAGRAM_DISCOVER,
       tiktokProfiles: config.BRIGHTDATA_DATASET_TIKTOK_PROFILES,
       tiktokDiscover: config.BRIGHTDATA_DATASET_TIKTOK_DISCOVER,
+      youtubeProfiles: config.BRIGHTDATA_DATASET_YOUTUBE_PROFILES,
+      youtubeDiscover: config.BRIGHTDATA_DATASET_YOUTUBE_DISCOVER,
     },
     config.BRIGHTDATA_COST_PER_RECORD_USD,
   )

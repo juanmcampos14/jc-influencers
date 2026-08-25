@@ -35,6 +35,28 @@ const schema = z.object({
   BRIGHTDATA_DATASET_INSTAGRAM_DISCOVER: z.string().optional(),
   BRIGHTDATA_DATASET_TIKTOK_PROFILES: z.string().optional(),
   BRIGHTDATA_DATASET_TIKTOK_DISCOVER: z.string().optional(),
+  BRIGHTDATA_DATASET_YOUTUBE_PROFILES: z.string().optional(),
+  BRIGHTDATA_DATASET_YOUTUBE_DISCOVER: z.string().optional(),
+
+  /*
+   * Qué proveedor usa el scouting. La aplicación depende de la interfaz, no de
+   * ninguno de los dos: cambiar de uno a otro es cambiar esta variable.
+   */
+  SCOUTING_PROVIDER: z.enum(['brightdata', 'apify']).default('brightdata'),
+  /*
+   * Se aceptan los dos nombres: Apify llama "API token" al suyo y es fácil
+   * cargarlo como APIFY_API_TOKEN. Fallar por el nombre de la variable, con el
+   * valor correcto adentro, sería una pérdida de tiempo evitable.
+   */
+  APIFY_TOKEN: z.string().optional(),
+  APIFY_API_TOKEN: z.string().optional(),
+  APIFY_ACTOR_INSTAGRAM_PROFILES: z.string().optional(),
+  APIFY_ACTOR_INSTAGRAM_DISCOVER: z.string().optional(),
+  APIFY_ACTOR_TIKTOK_PROFILES: z.string().optional(),
+  APIFY_ACTOR_TIKTOK_DISCOVER: z.string().optional(),
+  APIFY_ACTOR_YOUTUBE_PROFILES: z.string().optional(),
+  APIFY_ACTOR_YOUTUBE_DISCOVER: z.string().optional(),
+  APIFY_COST_PER_RECORD_USD: z.coerce.number().nonnegative().default(0.004),
   /** Costo por registro entregado. Se usa para el tope de gasto y el aviso previo. */
   BRIGHTDATA_COST_PER_RECORD_USD: z.coerce.number().nonnegative().default(0.0015),
   /** Tope mensual global de la agencia, en dólares. */

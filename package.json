@@ -29,8 +29,9 @@
     "db:check": "tsx --conditions=react-server scripts/check-production-db.ts",
     "verify:build": "bash scripts/verify-build.sh",
     "db:bootstrap": "tsx --conditions=react-server scripts/bootstrap-production.ts",
-    "scouting:check": "tsx --conditions=react-server scripts/check-brightdata.ts",
-    "scouting:smoke": "tsx --conditions=react-server scripts/scouting-smoke.ts"
+    "scouting:check": "tsx --conditions=react-server scripts/check-scouting.ts",
+    "scouting:smoke": "tsx --conditions=react-server scripts/scouting-smoke.ts",
+    "scouting:descubrir": "tsx --conditions=react-server scripts/scouting-discover.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
