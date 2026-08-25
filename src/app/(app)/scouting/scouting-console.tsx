@@ -85,19 +85,35 @@ export function ScoutingConsole({
   const [mode, setMode] = React.useState<'DISCOVER' | 'ENRICH'>('DISCOVER')
 
   const running = runs.filter((run) => run.status === 'RUNNING')
+  /*
+   * Identidad estable de lo que está corriendo.
+   *
+   * `running` es un array nuevo en cada render, así que usarlo de dependencia
+   * destruía y recreaba el intervalo permanentemente.
+   */
+  const enCurso = running.map((run) => run.id).join(',')
 
-  // Mientras haya una corrida en curso, se consulta el avance cada 10 segundos.
+  /*
+   * El sondeo tiene su propia transición, separada de la del formulario.
+   *
+   * Compartían `pending`, así que cada diez segundos el botón "Ver cuánto
+   * cuesta" se deshabilitaba solo y decía "Calculando…" sin que nadie hubiera
+   * tocado nada.
+   */
+  const [, startSondeo] = React.useTransition()
+
   React.useEffect(() => {
-    if (running.length === 0) return
+    if (!enCurso) return
+    const ids = enCurso.split(',')
     const timer = setInterval(() => {
-      startTransition(async () => {
-        for (const run of running) {
-          const result = await pollScoutingAction({ runId: run.id })
+      startSondeo(async () => {
+        for (const runId of ids) {
+          const result = await pollScoutingAction({ runId })
           if (result.ok && result.data.status !== 'RUNNING') {
             toast.info(
               result.data.status === 'COMPLETED'
-                ? `Scouting terminado: ${result.data.collected} perfiles.`
-                : `La corrida terminó con estado ${result.data.status}.`,
+                ? `Búsqueda terminada: ${result.data.collected} perfiles.`
+                : `La búsqueda terminó con estado ${result.data.status}.`,
             )
             router.refresh()
           }
@@ -105,7 +121,24 @@ export function ScoutingConsole({
       })
     }, 10_000)
     return () => clearInterval(timer)
-  }, [running, router])
+  }, [enCurso, router])
+
+  /*
+   * Cancelar gastaba plata y no daba ninguna señal: sin confirmación, sin
+   * aviso y sin manejo de error. Si fallaba, la búsqueda seguía corriendo y
+   * quien la canceló creía que la había cortado.
+   */
+  function cancelar(runId: string) {
+    startTransition(async () => {
+      const resultado = await cancelScoutingAction({ runId })
+      if (!resultado.ok) {
+        toast.error(resultado.message)
+        return
+      }
+      toast.success('Se pidió cortar la búsqueda.')
+      router.refresh()
+    })
+  }
 
   function switchClient(next: string) {
     const query = new URLSearchParams(params.toString())
@@ -435,6 +468,9 @@ export function ScoutingConsole({
       <Card>
         <CardHeader>
           <CardTitle>Búsquedas</CardTitle>
+          {runs.length >= 30 ? (
+            <p className="text-xs text-ink-500">Se muestran las 30 más recientes.</p>
+          ) : null}
         </CardHeader>
         {runs.length === 0 ? (
           <EmptyState title="Todavía no hiciste ninguna búsqueda" description="Armá una arriba para empezar." />
@@ -479,9 +515,18 @@ export function ScoutingConsole({
                           Ver {run.resultCount}
                         </Button>
                       ) : run.status === 'RUNNING' ? (
-                        <Button size="sm" variant="ghost" onClick={() => cancelScoutingAction({ runId: run.id }).then(() => router.refresh())}>
-                          Cancelar
-                        </Button>
+                        <ConfirmButton
+                          title="Cancelar la búsqueda"
+                          description="Se le pide al proveedor que corte. Lo que ya recolectó se cobra igual."
+                          confirmLabel="Sí, cancelar"
+                          tone="danger"
+                          onConfirm={() => cancelar(run.id)}
+                          pending={pending}
+                        >
+                          <Button size="sm" variant="ghost" disabled={pending}>
+                            Cancelar
+                          </Button>
+                        </ConfirmButton>
                       ) : null}
                     </Td>
                   </Tr>

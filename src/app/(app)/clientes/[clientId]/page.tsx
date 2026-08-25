@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/app-shell'
-import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardDescription, CardBody, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { Stat, StatStrip } from '@/components/ui/stat'
@@ -75,6 +75,14 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
           <Card>
             <CardHeader>
               <CardTitle>Campañas</CardTitle>
+            {campaigns.items.length < campaigns.total ? (
+              <CardDescription>
+                Las {campaigns.items.length} más recientes de {campaigns.total}.{' '}
+                <Link href={`/campanas?cliente=${clientId}`} className="underline underline-offset-2">
+                  Ver todas
+                </Link>
+              </CardDescription>
+            ) : null}
             </CardHeader>
             {campaigns.items.length === 0 ? (
               <EmptyState

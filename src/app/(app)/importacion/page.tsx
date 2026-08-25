@@ -54,6 +54,9 @@ export default async function ImportPage() {
         <Card>
           <CardHeader>
             <CardTitle>Importaciones anteriores</CardTitle>
+            {runs.length >= 50 ? (
+              <p className="text-xs text-ink-500">Se muestran las 50 más recientes.</p>
+            ) : null}
           </CardHeader>
           {runs.length === 0 ? (
             <EmptyState title="Sin importaciones" description="Todavía no importaste ningún archivo para este cliente." />

@@ -1,4 +1,14 @@
 import 'server-only'
+
+/**
+ * Tope de filas de una exportación.
+ *
+ * Existe para no armar un archivo de cien megas en memoria. Pero un CSV
+ * incompleto que se descarga como si estuviera completo es peor que uno que no
+ * se descarga: quien lo abre no tiene forma de saber que le faltan filas, así
+ * que el archivo lo dice en su última línea.
+ */
+export const EXPORT_MAX_ROWS = 5000
 import type { AuthContext } from '@/lib/authz/context'
 import { assertCan, assertClientInScope, capabilitiesFor } from '@/lib/authz/context'
 import { ForbiddenError, NotFoundError } from '@/lib/authz/errors'
@@ -89,11 +99,13 @@ export async function exportCampaignCandidacies(ctx: AuthContext, campaignId: st
         },
         cluster: { select: { label: true } },
       },
-      take: 5000,
+      take: EXPORT_MAX_ROWS,
     }),
   )
 
   const items = rows.map((row) => toCandidacyDto(row, perms))
+  // Cuántas hay realmente, para poder avisar si el archivo salió recortado.
+  const total = await scoped(ctx, (tx) => tx.candidacy.count({ where: { campaignId, clientId: campaign.clientId } }))
   const columns = [
     ...BASE_COLUMNS,
     ...(caps.has('budget.view') ? BUDGET_COLUMNS : []),
@@ -106,13 +118,25 @@ export async function exportCampaignCandidacies(ctx: AuthContext, campaignId: st
       entityType: 'Campaign',
       entityId: campaignId,
       clientId: campaign.clientId,
-      metadata: { rows: items.length, columns: columns.map((c) => c.header) },
+      metadata: { rows: items.length, total, columns: columns.map((c) => c.header) },
     }),
   )
 
+  const csv = toCsv(items, columns)
   return {
     filename: `${campaign.slug}-candidaturas.csv`,
     contentType: 'text/csv; charset=utf-8',
-    body: toCsv(items, columns),
+    /*
+     * Si el archivo salió recortado, lo dice en su última línea.
+     *
+     * Un CSV incompleto que se descarga como si estuviera completo es peor que
+     * uno que no se descarga: quien lo abre en una planilla no tiene forma de
+     * saber que le faltan filas, y va a sacar conclusiones sobre un subconjunto
+     * creyendo que es todo.
+     */
+    body:
+      total > items.length
+        ? `${csv}\n"ATENCIÓN: este archivo tiene ${items.length} de ${total} perfiles. El tope por exportación es ${EXPORT_MAX_ROWS}."`
+        : csv,
   }
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { PageHeader } from '@/components/app-shell'
-import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Stat, StatStrip } from '@/components/ui/stat'
 import { EmptyState } from '@/components/ui/states'
@@ -75,6 +75,12 @@ export default async function UsersPage() {
         <Card>
           <CardHeader>
             <CardTitle>Personas con acceso</CardTitle>
+            {users.length < resumen.activas + resumen.desactivadas ? (
+              <CardDescription>
+                Se listan {users.length} de {resumen.activas + resumen.desactivadas}. Usá el buscador de tu navegador o
+                pedí una exportación para ver el resto.
+              </CardDescription>
+            ) : null}
           </CardHeader>
           {users.length === 0 ? (
             <EmptyState
