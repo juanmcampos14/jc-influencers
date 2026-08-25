@@ -6,14 +6,19 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Pagination } from '@/components/ui/pagination'
+import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/field'
 import { Dialog, DialogClose, DialogContent } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/states'
-import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
+import { columnaFija, Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { ApprovalBadge, ExternalLink, StarsLabel, StatusBadge } from '@/components/status-badge'
 import { CANDIDACY_STATUS_SEED } from '@/lib/domain/statuses'
-import { formatFollowers, formatMoney, formatPercent } from '@/lib/util/format'
+
+/** Etiqueta visible de cada estado, para los avisos. */
+const STATUS_LABEL = new Map(CANDIDACY_STATUS_SEED.map((status) => [status.key, status.label]))
+import { cn, formatFollowers, formatMoney, formatPercent } from '@/lib/util/format'
 import type { CandidacyDto } from '@/lib/domain/dto'
 import type { Paginated } from '@/lib/repos/base'
 import { changeStatusAction, updateCandidacyAction, visibilityAction } from '../../actions/candidacies'
@@ -70,6 +75,15 @@ export function CandidacyTable({
   const [selected, setSelected] = React.useState<Set<string>>(new Set())
   const [detail, setDetail] = React.useState<CandidacyDto | null>(null)
   const [pending, startTransition] = React.useTransition()
+  /**
+   * Cambios de estado que ya se pidieron pero todavía no volvieron del
+   * servidor. Sin esto el desplegable mostraba el valor viejo hasta que llegaba
+   * la respuesta: elegías "Aprobado", volvía solo a lo anterior, y un segundo
+   * después cambiaba. La interacción más repetida de la pantalla parecía rota.
+   */
+  const [optimista, setOptimista] = React.useState<Record<string, string>>({})
+  /** Qué fila se está guardando. Antes se deshabilitaba la tabla entera. */
+  const [guardando, setGuardando] = React.useState<string | null>(null)
   const [visible, setVisible] = React.useState<ColumnKey[]>(() =>
     ALL_COLUMNS.map((column) => column.key).filter((key) => key !== 'entregables'),
   )
@@ -123,13 +137,26 @@ export function CandidacyTable({
     })
   }
 
-  function changeStatus(candidacyId: string, statusKey: string) {
+  function changeStatus(candidacyId: string, statusKey: string, anterior: string) {
+    setOptimista((actual) => ({ ...actual, [candidacyId]: statusKey }))
+    setGuardando(candidacyId)
     startTransition(async () => {
       const result = await changeStatusAction({ candidacyId, campaignId, statusKey })
+      setGuardando(null)
       if (!result.ok) {
+        // Vuelve a lo que había: mostrar un estado que no se guardó sería peor
+        // que no haber cambiado nada.
+        setOptimista((actual) => ({ ...actual, [candidacyId]: anterior }))
         toast.error(result.message)
         return
       }
+      const etiqueta = STATUS_LABEL.get(statusKey) ?? statusKey
+      toast.success(`Estado: ${etiqueta}.`, {
+        action: {
+          label: 'Deshacer',
+          onClick: () => changeStatus(candidacyId, anterior, statusKey),
+        },
+      })
       router.refresh()
     })
   }
@@ -215,7 +242,7 @@ export function CandidacyTable({
                         />
                       </Th>
                     ) : null}
-                    {shows('creador') ? <Th>Creador</Th> : null}
+                    {shows('creador') ? <Th className={columnaFija}>Creador</Th> : null}
                     {shows('cluster') ? <Th>Cluster</Th> : null}
                     {shows('perfil') ? <Th>Perfil</Th> : null}
                     {shows('seguidores') ? <Th className="text-right">Seguidores</Th> : null}
@@ -251,17 +278,30 @@ export function CandidacyTable({
                           </Td>
                         ) : null}
                         {shows('creador') ? (
-                          <Td>
-                            <Link
-                              href={`/influencers/${item.influencer.id}`}
-                              className="font-medium text-ink-900 hover:text-brand-700"
-                            >
-                              {item.influencer.displayName}
-                            </Link>
-                            <p className="text-xs text-ink-500">
-                              {item.influencer.country ?? '—'}
-                              {item.rank ? ` · #${item.rank}` : ''}
-                            </p>
+                          /*
+                           * Anclada al borde izquierdo: con once columnas, al
+                           * correrse a la derecha se perdía de vista de quién
+                           * era cada fila. Y "Ficha" -- la acción principal --
+                           * vive acá y no al final, donde en un teléfono no se
+                           * llegaba nunca.
+                           */
+                          <Td className={columnaFija}>
+                            <div className="flex items-center gap-2.5">
+                              <Avatar name={item.influencer.displayName} size="sm" />
+                              <div className="min-w-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setDetail(item)}
+                                  className="block max-w-44 truncate text-left font-medium text-ink-900 underline-offset-4 hover:underline"
+                                >
+                                  {item.influencer.displayName}
+                                </button>
+                                <p className="truncate text-xs text-ink-500">
+                                  {item.influencer.country ?? '—'}
+                                  {item.rank ? ` · #${item.rank}` : ''}
+                                </p>
+                              </div>
+                            </div>
                           </Td>
                         ) : null}
                         {shows('cluster') ? (
@@ -307,10 +347,15 @@ export function CandidacyTable({
                             {permissions.canManage ? (
                               <Select
                                 aria-label={`Estado de ${item.influencer.displayName}`}
-                                value={item.statusKey}
-                                onChange={(event) => changeStatus(item.id, event.target.value)}
-                                disabled={pending}
-                                className="h-8 min-w-40 text-xs"
+                                value={optimista[item.id] ?? item.statusKey}
+                                onChange={(event) =>
+                                  changeStatus(item.id, event.target.value, optimista[item.id] ?? item.statusKey)
+                                }
+                                // Sólo se bloquea la fila que se está guardando,
+                                // no las otras cuarenta y nueve.
+                                disabled={guardando === item.id}
+                                aria-busy={guardando === item.id}
+                                className={cn('h-8 min-w-40 text-xs', guardando === item.id && 'opacity-60')}
                               >
                                 {CANDIDACY_STATUS_SEED.map((status) => (
                                   <option key={status.key} value={status.key}>
@@ -353,8 +398,8 @@ export function CandidacyTable({
                           </Td>
                         ) : null}
                         <Td>
-                          <Button size="sm" variant="ghost" onClick={() => setDetail(item)}>
-                            Ficha
+                          <Button size="sm" variant="ghost" asChild>
+                            <Link href={`/influencers/${item.influencer.id}`}>Ver perfil</Link>
                           </Button>
                         </Td>
                       </Tr>
@@ -363,29 +408,14 @@ export function CandidacyTable({
                 </tbody>
               </Table>
             </TableWrap>
-            <div className="flex items-center justify-between border-t border-ink-200 px-5 py-3 text-sm">
-              <p className="text-ink-500">
-                {data.total} perfiles · página {data.page} de {data.pageCount}
-              </p>
-              <div className="flex gap-2">
-                {data.page > 1 ? (
-                  <Link
-                    href={`/campanas/${campaignId}?tab=perfiles&pagina=${data.page - 1}`}
-                    className="rounded-md border border-ink-300 px-3 py-1.5 hover:bg-ink-100"
-                  >
-                    Anterior
-                  </Link>
-                ) : null}
-                {data.page < data.pageCount ? (
-                  <Link
-                    href={`/campanas/${campaignId}?tab=perfiles&pagina=${data.page + 1}`}
-                    className="rounded-md border border-ink-300 px-3 py-1.5 hover:bg-ink-100"
-                  >
-                    Siguiente
-                  </Link>
-                ) : null}
-              </div>
-            </div>
+            <Pagination
+              base={`/campanas/${campaignId}`}
+              params={params}
+              page={data.page}
+              pageCount={data.pageCount}
+              total={data.total}
+              unidad="perfiles"
+            />
           </>
         )}
       </Card>

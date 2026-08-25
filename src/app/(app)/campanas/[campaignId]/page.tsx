@@ -13,6 +13,7 @@ import { getBrief, getCampaign } from '@/lib/repos/campaigns'
 import { candidacySummary, duplicateWarnings, listCandidacies } from '@/lib/repos/candidacies'
 import { listComments } from '@/lib/repos/comments'
 import { formatDate, formatMoney } from '@/lib/util/format'
+import { hrefCon } from '@/lib/util/query'
 import { CandidacyTable } from './candidacy-table'
 import { FunnelBoard } from './funnel-board'
 import { ShortlistPanel } from './shortlist-panel'
@@ -160,7 +161,12 @@ export default async function CampaignDetailPage({
           {TABS.map((entry) => (
             <li key={entry.key}>
               <Link
-                href={`/campanas/${campaign.id}?tab=${entry.key}`}
+                href={hrefCon(`/campanas/${campaign.id}`, query, {
+                  tab: entry.key,
+                  // Cambiar de sección arranca desde la primera página; el
+                  // filtro se conserva, la página no tendría sentido.
+                  pagina: null,
+                })}
                 aria-current={tab === entry.key ? 'page' : undefined}
                 className={
                   tab === entry.key

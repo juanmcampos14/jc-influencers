@@ -44,7 +44,15 @@ export async function listCampaigns(
     const [rows, total] = await Promise.all([
       tx.campaign.findMany({
         where,
-        orderBy: [{ updatedAt: 'desc' }],
+        /*
+         * Las campañas vivas van primero. El enum está declarado en orden de
+         * avance y termina en CLOSED y CANCELLED, así que ordenar por estado
+         * deja las cerradas al final sin necesidad de un CASE.
+         *
+         * Antes ordenaba sólo por última modificación, y como importar toca las
+         * históricas, las cerradas tapaban a las tres que estaban en curso.
+         */
+        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
         ...skipTake(pagination),
         include: {
           client: { select: { name: true } },

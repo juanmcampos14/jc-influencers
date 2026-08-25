@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { DEMO_PASSWORD, USERS, formAlert, lastEmailLink, login, logout, resetRateLimits } from './helpers'
+import { DEMO_PASSWORD, USERS, formAlert, lastEmailLink, login, logout, resetRateLimits, resetAprobaciones } from './helpers'
 
 test.beforeEach(async () => {
   await resetRateLimits()
@@ -115,21 +115,56 @@ test.describe('Aislamiento entre clientes', () => {
 })
 
 test.describe('Portal del cliente', () => {
-  test('el revisor aprueba un perfil y la agencia lo ve', async ({ page }) => {
+  test.beforeEach(async () => {
+    await resetAprobaciones('Lanzamiento tarjeta global')
+  })
+
+  test('el revisor entra directo a lo que tiene que decidir', async ({ page }) => {
     await login(page, USERS.clientReviewer)
-    await expect(page).toHaveURL(/\/portal/)
     await page.getByRole('link', { name: /Lanzamiento tarjeta global/ }).click()
 
-    const card = page.locator('li', { hasText: 'Valentina Ruiz (demo)' }).first()
+    // El cliente entra a decidir: si hay algo esperándolo, se abre en esa lista.
+    const activo = page.locator('nav[aria-label="Filtros de perfiles"] a[aria-current="page"]')
+    await expect(activo).toContainText('Esperan tu decisión')
+    await expect(page.getByRole('progressbar')).toBeVisible()
+  })
+
+  test('aprobar no abre ninguna ventana y se puede deshacer', async ({ page }) => {
+    await login(page, USERS.clientReviewer)
+    await page.getByRole('link', { name: /Lanzamiento tarjeta global/ }).click()
+
+    // Se toma el primero que esté esperando decisión, no un nombre fijo: los
+    // tests comparten la base y otro puede haberlo decidido antes.
+    const card = page.locator('main li').filter({ has: page.getByRole('button', { name: 'Aprobar', exact: true }) }).first()
     await expect(card).toBeVisible()
-    await card.getByRole('button', { name: 'Aprobar' }).click()
+    await card.getByRole('button', { name: 'Aprobar', exact: true }).click()
+
+    // El comentario al aprobar era opcional, así que el diálogo sólo agregaba
+    // clics. Lo que protegía -- poder arrepentirse -- lo da el "Deshacer".
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByText(/aprobado/).first()).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Deshacer' })).toBeVisible()
+  })
+
+  test('rechazar sí pide el motivo', async ({ page }) => {
+    await login(page, USERS.clientReviewer)
+    await page.getByRole('link', { name: /Lanzamiento tarjeta global/ }).click()
+    // Con "Todos" siempre hay tarjetas, esté decidido o no.
+    await page.getByRole('link', { name: /^Todos/ }).click()
+
+    const card = page.locator('main li').filter({ has: page.getByRole('button', { name: 'Rechazar', exact: true }) }).first()
+    await expect(card).toBeVisible()
+    await card.getByRole('button', { name: 'Rechazar', exact: true }).click()
 
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
-    await dialog.getByLabel('Comentario').fill('Nos encanta el perfil, avancemos.')
-    await dialog.getByRole('button', { name: 'Aprobar', exact: true }).click()
-    await expect(page.getByText('La agencia ya lo ve')).toBeVisible()
-    await expect(card.getByText('Aprobado').first()).toBeVisible()
+    // Sin motivo no avanza: el rechazo es lo que la agencia necesita entender.
+    await dialog.getByRole('button', { name: 'Rechazar', exact: true }).click()
+    await expect(page.getByText(/Contanos el motivo/)).toBeVisible()
+
+    await dialog.getByLabel('Comentario').fill('No encaja con el público que buscamos.')
+    await dialog.getByRole('button', { name: 'Rechazar', exact: true }).click()
+    await expect(page.getByText(/La agencia ya lo ve/)).toBeVisible()
   })
 
   test('el portal no muestra notas internas ni presupuestos', async ({ page }) => {

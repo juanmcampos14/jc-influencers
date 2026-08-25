@@ -94,8 +94,21 @@ describe('Roles y campos sensibles', () => {
   it('12 · el listado completo del cliente no filtra ningún campo interno', async () => {
     const page = await listCandidacies(reviewer, campaignId)
     const serialized = JSON.stringify(page)
-    for (const secret of ['NOTA INTERNA', 'MARGEN INTERNO', 'budgetPrivateNotes', 'contactEmail', '1200', '900']) {
+    for (const secret of [
+      'NOTA INTERNA',
+      'MARGEN INTERNO',
+      'budgetPrivateNotes',
+      'contactEmail',
+      '1234.56',
+      '987.65',
+    ]) {
       expect(serialized).not.toContain(secret)
+    }
+    // Y por estructura, que no depende de qué texto tenga el valor: la clave no
+    // existe, no es que venga en null.
+    for (const item of page.items) {
+      expect('budget' in item).toBe(false)
+      expect('internalNotes' in item).toBe(false)
     }
   })
 
@@ -119,7 +132,7 @@ describe('Roles y campos sensibles', () => {
 
   it('3 · finanzas ve presupuesto', async () => {
     const candidacy = await getCandidacy(finance, candidacyId)
-    expect(candidacy.budget?.negotiated).toBe(900)
+    expect(candidacy.budget?.negotiated).toBe(987.65)
     expect(candidacy.budget?.privateNotes).toContain('MARGEN INTERNO')
   })
 

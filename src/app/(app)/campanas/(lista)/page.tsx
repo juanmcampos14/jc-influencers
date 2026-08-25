@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
 import { Card } from '@/components/ui/card'
+import { Pagination } from '@/components/ui/pagination'
 import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { CampaignStatusBadge, CAMPAIGN_STATUS_LABELS } from '@/components/status-badge'
@@ -17,6 +18,8 @@ export const metadata: Metadata = { title: 'Campañas' }
 export const dynamic = 'force-dynamic'
 
 type SearchParams = { q?: string; estado?: string; cliente?: string; pagina?: string }
+
+const cerrada = (status: string): boolean => status === 'CLOSED' || status === 'CANCELLED'
 
 export default async function CampaignsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
@@ -86,7 +89,19 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                         </Td>
                         <Td className="text-right tabular-nums">{campaign.candidacyCount}</Td>
                         <Td className="text-right tabular-nums text-emerald-700">{campaign.approvedCount}</Td>
-                        <Td className="text-right tabular-nums text-amber-700">{campaign.pendingApprovalCount}</Td>
+                        {/*
+                          * En una campaña cerrada, "pendientes" ya no espera a
+                          * nadie: pintarlo de ámbar era una alerta que no lo es.
+                          */}
+                        <Td
+                          className={
+                            cerrada(campaign.status)
+                              ? 'text-right tabular-nums text-ink-400'
+                              : 'text-right tabular-nums text-amber-700'
+                          }
+                        >
+                          {campaign.pendingApprovalCount}
+                        </Td>
                         <Td className="whitespace-nowrap text-xs text-ink-600">
                           {formatDate(campaign.startDate, ctx.user.timezone)} → {formatDate(campaign.endDate, ctx.user.timezone)}
                         </Td>
@@ -98,31 +113,14 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                   </tbody>
                 </Table>
               </TableWrap>
-              {campaigns.pageCount > 1 ? (
-                <div className="flex items-center justify-between border-t border-ink-200 px-5 py-3 text-sm">
-                  <p className="text-ink-500">
-                    Página {campaigns.page} de {campaigns.pageCount} · {campaigns.total} campañas
-                  </p>
-                  <div className="flex gap-2">
-                    {campaigns.page > 1 ? (
-                      <Link
-                        href={`/campanas?pagina=${campaigns.page - 1}`}
-                        className="rounded-md border border-ink-300 px-3 py-1.5 hover:bg-ink-100"
-                      >
-                        Anterior
-                      </Link>
-                    ) : null}
-                    {campaigns.page < campaigns.pageCount ? (
-                      <Link
-                        href={`/campanas?pagina=${campaigns.page + 1}`}
-                        className="rounded-md border border-ink-300 px-3 py-1.5 hover:bg-ink-100"
-                      >
-                        Siguiente
-                      </Link>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
+              <Pagination
+                base="/campanas"
+                params={params as Record<string, string | undefined>}
+                page={campaigns.page}
+                pageCount={campaigns.pageCount}
+                total={campaigns.total}
+                unidad="campañas"
+              />
             </>
           )}
         </Card>

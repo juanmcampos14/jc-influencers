@@ -39,17 +39,27 @@ export default async function PortalCampaignPage({
     throw error
   }
 
-  const [candidacies, summary, brief, comments, insights] = await Promise.all([
+  /*
+   * El cliente entra a decidir, así que si hay algo esperándolo se abre en esa
+   * lista y no en "Todos". Antes aterrizaba sobre los doscientos perfiles y
+   * tenía que encontrar solo los pendientes.
+   *
+   * El resumen se pide antes que el resto porque de él depende qué lista traer.
+   */
+  const summary = await candidacySummary(ctx, campaignId)
+  const esperando = (summary.byApproval.PENDING ?? 0) + (summary.byApproval.NEEDS_REVIEW ?? 0)
+  const filtroActivo = filtro ?? (esperando > 0 ? 'pendientes' : '')
+
+  const [candidacies, brief, comments, insights] = await Promise.all([
     listCandidacies(
       ctx,
       campaignId,
       {
-        clientApproval: filtro === 'pendientes' ? ['PENDING', 'NEEDS_REVIEW'] : null,
-        onlyShortlist: filtro === 'shortlist',
+        clientApproval: filtroActivo === 'pendientes' ? ['PENDING', 'NEEDS_REVIEW'] : null,
+        onlyShortlist: filtroActivo === 'shortlist',
       },
       { pageSize: 200 },
     ),
-    candidacySummary(ctx, campaignId),
     getBrief(ctx, campaignId),
     listComments(ctx, { campaignId }),
     can(ctx, 'ai.view', campaign.clientId) ? listInsights(ctx, { campaignId }) : Promise.resolve([]),
@@ -60,10 +70,12 @@ export default async function PortalCampaignPage({
   const canExport = can(ctx, 'export.create', campaign.clientId)
 
   const FILTERS = [
+    { key: 'pendientes', label: `Esperan tu decisión (${esperando})` },
     { key: '', label: `Todos (${summary.total})` },
-    { key: 'pendientes', label: `Esperan tu decisión (${(summary.byApproval.PENDING ?? 0) + (summary.byApproval.NEEDS_REVIEW ?? 0)})` },
     { key: 'shortlist', label: `Shortlist (${summary.shortlist})` },
   ]
+
+  const decididos = summary.total - esperando
 
   return (
     <>
@@ -134,9 +146,38 @@ export default async function PortalCampaignPage({
         ) : null}
 
         <nav aria-label="Filtros de perfiles">
+          {summary.total > 0 ? (
+            /* Cuánto falta. Sale de los mismos conteos que los filtros. */
+            <div className="mb-3">
+              <div className="mb-1.5 flex items-center justify-between text-xs">
+                <span className="font-medium text-ink-700">
+                  {esperando === 0
+                    ? 'Decidiste todos los perfiles propuestos.'
+                    : `Decidiste ${decididos} de ${summary.total}. Faltan ${esperando}.`}
+                </span>
+                <span className="tabular-nums text-ink-500">
+                  {Math.round((decididos / summary.total) * 100)}%
+                </span>
+              </div>
+              <div
+                className="h-1.5 overflow-hidden rounded-full bg-ink-200"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={summary.total}
+                aria-valuenow={decididos}
+                aria-label="Perfiles decididos"
+              >
+                <div
+                  className="h-full rounded-full bg-brand-600 transition-[width]"
+                  style={{ width: `${(decididos / summary.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          ) : null}
+
           <ul className="flex flex-wrap gap-2">
             {FILTERS.map((entry) => {
-              const isActive = (filtro ?? '') === entry.key
+              const isActive = filtroActivo === entry.key
               return (
                 <li key={entry.key || 'todos'}>
                   <Link

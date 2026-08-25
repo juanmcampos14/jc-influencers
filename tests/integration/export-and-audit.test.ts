@@ -50,13 +50,13 @@ describe('Exportaciones y auditoría', () => {
     expect(result.body).not.toContain('Presupuesto solicitado')
     expect(result.body).not.toContain('Notas internas')
     expect(result.body).not.toContain('MARGEN INTERNO')
-    expect(result.body).not.toContain('1200')
+    expect(result.body).not.toContain('1234.56')
   })
 
   it('8 · la exportación de finanzas sí incluye la columna de presupuesto', async () => {
     const result = await exportCampaignCandidacies(finance, campaignId)
     expect(result.body).toContain('Presupuesto solicitado')
-    expect(result.body).toContain('1200')
+    expect(result.body).toContain('1234.56')
   })
 
   it('8 · la exportación del scout incluye notas internas pero no presupuesto', async () => {

@@ -2,6 +2,8 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { MoreHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -19,30 +21,37 @@ const STATUS_BY_KEY = new Map(CANDIDACY_STATUS_SEED.map((status) => [status.key,
 
 type PendingAction = { candidacy: CandidacyDto; approval: 'APPROVED' | 'REJECTED' | 'NEEDS_REVIEW' | 'REPLACEMENT_REQUESTED' }
 
-const ACTION_COPY: Record<PendingAction['approval'], { title: string; description: string; confirm: string; requireFeedback: boolean }> = {
+const ACTION_COPY: Record<
+  PendingAction['approval'],
+  { title: string; description: string; confirm: string; requireFeedback: boolean; hecho: string }
+> = {
   APPROVED: {
     title: 'Aprobar perfil',
     description: 'Le confirmás a la agencia que este perfil va. Podés dejar un comentario opcional.',
     confirm: 'Aprobar',
     requireFeedback: false,
+    hecho: 'aprobado',
   },
   REJECTED: {
     title: 'Rechazar perfil',
     description: 'Contanos por qué no encaja: ayuda a que la próxima propuesta sea mejor.',
     confirm: 'Rechazar',
     requireFeedback: true,
+    hecho: 'rechazado',
   },
   NEEDS_REVIEW: {
     title: 'Pedir revisión',
     description: 'Queda marcado como “a revisar” y la agencia va a volver con más información.',
     confirm: 'Pedir revisión',
     requireFeedback: false,
+    hecho: 'marcado a revisar',
   },
   REPLACEMENT_REQUESTED: {
     title: 'Pedir reemplazo',
     description: 'La agencia va a proponer otro perfil en lugar de este.',
     confirm: 'Pedir reemplazo',
     requireFeedback: false,
+    hecho: 'marcado para reemplazo',
   },
 }
 
@@ -62,6 +71,42 @@ export function ProposalList({
   const [action, setAction] = React.useState<PendingAction | null>(null)
   const [feedback, setFeedback] = React.useState('')
   const [pending, startTransition] = React.useTransition()
+  /** Decisión ya tomada que todavía no volvió del servidor. */
+  const [optimista, setOptimista] = React.useState<Record<string, string>>({})
+  const [guardando, setGuardando] = React.useState<string | null>(null)
+
+  /**
+   * Aprobar no abre ningún diálogo.
+   *
+   * El comentario al aprobar era opcional, así que el modal sólo agregaba dos
+   * clics por perfil: decidir veinte perfiles eran cuarenta clics y veinte
+   * ventanas. Ahora se aplica en el momento y el aviso ofrece deshacer, que es
+   * lo que el modal intentaba proteger.
+   */
+  function decidirDirecto(item: CandidacyDto, approval: PendingAction['approval'], anterior: string) {
+    setOptimista((actual) => ({ ...actual, [item.id]: approval }))
+    setGuardando(item.id)
+    startTransition(async () => {
+      const result = await approvalAction({ candidacyId: item.id, campaignId, approval, feedback: null })
+      setGuardando(null)
+      if (!result.ok) {
+        setOptimista((actual) => ({ ...actual, [item.id]: anterior }))
+        toast.error(result.message)
+        return
+      }
+      toast.success(`${item.influencer.displayName}: ${ACTION_COPY[approval].hecho}`, {
+        duration: 6000,
+        action:
+          anterior === 'PENDING' || anterior === 'NEEDS_REVIEW'
+            ? {
+                label: 'Deshacer',
+                onClick: () => decidirDirecto(item, anterior as PendingAction['approval'], approval),
+              }
+            : undefined,
+      })
+      router.refresh()
+    })
+  }
 
   function submit() {
     if (!action) return
@@ -105,6 +150,7 @@ export function ProposalList({
         {items.map((item) => {
           const profile = item.influencer.profiles[0]
           const status = STATUS_BY_KEY.get(item.statusKey)
+          const decision = optimista[item.id] ?? item.clientApproval
           return (
             <li key={item.id} className="flex flex-col rounded-xl border border-ink-200 bg-surface p-5">
               <div className="mb-2 flex items-start justify-between gap-2">
@@ -116,7 +162,7 @@ export function ProposalList({
                     {item.inShortlist ? ` · shortlist #${item.shortlistOrder ?? ''}` : ''}
                   </p>
                 </div>
-                <ApprovalBadge approval={item.clientApproval} />
+                <ApprovalBadge approval={decision} />
               </div>
 
               <dl className="mb-3 grid grid-cols-3 gap-2 rounded-lg bg-ink-50 p-2.5 text-center">
@@ -175,22 +221,61 @@ export function ProposalList({
               </div>
 
               {canApprove ? (
-                <div className="mt-auto flex flex-wrap gap-2 pt-1">
-                  <Button size="sm" onClick={() => setAction({ candidacy: item, approval: 'APPROVED' })}>
-                    Aprobar
+                /*
+                 * Dos decisiones a la vista y el resto en un menú.
+                 *
+                 * Antes había cuatro botones por tarjeta: con doscientos
+                 * perfiles eran ochocientos botones, y "A revisar" contra
+                 * "Pedir reemplazo" no las distingue nadie fuera del equipo.
+                 */
+                <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+                  <Button
+                    className="min-h-11 flex-1"
+                    disabled={guardando === item.id}
+                    onClick={() => decidirDirecto(item, 'APPROVED', decision)}
+                  >
+                    {guardando === item.id ? 'Guardando…' : 'Aprobar'}
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={() => setAction({ candidacy: item, approval: 'NEEDS_REVIEW' })}>
-                    A revisar
-                  </Button>
-                  <Button size="sm" variant="secondary" onClick={() => setAction({ candidacy: item, approval: 'REPLACEMENT_REQUESTED' })}>
-                    Pedir reemplazo
-                  </Button>
-                  <Button size="sm" variant="danger" onClick={() => setAction({ candidacy: item, approval: 'REJECTED' })}>
+                  <Button
+                    variant="danger"
+                    className="min-h-11 flex-1"
+                    disabled={guardando === item.id}
+                    onClick={() => setAction({ candidacy: item, approval: 'REJECTED' })}
+                  >
                     Rechazar
                   </Button>
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger
+                      className="grid min-h-11 min-w-11 place-items-center rounded-lg border border-ink-300 text-ink-600 transition-colors hover:bg-ink-50"
+                      aria-label={`Otras opciones para ${item.influencer.displayName}`}
+                      disabled={guardando === item.id}
+                    >
+                      <MoreHorizontal className="size-4" aria-hidden="true" />
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content
+                        align="end"
+                        sideOffset={6}
+                        className="z-50 w-56 rounded-xl border border-ink-200 bg-surface p-1 shadow-xl"
+                      >
+                        <DropdownMenu.Item
+                          onSelect={() => setAction({ candidacy: item, approval: 'NEEDS_REVIEW' })}
+                          className="cursor-pointer rounded-lg px-2.5 py-2 text-sm text-ink-800 outline-none data-[highlighted]:bg-ink-100"
+                        >
+                          Pedir más información
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          onSelect={() => setAction({ candidacy: item, approval: 'REPLACEMENT_REQUESTED' })}
+                          className="cursor-pointer rounded-lg px-2.5 py-2 text-sm text-ink-800 outline-none data-[highlighted]:bg-ink-100"
+                        >
+                          Pedir otro perfil en su lugar
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
                 </div>
               ) : (
-                <p className="mt-auto pt-1 text-xs text-ink-400">Tu rol es de sólo lectura.</p>
+                <p className="mt-auto pt-1 text-xs text-ink-500">Tu rol es de sólo lectura.</p>
               )}
             </li>
           )

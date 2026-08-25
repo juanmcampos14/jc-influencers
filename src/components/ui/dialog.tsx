@@ -21,12 +21,15 @@ export function DialogContent({
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[color:color-mix(in_srgb,var(--jc-text)_45%,transparent)] backdrop-blur-[1px]" />
       <DialogPrimitive.Content
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 w-[min(38rem,calc(100vw-2rem))] max-h-[calc(100vh-4rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-ink-200 bg-surface p-5 shadow-lg',
+          // `dvh` y no `vh`: en Safari de iPhone `100vh` incluye la barra del
+          // navegador, así que el pie del diálogo -- donde están Guardar y
+          // Cerrar -- quedaba debajo del borde visible.
+          'fixed left-1/2 top-1/2 z-50 flex w-[min(38rem,calc(100vw-2rem))] max-h-[calc(100dvh-3rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-ink-200 bg-surface shadow-lg',
           className,
         )}
         {...props}
       >
-        <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4 border-b border-ink-200 px-5 py-4">
           <div>
             <DialogPrimitive.Title className="text-base font-semibold text-ink-900">{title}</DialogPrimitive.Title>
             {description ? (
@@ -36,13 +39,13 @@ export function DialogContent({
             )}
           </div>
           <DialogPrimitive.Close
-            className="rounded-md p-1 text-ink-500 hover:bg-ink-100"
+            className="-m-2 grid size-11 place-items-center rounded-lg text-ink-500 hover:bg-ink-100"
             aria-label="Cerrar"
           >
             <X className="size-4" />
           </DialogPrimitive.Close>
         </div>
-        {children}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   )

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
 import { Card } from '@/components/ui/card'
+import { Pagination } from '@/components/ui/pagination'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
@@ -95,23 +95,14 @@ export default async function AuditPage({
                   </tbody>
                 </Table>
               </TableWrap>
-              <div className="flex items-center justify-between border-t border-ink-200 px-5 py-3 text-sm">
-                <p className="text-ink-500">
-                  {page.total} eventos · página {page.page} de {page.pageCount}
-                </p>
-                <div className="flex gap-2">
-                  {page.page > 1 ? (
-                    <Link href={`/auditoria?pagina=${page.page - 1}`} className="rounded-md border border-ink-300 px-3 py-1.5 hover:bg-ink-100">
-                      Anterior
-                    </Link>
-                  ) : null}
-                  {page.page < page.pageCount ? (
-                    <Link href={`/auditoria?pagina=${page.page + 1}`} className="rounded-md border border-ink-300 px-3 py-1.5 hover:bg-ink-100">
-                      Siguiente
-                    </Link>
-                  ) : null}
-                </div>
-              </div>
+              <Pagination
+                base="/auditoria"
+                params={params as Record<string, string | undefined>}
+                page={page.page}
+                pageCount={page.pageCount}
+                total={page.total}
+                unidad="eventos"
+              />
             </>
           )}
         </Card>

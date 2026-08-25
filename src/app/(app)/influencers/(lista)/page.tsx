@@ -3,10 +3,11 @@ import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Pagination } from '@/components/ui/pagination'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
-import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
+import { columnaFija, Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { ExternalLink, InfluencerStatusBadge } from '@/components/status-badge'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
@@ -102,7 +103,7 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                 <Table>
                   <thead>
                     <tr>
-                      <Th>Creador</Th>
+                      <Th className={columnaFija}>Creador</Th>
                       <Th>País</Th>
                       <Th>Nichos</Th>
                       <Th>Perfiles</Th>
@@ -116,7 +117,7 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                       const main = influencer.profiles[0]
                       return (
                         <Tr key={influencer.id}>
-                          <Td>
+                          <Td className={columnaFija}>
                             <div className="flex items-center gap-2.5">
                               <Avatar name={influencer.displayName} />
                               <div className="min-w-0">
@@ -175,29 +176,14 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                   </tbody>
                 </Table>
               </TableWrap>
-              <div className="flex items-center justify-between border-t border-ink-200 px-5 py-3 text-sm">
-                <p className="text-ink-500">
-                  {page.total} influencers · página {page.page} de {page.pageCount}
-                </p>
-                <div className="flex gap-2">
-                  {page.page > 1 ? (
-                    <Link
-                      href={`/influencers?${new URLSearchParams({ ...Object.fromEntries(query), pagina: String(page.page - 1) })}`}
-                      className="rounded-md border border-ink-300 px-3 py-1.5 hover:bg-ink-100"
-                    >
-                      Anterior
-                    </Link>
-                  ) : null}
-                  {page.page < page.pageCount ? (
-                    <Link
-                      href={`/influencers?${new URLSearchParams({ ...Object.fromEntries(query), pagina: String(page.page + 1) })}`}
-                      className="rounded-md border border-ink-300 px-3 py-1.5 hover:bg-ink-100"
-                    >
-                      Siguiente
-                    </Link>
-                  ) : null}
-                </div>
-              </div>
+              <Pagination
+                base="/influencers"
+                params={query}
+                page={page.page}
+                pageCount={page.pageCount}
+                total={page.total}
+                unidad="influencers"
+              />
             </>
           )}
         </Card>

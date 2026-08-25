@@ -175,8 +175,11 @@ export async function createCandidacyFor(options: {
         agencyRationale: 'Encaja con el brief.',
         internalNotes: 'NOTA INTERNA DE CANDIDATURA',
         budgetPrivateNotes: 'MARGEN INTERNO 40%',
-        budgetRequested: '1200',
-        budgetNegotiated: '900',
+        // Montos con decimales imposibles de encontrar por casualidad dentro de
+        // un identificador aleatorio. Antes eran 1200 y 900, y un cuid que
+        // contuviera "900" hacía fallar el test de fugas cada tanto.
+        budgetRequested: '1234.56',
+        budgetNegotiated: '987.65',
         currency: 'USD',
       },
     })

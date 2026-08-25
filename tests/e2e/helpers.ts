@@ -78,3 +78,26 @@ export async function resetRateLimits(): Promise<void> {
     await client.end()
   }
 }
+
+/**
+ * Devuelve las candidaturas de una campaña al estado "esperando decisión".
+ *
+ * La suite corre en serie contra una única base sembrada, así que un test que
+ * aprueba deja sin pendientes al siguiente. Cada test del portal arranca desde
+ * su propio punto de partida en vez de depender del orden.
+ */
+export async function resetAprobaciones(campaignName: string): Promise<void> {
+  const url = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL
+  if (!url) return
+  const client = new PgClient({ connectionString: url })
+  await client.connect()
+  try {
+    await client.query(
+      `UPDATE candidacies SET "clientApproval" = 'PENDING', "clientApprovalAt" = NULL
+       WHERE "campaignId" IN (SELECT id FROM campaigns WHERE name = $1)`,
+      [campaignName],
+    )
+  } finally {
+    await client.end()
+  }
+}

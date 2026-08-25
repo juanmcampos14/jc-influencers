@@ -92,6 +92,17 @@ export function AppShell({
   const [switching, startSwitch] = React.useTransition()
   const active = clients.find((client) => client.id === activeClientId)
 
+  // Escape cierra el menú: se abre a pantalla completa y quedarse sin salida
+  // con el teclado no es aceptable.
+  React.useEffect(() => {
+    if (!open) return
+    const alPresionar = (evento: KeyboardEvent) => {
+      if (evento.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', alPresionar)
+    return () => window.removeEventListener('keydown', alPresionar)
+  }, [open])
+
   function switchTo(clientId: string) {
     startSwitch(async () => {
       await switchClientAction({ clientId })
@@ -116,7 +127,11 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
-      <header className="zona-oscura flex items-center justify-between bg-nav px-4 py-3 lg:hidden">
+      {/*
+        * Pegado arriba: sin esto, para cambiar de sección desde el medio de una
+        * tabla de doscientas filas había que subir hasta el principio.
+        */}
+      <header className="zona-oscura sticky top-0 z-40 flex items-center justify-between bg-nav px-4 py-3 lg:hidden">
         {marca}
         <button
           type="button"

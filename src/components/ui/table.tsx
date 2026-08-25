@@ -5,6 +5,14 @@ export function TableWrap({ className, ...props }: React.HTMLAttributes<HTMLDivE
   return <div className={cn('w-full overflow-x-auto', className)} {...props} />
 }
 
+/**
+ * Primera columna anclada al borde izquierdo.
+ *
+ * En una tabla de once columnas, al desplazarse a la derecha se pierde de vista
+ * de quién es cada fila. Se aplica en `Th` y `Td` de la primera columna.
+ */
+export const columnaFija = 'sticky left-0 z-20 bg-surface'
+
 export function Table({ className, ...props }: React.TableHTMLAttributes<HTMLTableElement>) {
   return <table className={cn('w-full border-collapse text-sm', className)} {...props} />
 }
