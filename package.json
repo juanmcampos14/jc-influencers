@@ -28,7 +28,8 @@
     "docs:permisos": "tsx --conditions=react-server scripts/print-permissions.ts > docs/03-roles-y-permisos.md",
     "db:check": "tsx --conditions=react-server scripts/check-production-db.ts",
     "verify:build": "bash scripts/verify-build.sh",
-    "db:bootstrap": "tsx --conditions=react-server scripts/bootstrap-production.ts"
+    "db:bootstrap": "tsx --conditions=react-server scripts/bootstrap-production.ts",
+    "scouting:check": "tsx --conditions=react-server scripts/check-brightdata.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
