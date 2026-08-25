@@ -7,6 +7,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/authz/erro
 import { AUDIT, recordAudit } from '@/lib/audit'
 import { fieldPermissionsFor, toInfluencerDto, type InfluencerDto } from '@/lib/domain/dto'
 import { nameSimilarity, normalizeHandle, parseProfileUrl } from '@/lib/domain/normalize'
+import { STALE_METRIC_DAYS } from '@/lib/domain/statuses'
 import { actorOf, assertUpdated, normalizePagination, paginate, scoped, skipTake, type Paginated, type Tx } from './base'
 
 const INCLUDE = {
@@ -669,5 +670,84 @@ export async function mergeInfluencers(
       conflictedCandidacies: candidaturasOrigen.length - aMover.length,
       conflictedProfiles: perfilesOrigen.length - perfilesAMover.length,
     }
+  })
+}
+
+/**
+ * Borra un influencer, de verdad.
+ *
+ * Existe para lo que la fusión no resuelve: filas basura de una importación --
+ * un nombre mal parseado, una fila de encabezado que entró como persona -- que
+ * no son duplicado de nadie y sólo ensucian la base.
+ *
+ * Se niega si participó de alguna campaña, y eso NO es una precaución de más:
+ * la base tiene la relación en `Restrict`, así que el borrado fallaría igual,
+ * pero con un error de motor en vez de una explicación. Para esos casos está la
+ * fusión, que conserva la historia.
+ */
+export async function deleteInfluencer(ctx: AuthContext, influencerId: string): Promise<{ displayName: string }> {
+  assertAgency(ctx)
+  assertCan(ctx, 'influencer.manage', null)
+
+  return scoped(ctx, async (tx) => {
+    const influencer = await tx.influencer.findUnique({
+      where: { id: influencerId },
+      select: { id: true, displayName: true, _count: { select: { candidacies: true } } },
+    })
+    if (!influencer) throw new NotFoundError()
+
+    if (influencer._count.candidacies > 0) {
+      throw new ValidationError(
+        `${influencer.displayName} participó de ${influencer._count.candidacies} ${
+          influencer._count.candidacies === 1 ? 'campaña' : 'campañas'
+        }. Borrarlo dejaría esas campañas sin parte de su historia. Si es un duplicado, fusionalo; si ya no trabajás con él, archivalo.`,
+      )
+    }
+
+    await recordAudit(tx, actorOf(ctx), {
+      action: AUDIT.INFLUENCER_DELETED,
+      entityType: 'Influencer',
+      entityId: influencer.id,
+      before: { displayName: influencer.displayName },
+    })
+    await tx.influencer.delete({ where: { id: influencer.id } })
+    return { displayName: influencer.displayName }
+  })
+}
+
+/**
+ * Cifras de la base de influencers.
+ *
+ * Se cuentan en la base, no sobre la página que se está viendo: sumar treinta
+ * filas y llamar a eso "total" es la forma más silenciosa de mentir.
+ */
+export type ResumenDeLaBase = {
+  total: number
+  /** Coinciden con los filtros aplicados ahora mismo. */
+  filtrados: number
+  activos: number
+  /** Perfiles cuya última medición tiene más de 45 días, o que nunca se midió. */
+  sinActualizar: number
+  duplicadosAbiertos: number
+}
+
+export async function resumenDeLaBase(
+  ctx: AuthContext,
+  filtrados: number,
+): Promise<ResumenDeLaBase> {
+  assertAgency(ctx)
+  assertCan(ctx, 'influencer.view', null)
+  const desactualizadoAntesDe = new Date(Date.now() - STALE_METRIC_DAYS * 24 * 60 * 60 * 1000)
+
+  return scoped(ctx, async (tx) => {
+    const [total, activos, sinActualizar, duplicadosAbiertos] = await Promise.all([
+      tx.influencer.count(),
+      tx.influencer.count({ where: { status: 'ACTIVE' } }),
+      tx.socialProfile.count({
+        where: { OR: [{ measuredAt: null }, { measuredAt: { lt: desactualizadoAntesDe } }] },
+      }),
+      tx.influencerDuplicate.count({ where: { status: 'OPEN' } }),
+    ])
+    return { total, filtrados, activos, sinActualizar, duplicadosAbiertos }
   })
 }

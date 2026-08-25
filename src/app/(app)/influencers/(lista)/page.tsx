@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Stat, StatStrip } from '@/components/ui/stat'
 import { Pagination } from '@/components/ui/pagination'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -13,7 +14,7 @@ import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
 import { can } from '@/lib/authz/context'
 import { listCampaigns } from '@/lib/repos/campaigns'
-import { searchInfluencers } from '@/lib/repos/influencers'
+import { resumenDeLaBase, searchInfluencers } from '@/lib/repos/influencers'
 import { scoped } from '@/lib/repos/base'
 import { formatFollowers, formatPercent } from '@/lib/util/format'
 import { InfluencerFilters } from '../filters'
@@ -40,7 +41,7 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
   const ctx = await requireContext()
 
   // Un usuario sin acceso a la base global recibe 404, no una pantalla vacía.
-  const { niches, countries, page, campanas } = await loadPage(async () => {
+  const { niches, countries, page, campanas, resumen } = await loadPage(async () => {
     const [nicheRows, countryRows] = await Promise.all([
       scoped(ctx, (tx) => tx.niche.findMany({ where: { active: true }, orderBy: { order: 'asc' } })),
       scoped(ctx, (tx) =>
@@ -71,7 +72,9 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
     // era una lista para mirar: encontrabas a alguien útil y no podías hacer
     // nada con eso.
     const campanas = await listCampaigns(ctx, { status: ['DRAFT', 'BRIEFING', 'SCOUTING', 'PROPOSAL'] as never }, { pageSize: 50 })
-    return { niches: nicheRows, countries: countryRows, page: results, campanas }
+    // Contadas en la base, no sumadas de la página que se está viendo.
+    const resumen = await resumenDeLaBase(ctx, results.total)
+    return { niches: nicheRows, countries: countryRows, page: results, campanas, resumen }
   })
 
   const canManage = can(ctx, 'influencer.manage', null)
@@ -95,6 +98,22 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
         }
       />
       <div className="space-y-4 px-5 py-6 sm:px-8">
+        <StatStrip>
+          <Stat
+            label="En la base"
+            value={resumen.total}
+            hint={resumen.filtrados !== resumen.total ? `${resumen.filtrados} con los filtros puestos` : undefined}
+          />
+          <Stat label="Activos" value={resumen.activos} tone="good" />
+          <Stat
+            label="Sin actualizar"
+            value={resumen.sinActualizar}
+            tone="warn"
+            hint="Perfiles medidos hace más de 45 días"
+          />
+          <Stat label="Duplicados sin resolver" value={resumen.duplicadosAbiertos} tone="accent" />
+        </StatStrip>
+
         <InfluencerFilters
           niches={niches.map((n) => ({ key: n.key, label: n.label }))}
           countries={countries.map((c) => c.country).filter((c): c is string => Boolean(c))}

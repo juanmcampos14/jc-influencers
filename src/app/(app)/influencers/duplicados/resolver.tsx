@@ -4,7 +4,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Trash2 } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,7 @@ import { ConfirmButton } from '@/components/ui/confirm'
 import { InfluencerStatusBadge } from '@/components/status-badge'
 import { platformLabel } from '@/lib/domain/labels'
 import { cn, formatFollowers } from '@/lib/util/format'
-import { dismissDuplicateAction, mergeInfluencersAction } from '../../actions/influencers'
+import { deleteInfluencerAction, dismissDuplicateAction, mergeInfluencersAction } from '../../actions/influencers'
 
 export type LadoDelPar = {
   id: string
@@ -74,6 +74,24 @@ export function ResolverDuplicado({
     })
   }
 
+  /*
+   * Borrar es distinto de fusionar. Sirve para la fila basura de una
+   * importación: un nombre mal parseado que no es duplicado de nadie y no
+   * participó de ninguna campaña. Sólo se ofrece cuando eso se cumple, porque
+   * borrar a alguien con historia dejaría campañas incompletas.
+   */
+  function borrar() {
+    startTransition(async () => {
+      const resultado = await deleteInfluencerAction({ influencerId: absorbido.id })
+      if (!resultado.ok) {
+        toast.error(resultado.message)
+        return
+      }
+      toast.success(`${resultado.data.displayName} borrado de la base.`)
+      router.refresh()
+    })
+  }
+
   function descartar() {
     startTransition(async () => {
       const resultado = await dismissDuplicateAction({ duplicateId, notes: 'Revisado: no son la misma persona.' })
@@ -130,6 +148,27 @@ export function ResolverDuplicado({
               No son duplicados
             </Button>
           </ConfirmButton>
+
+          {absorbido.candidacies === 0 ? (
+            <ConfirmButton
+              title={`Borrar ${absorbido.displayName}`}
+              description={`Se borra de la base y no se puede deshacer. Es seguro porque no participó de ninguna campaña: no hay historia que perder. ${sobrevive.displayName} no se toca.`}
+              confirmLabel="Borrar definitivamente"
+              tone="danger"
+              onConfirm={borrar}
+              pending={pendiente}
+            >
+              <Button size="sm" variant="ghost" disabled={pendiente} className="w-full text-rose-700 hover:bg-rose-50">
+                <Trash2 className="size-4" aria-hidden="true" />
+                Borrar el repetido
+              </Button>
+            </ConfirmButton>
+          ) : (
+            <p className="text-[11px] leading-snug text-ink-500">
+              {absorbido.displayName} no se puede borrar: participó de{' '}
+              {absorbido.candidacies === 1 ? '1 campaña' : `${absorbido.candidacies} campañas`}.
+            </p>
+          )}
         </div>
       ) : null}
     </div>

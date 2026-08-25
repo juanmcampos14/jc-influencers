@@ -161,3 +161,57 @@ describe('Fusión de influencers duplicados', () => {
     expect(evento?.entityId).toBe(bueno)
   })
 })
+
+describe('Borrado de influencers', () => {
+  let admin: AuthContext
+  let clientId: string
+
+  beforeEach(async () => {
+    await resetDatabase()
+    await seedCatalogs()
+    clientId = (await createClientTenant('Marca')).id
+    admin = await contextFor((await createUser({ agencyRole: 'AGENCY_ADMIN' })).id)
+  })
+
+  it('borra una fila basura que no participó de nada', async () => {
+    const basura = await withSystemScope((tx) =>
+      tx.influencer.create({ data: { displayName: 'Nombre mal parseado' } }),
+    )
+    const { deleteInfluencer } = await import('@/lib/repos/influencers')
+
+    await deleteInfluencer(admin, basura.id)
+
+    const quedo = await withSystemScope((tx) => tx.influencer.findUnique({ where: { id: basura.id } }))
+    expect(quedo).toBeNull()
+  })
+
+  it('se niega a borrar a alguien que participó de una campaña', async () => {
+    // Borrarlo dejaría esa campaña sin parte de su historia. La base también lo
+    // impide (relación en Restrict), pero el mensaje tiene que explicarlo.
+    const conHistoria = await withSystemScope((tx) => tx.influencer.create({ data: { displayName: 'Con historia' } }))
+    const campana = await withSystemScope((tx) =>
+      tx.campaign.create({ data: { clientId, name: 'C', slug: `c-${Date.now()}`, currency: 'USD' } }),
+    )
+    await withSystemScope((tx) =>
+      tx.candidacy.create({ data: { campaignId: campana.id, clientId, influencerId: conHistoria.id, statusKey: 'PROPUESTO' } }),
+    )
+    const { deleteInfluencer } = await import('@/lib/repos/influencers')
+
+    await expect(deleteInfluencer(admin, conHistoria.id)).rejects.toThrow(/campaña/)
+
+    const sigue = await withSystemScope((tx) => tx.influencer.findUnique({ where: { id: conHistoria.id } }))
+    expect(sigue).not.toBeNull()
+  })
+
+  it('deja registro de lo borrado antes de borrarlo', async () => {
+    const basura = await withSystemScope((tx) => tx.influencer.create({ data: { displayName: 'Basura auditada' } }))
+    const { deleteInfluencer } = await import('@/lib/repos/influencers')
+    await deleteInfluencer(admin, basura.id)
+
+    const evento = await withSystemScope((tx) =>
+      tx.auditLog.findFirst({ where: { action: 'influencer.deleted' }, orderBy: { occurredAt: 'desc' } }),
+    )
+    // La fila ya no existe: el registro es lo único que queda de ella.
+    expect(JSON.stringify(evento?.before)).toContain('Basura auditada')
+  })
+})

@@ -3,7 +3,14 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { defineAction } from '@/lib/actions/define'
-import { createInfluencer, dismissDuplicate, mergeInfluencers, updateInfluencer, upsertSocialProfile } from '@/lib/repos/influencers'
+import {
+  createInfluencer,
+  deleteInfluencer,
+  dismissDuplicate,
+  mergeInfluencers,
+  updateInfluencer,
+  upsertSocialProfile,
+} from '@/lib/repos/influencers'
 
 const influencerFields = {
   displayName: z.string().trim().min(2, 'El nombre es obligatorio.').max(160),
@@ -88,6 +95,16 @@ export const mergeInfluencersAction = defineAction(
     revalidatePath('/influencers/duplicados')
     revalidatePath('/influencers')
     revalidatePath(`/influencers/${resultado.survivorId}`)
+    return resultado
+  },
+)
+
+export const deleteInfluencerAction = defineAction(
+  z.object({ influencerId: z.string().min(1).max(60) }),
+  async (input, ctx) => {
+    const resultado = await deleteInfluencer(ctx, input.influencerId)
+    revalidatePath('/influencers')
+    revalidatePath('/influencers/duplicados')
     return resultado
   },
 )
