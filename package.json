@@ -26,7 +26,8 @@
     "setup": "bash scripts/setup.sh",
     "verify": "npm run lint && npm run typecheck && npm run test",
     "docs:permisos": "tsx --conditions=react-server scripts/print-permissions.ts > docs/03-roles-y-permisos.md",
-    "db:check": "tsx --conditions=react-server scripts/check-production-db.ts"
+    "db:check": "tsx --conditions=react-server scripts/check-production-db.ts",
+    "verify:build": "bash scripts/verify-build.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",

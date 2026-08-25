@@ -107,6 +107,17 @@ Si el DNS está en Donweb, el registro es un `CNAME` hacia `cname.vercel-dns.com
 
 ---
 
+## 3.bis Antes de pushear
+
+```bash
+npm run verify        # lint, tipos y tests
+npm run verify:build  # que compile SIN variables de entorno
+```
+
+El segundo importa más de lo que parece: Vercel compila **antes** de que existan las variables de
+entorno de ejecución. Dos veces se rompió el build por código que necesitaba `DATABASE_URL` en tiempo
+de compilación. Ese comando reproduce esa condición.
+
 ## 4. Primer despliegue
 
 ```bash
@@ -161,3 +172,5 @@ Y una comprobación a mano: entrar con un usuario de cliente y confirmar que ve 
 | `too many connections` | `DATABASE_URL` apunta al puerto 5432 en vez del pooler 6543 |
 | Las invitaciones no llegan | `EMAIL_DRIVER` sigue en `console`, o falta SPF/DKIM en el dominio |
 | Los logos desaparecen | `STORAGE_DRIVER` quedó en `local` |
+| `The deployment was blocked because <usuario> does not have a Vercel account linked` | El **autor del commit** es un usuario de GitHub distinto al de la cuenta de Vercel. Se arregla con `git config user.email` correcto en el repo, o desactivando *Git Author Verification* en Vercel |
+| `Command "npm run build" exited with 1` | Algo del build necesita variables que todavía no están. `npm run verify:build` lo reproduce local |

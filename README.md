@@ -39,6 +39,7 @@ npm run setup
 | `npm run dev` | Servidor de desarrollo en el puerto 3100 |
 | `npm run build` / `npm start` | Compilación y arranque de producción |
 | `npm run verify` | Lint + TypeScript + tests unitarios y de integración |
+| `npm run verify:build` | Comprueba que compile **sin** variables de entorno, que es como compila Vercel |
 | `npm test` | Vitest (unitarios + integración contra PostgreSQL real) |
 | `npm run test:e2e` | Playwright de punta a punta |
 | `npm run db:migrate` | Aplica migraciones pendientes |
