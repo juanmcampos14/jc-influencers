@@ -1,3 +1,4 @@
+import type * as React from 'react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -6,11 +7,15 @@ import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { InfoNote } from '@/components/ui/states'
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
-import { ApprovalBadge, ExternalLink, StatusBadge, INFLUENCER_STATUS_LABELS } from '@/components/status-badge'
+import { ApprovalBadge, ExternalLink, StatusBadge, InfluencerStatusBadge } from '@/components/status-badge'
 import { requireContext } from '@/lib/auth/current'
 import { can } from '@/lib/authz/context'
 import { NotFoundError } from '@/lib/authz/errors'
 import { getInfluencer } from '@/lib/repos/influencers'
+import { scoped } from '@/lib/repos/base'
+import { listCampaigns } from '@/lib/repos/campaigns'
+import { EditarFicha } from './editar-ficha'
+import { AgregarACampana } from './agregar-a-campana'
 import { formatDate, formatDateTime, formatFollowers, formatPercent } from '@/lib/util/format'
 import { AddProfileDialog } from './add-profile-dialog'
 
@@ -36,6 +41,22 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
   }
 
   const canManage = can(ctx, 'influencer.manage', null)
+
+  // El catálogo de nichos, para poder editarlos. El DTO trae las etiquetas, no
+  // las claves, así que se traducen contra el catálogo -- que es donde las
+  // etiquetas son únicas.
+  const niches = canManage
+    ? await scoped(ctx, (tx) => tx.niche.findMany({ where: { active: true }, orderBy: { order: 'asc' } }))
+    : []
+  const clavesDeNicho = niches.filter((n) => influencer.niches.includes(n.label)).map((n) => n.key)
+
+  // Campañas abiertas donde este usuario puede sumar gente.
+  const campanas = canManage
+    ? await listCampaigns(ctx, { status: ['DRAFT', 'BRIEFING', 'SCOUTING', 'PROPOSAL'] as never }, { pageSize: 50 })
+    : null
+  const campanasElegibles = (campanas?.items ?? [])
+    .filter((campana) => can(ctx, 'candidate.manage', campana.clientId))
+    .map((campana) => ({ id: campana.id, name: campana.name, clientName: campana.clientName }))
   const openDuplicates = influencer.duplicates.filter((duplicate) => duplicate.status === 'OPEN')
 
   return (
@@ -49,7 +70,37 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
             Influencers
           </Link>
         }
-        actions={canManage ? <AddProfileDialog influencerId={influencer.id} /> : null}
+        actions={
+          canManage ? (
+            <>
+              <EditarFicha
+                ficha={{
+                  id: influencer.id,
+                  version: influencer.version,
+                  displayName: influencer.displayName,
+                  realName: influencer.realName ?? null,
+                  primaryHandle: influencer.primaryHandle ?? null,
+                  country: influencer.country ?? null,
+                  city: influencer.city ?? null,
+                  language: influencer.language ?? null,
+                  bio: influencer.bio ?? null,
+                  status: influencer.status,
+                  adultStatus: influencer.adultStatus,
+                  representative: influencer.representative ?? null,
+                  internalNotes: influencer.internalNotes ?? null,
+                  nicheKeys: clavesDeNicho,
+                }}
+                niches={niches.map((n) => ({ key: n.key, label: n.label }))}
+              />
+              <AgregarACampana
+                influencerId={influencer.id}
+                nombre={influencer.displayName}
+                campanas={campanasElegibles}
+              />
+              <AddProfileDialog influencerId={influencer.id} />
+            </>
+          ) : null
+        }
       />
 
       <div className="space-y-6 px-5 py-6 sm:px-8">
@@ -235,7 +286,7 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
                   <Row label="Ciudad" value={influencer.city} />
                   <Row label="Idioma" value={influencer.language} />
                   <Row label="Representante" value={influencer.representative} />
-                  <Row label="Estado" value={INFLUENCER_STATUS_LABELS[influencer.status]?.label ?? influencer.status} />
+                  <Row label="Estado" value={<InfluencerStatusBadge status={influencer.status} />} />
                   <Row label="Edad" value={ADULT_LABELS[influencer.adultStatus] ?? influencer.adultStatus} />
                 </dl>
                 {influencer.niches.length > 0 ? (
@@ -300,7 +351,7 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
   )
 }
 
-function Row({ label, value }: { label: string; value: string | null | undefined }) {
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-4">
       <dt className="text-xs text-ink-500">{label}</dt>

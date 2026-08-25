@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Stat, StatStrip } from '@/components/ui/stat'
 import { Button } from '@/components/ui/button'
 import { InfoNote } from '@/components/ui/states'
-import { CampaignStatusBadge } from '@/components/status-badge'
+import { EstadoDeCampana } from './estado-campana'
 import { requireContext } from '@/lib/auth/current'
 import { can } from '@/lib/authz/context'
 import { NotFoundError } from '@/lib/authz/errors'
@@ -105,7 +105,14 @@ export default async function CampaignDetailPage({
       <PageHeader
         title={campaign.name}
         variant="nombre"
-        badge={<CampaignStatusBadge status={campaign.status} />}
+        badge={
+          <EstadoDeCampana
+            campaignId={campaign.id}
+            status={campaign.status}
+            version={campaign.version}
+            puedeEditar={can(ctx, 'campaign.update', clientId)}
+          />
+        }
         description={campaign.objective ?? campaign.description ?? undefined}
         breadcrumb={
           <span className="flex gap-1">

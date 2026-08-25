@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { defineAction } from '@/lib/actions/define'
-import { createCampaign, updateCampaign, upsertBrief } from '@/lib/repos/campaigns'
+import { changeCampaignStatus, createCampaign, updateCampaign, upsertBrief } from '@/lib/repos/campaigns'
 
 const CAMPAIGN_STATUS = z.enum([
   'DRAFT',
@@ -113,6 +113,29 @@ export const saveBriefAction = defineAction(
     const { campaignId, ...rest } = input
     await upsertBrief(ctx, campaignId, rest)
     revalidatePath(`/campanas/${campaignId}`)
+    return { ok: true }
+  },
+)
+
+/**
+ * Cambiar sólo el estado de una campaña.
+ *
+ * `updateCampaignAction` pide la campaña completa, así que para mover una de
+ * Brief a Scouting había que reenviar nombre, fechas, presupuesto y todo lo
+ * demás. Eso hacía que el cambio de estado -- que es lo que más se hace --
+ * fuera lo más caro de hacer, y terminó no habiendo pantalla para hacerlo:
+ * toda campaña envejecía marcada como "Brief" y la lista se volvía mentira.
+ */
+export const changeCampaignStatusAction = defineAction(
+  z.object({
+    campaignId: z.string().min(1).max(60),
+    version: z.number().int().min(1),
+    status: CAMPAIGN_STATUS,
+  }),
+  async (input, ctx) => {
+    await changeCampaignStatus(ctx, input.campaignId, input.status, input.version)
+    revalidatePath('/campanas')
+    revalidatePath(`/campanas/${input.campaignId}`)
     return { ok: true }
   },
 )

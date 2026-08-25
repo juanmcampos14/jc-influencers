@@ -2,7 +2,7 @@ import 'server-only'
 import type { CampaignStatus } from '@/generated/prisma/enums'
 import type { AuthContext } from '@/lib/authz/context'
 import { assertCan, assertClientInScope, capabilitiesFor } from '@/lib/authz/context'
-import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/authz/errors'
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/authz/errors'
 import { AUDIT, recordAudit } from '@/lib/audit'
 import { slugify } from '@/lib/domain/normalize'
 import { fieldPermissionsFor, toCampaignDto, type CampaignDto } from '@/lib/domain/dto'
@@ -497,6 +497,45 @@ export async function upsertBrief(ctx: AuthContext, campaignId: string, input: B
       clientId,
       before: before ? { followersMin: before.followersMin, followersMax: before.followersMax } : undefined,
       after: { followersMin: data.followersMin, followersMax: data.followersMax },
+    })
+  })
+}
+
+/**
+ * Mueve una campaña de estado, sin tocar nada más.
+ *
+ * Es la operación más repetida sobre una campaña -- Brief → Scouting →
+ * Propuesta → Cerrada -- y además es lo que ordena la lista. No tenía forma de
+ * hacerse: el estado se elegía en el alta y quedaba congelado ahí.
+ */
+export async function changeCampaignStatus(
+  ctx: AuthContext,
+  campaignId: string,
+  status: CampaignStatus,
+  version: number,
+): Promise<void> {
+  const current = await scoped(ctx, (tx) => tx.campaign.findUnique({ where: { id: campaignId } }))
+  if (!current) throw new NotFoundError()
+  assertClientInScope(ctx, current.clientId)
+  assertCan(ctx, 'campaign.update', current.clientId)
+  if (current.status === status) return
+
+  await scoped(ctx, async (tx) => {
+    const result = await tx.campaign.updateMany({
+      where: { id: campaignId, clientId: current.clientId, version },
+      data: { status, version: { increment: 1 } },
+    })
+    // El bloqueo optimista existe para que dos personas no se pisen: si alguien
+    // más la movió mientras tanto, se avisa en vez de sobrescribir.
+    if (result.count === 0) throw new ConflictError()
+
+    await recordAudit(tx, actorOf(ctx), {
+      action: AUDIT.CAMPAIGN_UPDATED,
+      entityType: 'Campaign',
+      entityId: campaignId,
+      clientId: current.clientId,
+      before: { status: current.status },
+      after: { status },
     })
   })
 }
