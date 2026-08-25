@@ -72,6 +72,7 @@ export default async function ClientsPage() {
                     <Th className="text-right">Campañas activas / total</Th>
                     <Th className="text-right">Esperando decisión</Th>
                     <Th className="text-right">Accesos</Th>
+                    <Th>Identidad visual</Th>
                     <Th>Permisos</Th>
                   </tr>
                 </thead>
@@ -79,12 +80,24 @@ export default async function ClientsPage() {
                   {clients.map((client) => (
                     <Tr key={client.id}>
                       <Td>
-                        <Link
-                          href={`/clientes/${client.id}`}
-                          className="font-medium text-ink-900 underline-offset-4 hover:underline"
-                        >
-                          {client.name}
-                        </Link>
+                        <span className="flex items-center gap-2.5">
+                          {/*
+                            * Punto de color con la marca del cliente. Sin él no
+                            * había forma de ver a cuáles les falta su identidad
+                            * sin entrar uno por uno.
+                            */}
+                          <span
+                            aria-hidden="true"
+                            className="size-2.5 shrink-0 rounded-full border border-ink-300"
+                            style={client.brandColor ? { backgroundColor: client.brandColor } : undefined}
+                          />
+                          <Link
+                            href={`/clientes/${client.id}`}
+                            className="font-medium text-ink-900 underline-offset-4 hover:underline"
+                          >
+                            {client.name}
+                          </Link>
+                        </span>
                         {/* El slug es un identificador técnico: se ve en el
                             detalle, no hace falta repetirlo en la lista. */}
                       </Td>
@@ -116,6 +129,18 @@ export default async function ClientsPage() {
                           </Link>
                         ) : (
                           client.userCount
+                        )}
+                      </Td>
+                      <Td className="text-xs">
+                        {client.brandColor ? (
+                          <span className="text-ink-600">Propia</span>
+                        ) : (
+                          <Link
+                            href={`/clientes/${client.id}/marca`}
+                            className="text-amber-700 underline decoration-amber-300 underline-offset-4 hover:decoration-amber-700"
+                          >
+                            Sin configurar
+                          </Link>
                         )}
                       </Td>
                       <Td>

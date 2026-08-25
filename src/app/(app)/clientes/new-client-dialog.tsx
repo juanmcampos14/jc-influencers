@@ -35,9 +35,17 @@ export function NewClientDialog() {
         toast.error(result.message)
         return
       }
-      toast.success('Cliente creado.')
+      /*
+       * Se va derecho a cargar la identidad visual.
+       *
+       * Antes el diálogo se cerraba y volvías a la lista, y el acceso para
+       * darle su diseño estaba al fondo de la ficha del cliente, a dos mil
+       * píxeles de scroll. El momento de definir cómo se ve el espacio de un
+       * cliente es justo cuando lo creás, no un día que te acordás.
+       */
+      toast.success('Cliente creado. Ahora dale su identidad visual.')
       setOpen(false)
-      router.refresh()
+      router.push(`/clientes/${result.data.id}/marca`)
     })
   }
 

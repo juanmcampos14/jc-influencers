@@ -20,6 +20,14 @@ export type ClientSummary = {
   activeCampaignCount: number
   userCount: number
   version: number
+  /**
+   * Color de marca aplicado, o null si el espacio usa el tema neutro de JC.
+   *
+   * Con treinta clientes, un punto de color deja ver de un vistazo a cuáles les
+   * falta su identidad. Antes había que entrar a cada uno y bajar hasta el
+   * fondo de la ficha para saberlo.
+   */
+  brandColor: string | null
 }
 
 export async function listClients(ctx: AuthContext): Promise<ClientSummary[]> {
@@ -30,6 +38,7 @@ export async function listClients(ctx: AuthContext): Promise<ClientSummary[]> {
       include: {
         _count: { select: { memberships: true } },
         campaigns: { select: { status: true } },
+        brand: { select: { primary: true, status: true } },
       },
     })
     return rows.map((row) => ({
@@ -46,6 +55,7 @@ export async function listClients(ctx: AuthContext): Promise<ClientSummary[]> {
       activeCampaignCount: row.campaigns.filter((c) => c.status !== 'CLOSED' && c.status !== 'CANCELLED').length,
       userCount: row._count.memberships,
       version: row.version,
+      brandColor: row.brand?.status === 'APPROVED' ? row.brand.primary : null,
     }))
   })
 }

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/app-shell'
 import { Card, CardDescription, CardBody, CardHeader, CardTitle } from '@/components/ui/card'
+import { Palette } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { Stat, StatStrip } from '@/components/ui/stat'
@@ -56,6 +57,16 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
           <Link href="/clientes" className="hover:underline">
             Clientes
           </Link>
+        }
+        actions={
+          canManage ? (
+            <Button asChild variant={brand.status === 'APPROVED' ? 'secondary' : 'primary'} size="sm">
+              <Link href={`/clientes/${clientId}/marca`}>
+                <Palette className="size-4" aria-hidden="true" />
+                {brand.status === 'APPROVED' ? 'Identidad visual' : 'Darle su identidad visual'}
+              </Link>
+            </Button>
+          ) : null
         }
       />
       <div className="grid gap-6 px-5 py-6 sm:px-8 lg:grid-cols-3">
