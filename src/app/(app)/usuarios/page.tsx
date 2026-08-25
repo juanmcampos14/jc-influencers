@@ -2,16 +2,18 @@ import type { Metadata } from 'next'
 import { PageHeader } from '@/components/app-shell'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Stat, StatStrip } from '@/components/ui/stat'
 import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
 import { can } from '@/lib/authz/context'
-import { AGENCY_ROLE_LABELS, CLIENT_ROLE_LABELS } from '@/lib/authz/capabilities'
-import { listInvitations, listUsers } from '@/lib/repos/users'
+import { AGENCY_ROLE_LABELS, CLIENT_ROLE_LABELS, capabilityLabel } from '@/lib/authz/capabilities'
+import { listInvitations, listUsers, resumenDeAccesos } from '@/lib/repos/users'
 import { formatDate, formatDateTime } from '@/lib/util/format'
 import { InviteDialog } from './invite-dialog'
 import { UserActions } from './user-actions'
+import { EditarAccesos } from './editar-accesos'
 import { RevokeInvitationButton } from './revoke-invitation-button'
 
 export const metadata: Metadata = { title: 'Usuarios' }
@@ -29,10 +31,12 @@ export default async function UsersPage() {
   const canInvite = can(ctx, 'user.invite', null) || ctx.clients.some((client) => can(ctx, 'user.invite', client.id))
   const canManageMemberships = ctx.allClients && can(ctx, 'membership.manage', null)
 
-  const [users, invitations] = await loadPage(() =>
+  const [users, invitations, resumen] = await loadPage(() =>
     Promise.all([
-    listUsers(ctx, null),
+      listUsers(ctx, null),
       canInvite ? listInvitations(ctx, null) : Promise.resolve([]),
+      // Contadas en la base: las listas están acotadas y sumarlas mentiría.
+      resumenDeAccesos(ctx),
     ]),
   )
 
@@ -57,6 +61,17 @@ export default async function UsersPage() {
       />
 
       <div className="space-y-6 px-5 py-6 sm:px-8">
+        <StatStrip>
+          <Stat label="Personas con acceso" value={resumen.activas} />
+          <Stat label="Desactivadas" value={resumen.desactivadas} />
+          <Stat label="Invitaciones pendientes" value={resumen.invitacionesPendientes} />
+          <Stat
+            label="Vencen esta semana"
+            value={resumen.vencenPronto}
+            tone="warn"
+            hint="Después hay que volver a invitar"
+          />
+        </StatStrip>
         <Card>
           <CardHeader>
             <CardTitle>Personas con acceso</CardTitle>
@@ -89,7 +104,7 @@ export default async function UsersPage() {
                           <div className="mt-1 flex flex-wrap gap-1">
                             {user.agencyExtras.map((extra) => (
                               <Badge key={extra} tone="violet">
-                                {extra}
+                                {capabilityLabel(extra)}
                               </Badge>
                             ))}
                           </div>
@@ -129,9 +144,27 @@ export default async function UsersPage() {
                       {canManageMemberships ? (
                         <Td>
                           {user.id === ctx.user.id ? (
-                            <span className="text-xs text-ink-400">vos</span>
+                            <Badge tone="slate">Sos vos</Badge>
                           ) : (
-                            <UserActions userId={user.id} name={user.name} active={user.status === 'ACTIVE'} />
+                            <div className="flex items-center gap-1">
+                              <EditarAccesos
+                                acceso={{
+                                  userId: user.id,
+                                  name: user.name,
+                                  agencyRole: user.agencyRole ?? null,
+                                  agencyExtras: user.agencyExtras,
+                                  agencyClientIds: user.agencyClients.map((entry) => entry.clientId),
+                                  clientMemberships: user.clients.map((entry) => ({
+                                    clientId: entry.clientId,
+                                    clientName: entry.clientName,
+                                    role: entry.role,
+                                    extras: entry.extras ?? [],
+                                  })),
+                                }}
+                                clients={ctx.clients.map((c) => ({ id: c.id, name: c.name }))}
+                              />
+                              <UserActions userId={user.id} name={user.name} active={user.status === 'ACTIVE'} />
+                            </div>
                           )}
                         </Td>
                       ) : null}

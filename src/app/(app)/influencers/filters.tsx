@@ -1,5 +1,6 @@
 "use client"
 
+import { useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/field'
@@ -17,6 +18,12 @@ export function InfluencerFilters({
 }) {
   const router = useRouter()
   const params = useSearchParams()
+  /*
+   * Sin esto, tocar "Filtrar" no producía ningún cambio visible hasta que
+   * volvía el servidor: la lista quedaba igual y no había forma de saber si el
+   * clic se registró.
+   */
+  const [filtrando, startTransition] = useTransition()
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -26,7 +33,7 @@ export function InfluencerFilters({
       const value = String(form.get(key) ?? '').trim()
       if (value) next.set(key, value)
     }
-    router.push(`/influencers?${next.toString()}`)
+    startTransition(() => router.push(`/influencers?${next.toString()}`))
   }
 
   return (
@@ -107,8 +114,8 @@ export function InfluencerFilters({
           ))}
         </Select>
       </div>
-      <Button type="submit" variant="secondary">
-        Filtrar
+      <Button type="submit" variant="secondary" disabled={filtrando}>
+        {filtrando ? 'Filtrando…' : 'Filtrar'}
       </Button>
     </form>
   )

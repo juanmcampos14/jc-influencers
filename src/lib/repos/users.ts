@@ -329,3 +329,33 @@ export async function removeClientMembership(ctx: AuthContext, userId: string, c
   })
   await revokeAllSessionsForUser(userId, 'membership_removed')
 }
+
+/**
+ * Cifras de la pantalla de accesos.
+ *
+ * Se cuentan en la base: las listas están acotadas (500 personas, 200
+ * invitaciones) y sumarlas sería un total que deja de serlo justo cuando la
+ * agencia crece.
+ */
+export type ResumenDeAccesos = {
+  activas: number
+  desactivadas: number
+  invitacionesPendientes: number
+  /** Invitaciones que se vencen en los próximos 7 días: son las accionables. */
+  vencenPronto: number
+}
+
+export async function resumenDeAccesos(ctx: AuthContext): Promise<ResumenDeAccesos> {
+  assertCan(ctx, ctx.side === 'CLIENT' ? 'membership.manage' : 'client.view', null)
+  const enUnaSemana = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+  return scoped(ctx, async (tx) => {
+    const [activas, desactivadas, invitacionesPendientes, vencenPronto] = await Promise.all([
+      tx.user.count({ where: { status: 'ACTIVE' } }),
+      tx.user.count({ where: { status: 'DISABLED' } }),
+      tx.invitation.count({ where: { status: 'PENDING' } }),
+      tx.invitation.count({ where: { status: 'PENDING', expiresAt: { lt: enUnaSemana } } }),
+    ])
+    return { activas, desactivadas, invitacionesPendientes, vencenPronto }
+  })
+}

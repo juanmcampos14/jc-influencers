@@ -36,11 +36,20 @@ describe('esqueletos de carga y códigos de estado', () => {
     const segmentos = todosLosSegmentos(APP)
     const conLoading = segmentos.filter((ruta) => readdirSync(ruta).includes('loading.tsx'))
 
-    const problemas = conLoading.flatMap((base) =>
-      todosLosSegmentos(base)
+    const problemas = conLoading.flatMap((base) => [
+      /*
+       * El segmento propio cuenta.
+       *
+       * La primera versión de este test sólo miraba los descendientes, y por eso
+       * dejó pasar un `loading.tsx` puesto DENTRO de `[campaignId]`: ese
+       * segmento es el que llama a `notFound()`, así que el esqueleto se dibuja
+       * antes de saber si el recurso existe y el 404 sale como 200.
+       */
+      ...(esDinamico(base) ? [`${relative(APP, base)}/loading.tsx está dentro de una ruta dinámica`] : []),
+      ...todosLosSegmentos(base)
         .filter(esDinamico)
         .map((dinamico) => `${relative(APP, base)}/loading.tsx cubre ${relative(APP, dinamico)}`),
-    )
+    ])
 
     expect(problemas, problemas.join('\n')).toEqual([])
   })

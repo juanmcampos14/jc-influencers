@@ -8,16 +8,27 @@ import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
 import { listAudit } from '@/lib/repos/audit'
+import { AGENCY_ROLE_LABELS, CLIENT_ROLE_LABELS } from '@/lib/authz/capabilities'
+import { auditActionLabel, entityTypeLabel } from '@/lib/domain/labels'
 import { formatDateTime } from '@/lib/util/format'
 import { AuditFilters } from './filters'
 
 export const metadata: Metadata = { title: 'Auditoría' }
 export const dynamic = 'force-dynamic'
 
+/**
+ * El rol de quien hizo la acción, legible. Se guarda la clave del enum porque
+ * es lo que hay que conservar; mostrarla cruda es otra cosa.
+ */
+const rolLegible = (rol: string): string =>
+  (AGENCY_ROLE_LABELS as Record<string, string>)[rol] ??
+  (CLIENT_ROLE_LABELS as Record<string, string>)[rol] ??
+  rol
+
 export default async function AuditPage({
   searchParams,
 }: {
-  searchParams: Promise<{ accion?: string; entidad?: string; cliente?: string; pagina?: string }>
+  searchParams: Promise<{ accion?: string; entidad?: string; cliente?: string; pagina?: string; desde?: string; hasta?: string }>
 }) {
   const params = await searchParams
   const ctx = await requireContext()
@@ -29,6 +40,9 @@ export default async function AuditPage({
     {
       action: params.accion?.trim() || null,
       entityType: params.entidad?.trim() || null,
+      // Las fechas llegan como AAAA-MM-DD; "hasta" incluye todo ese día.
+      from: params.desde ? new Date(`${params.desde}T00:00:00`) : null,
+      to: params.hasta ? new Date(`${params.hasta}T23:59:59.999`) : null,
       clientId: clientFilter,
     },
       { page: Number(params.pagina ?? 1) || 1, pageSize: 50 },
@@ -67,13 +81,20 @@ export default async function AuditPage({
                         <Td className="whitespace-nowrap text-xs">{formatDateTime(row.occurredAt, ctx.user.timezone)}</Td>
                         <Td className="text-xs">
                           <p className="text-ink-800">{row.actorEmail ?? 'sistema'}</p>
-                          {row.actorRole ? <p className="text-ink-500">{row.actorRole}</p> : null}
+                          {row.actorRole ? <p className="text-ink-500">{rolLegible(row.actorRole)}</p> : null}
                         </Td>
                         <Td>
-                          <Badge tone={row.action.startsWith('auth.login.failure') ? 'rose' : 'slate'}>{row.action}</Badge>
+                          {/* La clave técnica queda en el title: sirve para buscar, no para leer. */}
+                          <Badge
+                            tone={row.action.startsWith('auth.login.failure') ? 'rose' : 'slate'}
+                            title={row.action}
+                            dot
+                          >
+                            {auditActionLabel(row.action)}
+                          </Badge>
                         </Td>
                         <Td className="text-xs">
-                          <p className="text-ink-800">{row.entityType}</p>
+                          <p className="text-ink-800">{entityTypeLabel(row.entityType)}</p>
                           {row.entityId ? <p className="font-mono text-[11px] text-ink-500">{row.entityId}</p> : null}
                         </Td>
                         <Td className="text-xs text-ink-600">{row.ip ?? '—'}</Td>
@@ -81,9 +102,11 @@ export default async function AuditPage({
                         <Td className="max-w-md text-xs">
                           {row.before || row.after ? (
                             <details>
-                              <summary className="cursor-pointer text-brand-600">ver</summary>
+                              <summary className="cursor-pointer text-ink-700 underline decoration-ink-300 underline-offset-4 hover:decoration-ink-900">
+                                Ver el cambio
+                              </summary>
                               <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-ink-100 p-2 text-[11px]">
-                                {JSON.stringify({ antes: row.before, despues: row.after, extra: row.metadata }, null, 2)}
+                                {JSON.stringify({ antes: row.before, después: row.after, extra: row.metadata }, null, 2)}
                               </pre>
                             </details>
                           ) : (

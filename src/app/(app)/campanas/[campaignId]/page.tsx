@@ -7,6 +7,7 @@ import { Stat, StatStrip } from '@/components/ui/stat'
 import { Button } from '@/components/ui/button'
 import { InfoNote } from '@/components/ui/states'
 import { EstadoDeCampana } from './estado-campana'
+import { PestanasDeCampana } from './tabs'
 import { requireContext } from '@/lib/auth/current'
 import { can } from '@/lib/authz/context'
 import { NotFoundError } from '@/lib/authz/errors'
@@ -187,30 +188,19 @@ export default async function CampaignDetailPage({
         </div>
       </div>
 
-      <nav className="border-b border-ink-200 bg-surface px-5 sm:px-8" aria-label="Secciones de la campaña">
-        <ul className="flex gap-1 overflow-x-auto">
-          {TABS.map((entry) => (
-            <li key={entry.key}>
-              <Link
-                href={hrefCon(`/campanas/${campaign.id}`, query, {
-                  tab: entry.key,
-                  // Cambiar de sección arranca desde la primera página; el
-                  // filtro se conserva, la página no tendría sentido.
-                  pagina: null,
-                })}
-                aria-current={tab === entry.key ? 'page' : undefined}
-                className={
-                  tab === entry.key
-                    ? 'inline-block border-b-2 border-brand-600 px-3 py-2.5 text-sm font-medium text-brand-700'
-                    : 'inline-block border-b-2 border-transparent px-3 py-2.5 text-sm text-ink-600 hover:text-ink-900'
-                }
-              >
-                {entry.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <PestanasDeCampana
+        activa={tab}
+        tabs={TABS.map((entry) => ({
+          key: entry.key,
+          label: entry.label,
+          href: hrefCon(`/campanas/${campaign.id}`, query, {
+            tab: entry.key,
+            // Cambiar de sección arranca desde la primera página; el filtro se
+            // conserva, la página no tendría sentido.
+            pagina: null,
+          }),
+        }))}
+      />
 
       <div className="space-y-4 px-5 py-6 sm:px-8">
         {duplicates.length > 0 && (tab === 'perfiles' || tab === 'shortlist') ? (

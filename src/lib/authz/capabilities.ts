@@ -222,3 +222,13 @@ export const GRANTABLE_AGENCY_EXTRAS: readonly Capability[] = [
 
 /** Capacidades extra que un usuario de cliente sí puede recibir. */
 export const GRANTABLE_CLIENT_EXTRAS: readonly Capability[] = ['user.invite', 'export.create']
+
+/**
+ * Etiqueta de una capacidad cuando la clave viene como texto suelto.
+ *
+ * La pantalla de usuarios imprimía la clave cruda -- `budget.view`,
+ * `internal_notes.view` -- al lado de las etiquetas bien escritas del diálogo
+ * de invitación. Es jerga interna en una pantalla de producto.
+ */
+export const capabilityLabel = (key: string): string =>
+  (CAPABILITY_LABELS as Record<string, string>)[key] ?? key
