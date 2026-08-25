@@ -5,6 +5,7 @@ import { assertCan, assertClientInScope } from '@/lib/authz/context'
 import { NotFoundError, ValidationError } from '@/lib/authz/errors'
 import { AUDIT, recordAudit } from '@/lib/audit'
 import { env } from '@/lib/env'
+import { withSystemScope } from '@/lib/db/scope'
 import { consumeRateLimit } from '@/lib/auth/rate-limit'
 import { scoutingProvider, ScoutingUnavailableError } from '@/lib/ports/scouting'
 import { parseProfileUrl } from '@/lib/domain/normalize'
@@ -46,14 +47,31 @@ export async function getBudgetState(ctx: AuthContext, clientId: string, now = n
   const period = currentPeriod(now)
   const globalLimit = env().SCOUTING_MONTHLY_LIMIT_USD
 
-  const [clientBudget, globalBudget, globalSpentRows] = await scoped(ctx, async (tx) => [
+  const [clientBudget, globalBudget] = await scoped(ctx, async (tx) => [
     await tx.scoutingBudget.findUnique({ where: { clientId_period: { clientId, period } } }),
     await tx.scoutingBudget.findFirst({ where: { clientId: null, period } }),
-    await tx.scoutingRun.findMany({
+  ])
+
+  /*
+   * El gasto GLOBAL se cuenta con permisos de sistema, no con el alcance del
+   * usuario.
+   *
+   * RLS filtra `scouting_runs` por los clientes que cada uno ve, y `scouting.run`
+   * la tienen también los account managers y los scouts, que ven sólo lo suyo.
+   * Leído bajo su alcance, "gastado este mes" era lo gastado en SUS clientes:
+   * tres personas con clientes distintos y un tope de US$200 podían gastar
+   * US$600 viendo cada una su barra en el 20%. Y el corte duro usaba el mismo
+   * número, así que tampoco cortaba.
+   *
+   * Sólo sale de acá un total agregado -- nunca filas de otros clientes -- así
+   * que no expone nada que no sea el número que el tope necesita.
+   */
+  const globalSpentRows = await withSystemScope((tx) =>
+    tx.scoutingRun.findMany({
       where: { status: { in: ['RUNNING', 'COMPLETED'] }, startedAt: { gte: new Date(`${period}-01T00:00:00.000Z`) } },
       select: { actualCostUsd: true, estimatedCostUsd: true },
     }),
-  ])
+  )
 
   const globalSpent = globalSpentRows.reduce(
     (sum, row) => sum + Number(row.actualCostUsd ?? row.estimatedCostUsd ?? 0),

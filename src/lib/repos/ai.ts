@@ -6,6 +6,7 @@ import { assertCan, assertClientInScope } from '@/lib/authz/context'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/authz/errors'
 import { AUDIT, recordAudit } from '@/lib/audit'
 import { env } from '@/lib/env'
+import { withSystemScope } from '@/lib/db/scope'
 import { aiProvider, AiUnavailableError, PROMPT_VERSION } from '@/lib/ports/ai'
 import { buildBriefContext, buildCampaignState, buildProfileContext } from './ai-context'
 import { actorOf, scoped } from './base'
@@ -62,14 +63,33 @@ function toDto(row: {
 
 const currentPeriod = (now = new Date()): string => now.toISOString().slice(0, 7)
 
-/** Gasto de IA del mes en curso, en dólares. */
-export async function aiSpendThisMonth(ctx: AuthContext): Promise<{ spent: number; limit: number }> {
+/**
+ * Gasto de IA del mes en curso, en dólares.
+ *
+ * El tope es de la agencia, así que el gasto también tiene que serlo: leído
+ * bajo el alcance del usuario, RLS lo recortaba a sus clientes y cada persona
+ * veía una fracción del total mientras el tope global se pasaba sin que nadie
+ * lo notara. Sólo sale de acá un número agregado.
+ */
+export async function aiSpendThisMonth(_ctx: AuthContext): Promise<{ spent: number; limit: number }> {
   const from = new Date(`${currentPeriod()}-01T00:00:00.000Z`)
-  const rows = await scoped(ctx, (tx) =>
-    tx.aiInsight.findMany({ where: { createdAt: { gte: from } }, select: { costUsd: true } }),
+  const rows = await withSystemScope((tx) =>
+    tx.aiInsight.findMany({
+      where: { createdAt: { gte: from } },
+      select: { costUsd: true, status: true },
+    }),
   )
-  const spent = rows.reduce((sum, row) => sum + Number(row.costUsd ?? 0), 0)
-  return { spent, limit: env().AI_MONTHLY_LIMIT_USD }
+  /*
+   * Un análisis que falló o que todavía corre tiene `costUsd` en null y suma
+   * cero, pero puede haber consumido tokens igual. El número no puede quedar
+   * por debajo del gasto real sin decirlo, así que lo que no tiene costo
+   * cargado cuenta como el promedio de lo que sí lo tiene.
+   */
+  const conCosto = rows.filter((row) => row.costUsd !== null)
+  const cerrado = conCosto.reduce((sum, row) => sum + Number(row.costUsd ?? 0), 0)
+  const promedio = conCosto.length > 0 ? cerrado / conCosto.length : 0
+  const estimado = (rows.length - conCosto.length) * promedio
+  return { spent: cerrado + estimado, limit: env().AI_MONTHLY_LIMIT_USD }
 }
 
 async function assertAiBudget(ctx: AuthContext): Promise<void> {

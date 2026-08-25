@@ -73,7 +73,23 @@ function SimpleMarkdown({ text }: { text: string }) {
   )
 }
 
-export function InsightView({ insight, timezone }: { insight: InsightDto; timezone: string }) {
+export function InsightView({
+  insight,
+  timezone,
+  mostrarDetalleTecnico = false,
+}: {
+  insight: InsightDto
+  timezone: string
+  /**
+   * Modelo, versión de instrucciones, costo y datos de entrada.
+   *
+   * Por defecto NO se muestra. Este componente se usa en el panel de la agencia
+   * y en el portal del cliente, y un dato interno no puede depender de que
+   * alguien se acuerde de ocultarlo en el lugar correcto: se muestra sólo donde
+   * se pide explícitamente.
+   */
+  mostrarDetalleTecnico?: boolean
+}) {
   const output = insight.output as Record<string, unknown> | null
 
   return (
@@ -145,10 +161,23 @@ export function InsightView({ insight, timezone }: { insight: InsightDto; timezo
         </>
       ) : null}
 
-      <footer className="mt-3 border-t border-ink-100 pt-2 text-[11px] text-ink-400">
-        Generado con {insight.model} · versión de instrucciones {insight.promptVersion}
-        {insight.costUsd !== null ? ` · costo US$ ${insight.costUsd.toFixed(4)}` : ''}
-        {insight.inputsSummary ? ` · datos usados: ${JSON.stringify(insight.inputsSummary)}` : ''}
+      {/*
+        * El pie con proveedor, versión, costo y datos de entrada es información
+        * interna de la agencia. Este mismo componente se renderiza en el portal
+        * del cliente, así que le mostraba cuánto le cuesta a la agencia cada
+        * análisis y con qué modelo lo hace. Al cliente le alcanza con saber que
+        * lo generó una IA.
+        */}
+      <footer className="mt-3 border-t border-ink-100 pt-2 text-[11px] text-ink-500">
+        {mostrarDetalleTecnico ? (
+          <>
+            Generado con {insight.model} · versión de instrucciones {insight.promptVersion}
+            {insight.costUsd !== null ? ` · costo US$ ${insight.costUsd.toFixed(4)}` : ''}
+            {insight.inputsSummary ? ` · datos usados: ${JSON.stringify(insight.inputsSummary)}` : ''}
+          </>
+        ) : (
+          'Generado con inteligencia artificial a partir de los datos de la campaña.'
+        )}
       </footer>
     </article>
   )

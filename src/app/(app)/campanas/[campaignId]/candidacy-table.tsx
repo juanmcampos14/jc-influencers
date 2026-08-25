@@ -562,7 +562,7 @@ function CandidacyDialog({
             ) : null}
             {insight ? (
               <div className="mt-3">
-                <InsightView insight={insight} timezone="America/Argentina/Buenos_Aires" />
+                <InsightView insight={insight} timezone="America/Argentina/Buenos_Aires" mostrarDetalleTecnico />
               </div>
             ) : null}
           </div>

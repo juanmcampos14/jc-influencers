@@ -522,6 +522,8 @@ export async function setShortlist(
   ctx: AuthContext,
   campaignId: string,
   entries: Array<{ candidacyId: string; order: number }>,
+  /** Candidaturas que quien guarda tenía a la vista. Sólo se toca este conjunto. */
+  known: string[] = [],
 ): Promise<void> {
   const clientId = await resolveCampaignClient(ctx, campaignId)
   assertCan(ctx, 'candidate.manage', clientId)
@@ -534,8 +536,26 @@ export async function setShortlist(
     })
     if (rows.length !== ids.length) throw new NotFoundError()
 
+    /*
+     * Sólo se toca lo que quien guarda tenía a la vista.
+     *
+     * Antes esto limpiaba la shortlist ENTERA y volvía a marcar las entradas
+     * recibidas. Como la pantalla manda una página --y encima podía venir
+     * filtrada-- guardar el orden de doce perfiles sacaba de la shortlist a los
+     * otros treinta, en silencio, y el aviso decía "Shortlist actualizada".
+     *
+     * `known` es el conjunto que el cliente realmente vio. Lo que está fuera de
+     * ese conjunto no se toca: no se puede decidir sobre lo que no se miró.
+     */
+    const conocidas = [...new Set([...known, ...ids])]
+    const existentes = await tx.candidacy.findMany({
+      where: { id: { in: conocidas }, campaignId, clientId },
+      select: { id: true },
+    })
+    if (existentes.length !== conocidas.length) throw new NotFoundError()
+
     await tx.candidacy.updateMany({
-      where: { campaignId, clientId },
+      where: { id: { in: conocidas }, campaignId, clientId },
       data: { inShortlist: false, shortlistOrder: null },
     })
     for (const entry of entries) {
@@ -655,8 +675,17 @@ export async function addInfluencersToCampaign(
   const clientId = await resolveCampaignClient(ctx, campaignId)
   assertCan(ctx, 'candidate.manage', clientId)
 
-  const unicos = [...new Set(influencerIds)].slice(0, 200)
-  if (unicos.length === 0) throw new ValidationError('No elegiste ningún influencer.')
+  const TOPE = 200
+  const todos = [...new Set(influencerIds)]
+  if (todos.length === 0) throw new ValidationError('No elegiste ningún influencer.')
+  // Un lote que no entra se rechaza, no se recorta en silencio: decir "agregué
+  // 200" cuando elegiste 230 esconde treinta que nadie va a volver a mirar.
+  if (todos.length > TOPE) {
+    throw new ValidationError(
+      `Elegiste ${todos.length} influencers y el máximo por vez es ${TOPE}. Hacelo en tandas para poder revisar el resultado de cada una.`,
+    )
+  }
+  const unicos = todos
 
   let added = 0
   let alreadyThere = 0

@@ -34,7 +34,7 @@ export function ShortlistPanel({
       .filter((entry) => Number.isFinite(entry.order) && entry.order > 0)
       .sort((a, b) => a.order - b.order)
     startTransition(async () => {
-      const result = await shortlistAction({ campaignId, entries })
+      const result = await shortlistAction({ campaignId, entries, known: items.map((item) => item.id) })
       if (!result.ok) {
         toast.error(result.message)
         return
@@ -51,7 +51,7 @@ export function ShortlistPanel({
       .sort((a, b) => a.order - b.order)
       .map((entry, index) => ({ candidacyId: entry.candidacyId, order: index + 1 }))
     startTransition(async () => {
-      const result = await shortlistAction({ campaignId, entries })
+      const result = await shortlistAction({ campaignId, entries, known: items.map((item) => item.id) })
       if (!result.ok) {
         toast.error(result.message)
         return

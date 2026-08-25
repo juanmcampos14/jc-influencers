@@ -36,13 +36,27 @@ export function InsightsPanel({
   const [pending, startTransition] = React.useTransition()
   const [busy, setBusy] = React.useState<string | null>(null)
 
-  function run(kind: string, action: () => Promise<{ ok: boolean; message?: string }>) {
+  /**
+   * `runInsight` atrapa el fallo del proveedor y devuelve un registro con
+   * `status: 'FAILED'` en vez de lanzar, así que la acción vuelve como `ok`.
+   * Confiar sólo en `ok` daba un "Análisis listo" en verde y, un segundo
+   * después, una tarjeta roja diciendo que falló.
+   */
+  function run(
+    kind: string,
+    action: () => Promise<{ ok: boolean; message?: string; data?: { status?: string; errorMessage?: string | null } }>,
+  ) {
     setBusy(kind)
     startTransition(async () => {
       const result = await action()
       setBusy(null)
       if (!result.ok) {
         toast.error(result.message ?? 'No se pudo generar el análisis.')
+        return
+      }
+      if (result.data?.status === 'FAILED') {
+        toast.error(result.data.errorMessage ?? 'No se pudo generar el análisis.')
+        router.refresh()
         return
       }
       toast.success('Análisis listo.')
@@ -143,7 +157,7 @@ export function InsightsPanel({
         <div className="space-y-4">
           {insights.map((insight) => (
             <div key={insight.id}>
-              <InsightView insight={insight} timezone={timezone} />
+              <InsightView insight={insight} timezone={timezone} mostrarDetalleTecnico />
               {canRun && insight.status === 'READY' ? (
                 <label className="mt-1.5 flex items-center gap-2 text-xs text-ink-600">
                   <Checkbox

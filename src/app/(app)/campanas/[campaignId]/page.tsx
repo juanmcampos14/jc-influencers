@@ -78,8 +78,17 @@ export default async function CampaignDetailPage({
           ctx,
           campaignId,
           {
-            statusKeys: query.estado ? [query.estado] : null,
-            search: query.q?.trim() || null,
+            /*
+             * Shortlist y Funnel NO heredan el filtro de la pestaña Perfiles.
+             *
+             * Los tabs conservan la query, que es lo correcto para volver a
+             * Perfiles sin perder lo filtrado. Pero en Shortlist eso hacía que
+             * guardar el orden sacara de la lista a los que el filtro escondía,
+             * y en Funnel que las columnas dijeran "Vacío" sin que hubiera
+             * ningún filtro a la vista para explicarlo.
+             */
+            statusKeys: tab === 'perfiles' && query.estado ? [query.estado] : null,
+            search: tab === 'perfiles' ? query.q?.trim() || null : null,
             onlyShortlist: tab === 'shortlist',
           },
           { page: Number(query.pagina ?? 1) || 1, pageSize: tab === 'perfiles' ? 50 : 200 },

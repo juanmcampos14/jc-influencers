@@ -109,9 +109,11 @@ export const shortlistAction = defineAction(
   z.object({
     campaignId: id,
     entries: z.array(z.object({ candidacyId: id, order: z.number().int().min(1).max(999) })).max(200),
+    /** Lo que había en pantalla. Sin esto, guardar sacaría de la shortlist a lo que no se vio. */
+    known: z.array(id).max(500),
   }),
   async (input, ctx) => {
-    await setShortlist(ctx, input.campaignId, input.entries)
+    await setShortlist(ctx, input.campaignId, input.entries, input.known)
     revalidatePath(`/campanas/${input.campaignId}`)
     return { ok: true }
   },

@@ -148,6 +148,23 @@ export async function buildCampaignState(tx: Tx, campaignId: string, now = new D
   })
   if (!campaign) return 'No hay campaña.'
 
+  /*
+   * Los agregados se cuentan sobre TODA la campaña; el detalle se muestrea.
+   *
+   * Antes todo salía de las primeras 300 filas y el texto decía "Perfiles en la
+   * campaña: 300". Con 420 candidaturas, el reporte que se comparte al cliente
+   * afirmaba un total falso y porcentajes calculados sobre él. El modelo hacía
+   * lo correcto -- las instrucciones le prohíben inventar cifras -- y aun así
+   * el resultado mentía, porque el material que le dábamos ya venía mal.
+   */
+  const [total, porEstado, porAprobacion, porCluster] = await Promise.all([
+    tx.candidacy.count({ where: { campaignId } }),
+    tx.candidacy.groupBy({ by: ['statusKey'], where: { campaignId }, _count: { _all: true } }),
+    tx.candidacy.groupBy({ by: ['clientApproval'], where: { campaignId }, _count: { _all: true } }),
+    tx.candidacy.groupBy({ by: ['clusterId'], where: { campaignId }, _count: { _all: true } }),
+  ])
+
+  const MUESTRA = 300
   const candidacies = await tx.candidacy.findMany({
     where: { campaignId },
     include: {
@@ -155,38 +172,42 @@ export async function buildCampaignState(tx: Tx, campaignId: string, now = new D
       influencer: { include: { profiles: { orderBy: [{ isPrimary: 'desc' }] } } },
     },
     orderBy: [{ inShortlist: 'desc' }, { shortlistOrder: 'asc' }],
-    take: 300,
+    take: MUESTRA,
   })
 
-  const lines: string[] = [`Perfiles en la campaña: ${candidacies.length}`]
+  const lines: string[] = [`Perfiles en la campaña: ${total}`]
 
-  const byStatus = new Map<string, number>()
-  const byApproval = new Map<string, number>()
-  const byCluster = new Map<string, number>()
+  // La calidad del dato sí se mide sobre la muestra, y se dice.
   let stale = 0
   let withoutMetrics = 0
-
   for (const candidacy of candidacies) {
-    byStatus.set(candidacy.statusKey, (byStatus.get(candidacy.statusKey) ?? 0) + 1)
-    byApproval.set(candidacy.clientApproval, (byApproval.get(candidacy.clientApproval) ?? 0) + 1)
-    const clusterLabel = candidacy.cluster?.label ?? 'sin cluster'
-    byCluster.set(clusterLabel, (byCluster.get(clusterLabel) ?? 0) + 1)
     const profile = candidacy.influencer.profiles[0]
     if (!profile || profile.followers === null) withoutMetrics += 1
     else if (isMetricStale(profile.measuredAt, now)) stale += 1
   }
 
+  const etiquetaDeCluster = new Map(
+    campaign.brief?.clusters.map((cluster) => [cluster.id, cluster.label]) ?? [],
+  )
+  const byCluster = new Map<string, number>()
+  for (const fila of porCluster) {
+    const label = fila.clusterId ? (etiquetaDeCluster.get(fila.clusterId) ?? 'sin cluster') : 'sin cluster'
+    byCluster.set(label, (byCluster.get(label) ?? 0) + fila._count._all)
+  }
+
   lines.push('', '### Por estado')
-  for (const [key, count] of byStatus) lines.push(`- ${STATUS_LABELS.get(key) ?? key}: ${count}`)
+  for (const fila of porEstado) {
+    lines.push(`- ${STATUS_LABELS.get(fila.statusKey) ?? fila.statusKey}: ${fila._count._all}`)
+  }
 
   lines.push('', '### Aprobación del cliente')
-  for (const [key, count] of byApproval) lines.push(`- ${key}: ${count}`)
+  for (const fila of porAprobacion) lines.push(`- ${fila.clientApproval}: ${fila._count._all}`)
 
   lines.push('', '### Distribución real por cluster contra la deseada')
-  const total = candidacies.length || 1
+  const base = total || 1
   const targets = new Map(campaign.brief?.clusters.map((cluster) => [cluster.label, cluster.targetPercent]) ?? [])
   for (const [label, count] of byCluster) {
-    const real = Math.round((count / total) * 100)
+    const real = Math.round((count / base) * 100)
     const target = targets.get(label)
     lines.push(`- ${label}: ${count} perfiles (${real}% real${target === undefined ? '' : `, ${target}% deseado`})`)
   }
@@ -197,11 +218,20 @@ export async function buildCampaignState(tx: Tx, campaignId: string, now = new D
   lines.push(
     '',
     '### Calidad del dato',
+    total > MUESTRA
+      ? `(medido sobre ${candidacies.length} de ${total} perfiles)`
+      : '(medido sobre todos los perfiles)',
     `Perfiles con métricas desactualizadas o sin verificar: ${stale}`,
     `Perfiles sin ninguna métrica cargada: ${withoutMetrics}`,
   )
 
-  lines.push('', '### Detalle del squad')
+  lines.push(
+    '',
+    '### Detalle del squad',
+    total > 60
+      ? `Se listan ${Math.min(60, candidacies.length)} de ${total} perfiles. Los conteos de arriba sí abarcan la campaña completa.`
+      : '',
+  )
   for (const candidacy of candidacies.slice(0, 60)) {
     const profile = candidacy.influencer.profiles[0]
     lines.push(
@@ -212,7 +242,7 @@ export async function buildCampaignState(tx: Tx, campaignId: string, now = new D
         `${candidacy.inShortlist ? ' · en shortlist' : ''}`,
     )
   }
-  if (candidacies.length > 60) lines.push(`(y ${candidacies.length - 60} más)`)
+  if (total > 60) lines.push(`(y ${total - 60} más que no se listan acá)`)
 
   return lines.join('\n')
 }

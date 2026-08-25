@@ -15,6 +15,7 @@ import { formatDate, formatNumber } from '@/lib/util/format'
 import { ActivityPanel } from '@/app/(app)/campanas/[campaignId]/activity-panel'
 import { InsightView } from '@/components/insight-view'
 import { listInsights } from '@/lib/repos/ai'
+import { Pagination } from '@/components/ui/pagination'
 import { ProposalList } from './proposal-list'
 
 export const metadata: Metadata = { title: 'Campaña' }
@@ -25,10 +26,10 @@ export default async function PortalCampaignPage({
   searchParams,
 }: {
   params: Promise<{ campaignId: string }>
-  searchParams: Promise<{ filtro?: string }>
+  searchParams: Promise<{ filtro?: string; pagina?: string }>
 }) {
   const { campaignId } = await params
-  const { filtro } = await searchParams
+  const { filtro, pagina } = await searchParams
   const ctx = await requireContext()
 
   let campaign
@@ -58,7 +59,7 @@ export default async function PortalCampaignPage({
         clientApproval: filtroActivo === 'pendientes' ? ['PENDING', 'NEEDS_REVIEW'] : null,
         onlyShortlist: filtroActivo === 'shortlist',
       },
-      { pageSize: 200 },
+      { page: Number(pagina ?? 1) || 1, pageSize: 60 },
     ),
     getBrief(ctx, campaignId),
     listComments(ctx, { campaignId }),
@@ -181,7 +182,11 @@ export default async function PortalCampaignPage({
               return (
                 <li key={entry.key || 'todos'}>
                   <Link
-                    href={entry.key ? `/portal/campanas/${campaign.id}?filtro=${entry.key}` : `/portal/campanas/${campaign.id}`}
+                    href={
+                      entry.key
+                        ? `/portal/campanas/${campaign.id}?filtro=${entry.key}`
+                        : `/portal/campanas/${campaign.id}`
+                    }
                     aria-current={isActive ? 'page' : undefined}
                     className={
                       isActive
@@ -197,11 +202,28 @@ export default async function PortalCampaignPage({
           </ul>
         </nav>
 
+        {/*
+          * Con paginación de verdad.
+          *
+          * Antes se pedían 200 y el repositorio recortaba a 100 sin decirlo:
+          * la lista mostraba 100 tarjetas debajo de una pestaña que decía
+          * "Todos (245)". El cliente scrolleaba hasta el final y concluía que
+          * ésos eran los 245. Aprobaba sobre una muestra creyendo que era todo.
+          */}
         <ProposalList
           campaignId={campaign.id}
           items={candidacies.items}
           canApprove={canApprove}
           timezone={ctx.user.timezone}
+        />
+
+        <Pagination
+          base={`/portal/campanas/${campaign.id}`}
+          params={{ filtro: filtroActivo || undefined, pagina }}
+          page={candidacies.page}
+          pageCount={candidacies.pageCount}
+          total={candidacies.total}
+          unidad="perfiles"
         />
 
         {insights.length > 0 ? (
