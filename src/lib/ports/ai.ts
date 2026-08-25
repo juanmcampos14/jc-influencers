@@ -104,6 +104,50 @@ class UnconfiguredAiProvider implements AiProvider {
   }
 }
 
+/**
+ * Recorta la respuesta a los límites declarados en el esquema.
+ *
+ * Los `maxLength` y `maxItems` son una guía de estilo para el modelo, no un
+ * requisito de corrección. Descartar un análisis pago entero porque una viñeta
+ * salió veinte caracteres más larga sería tirar plata y trabajo: se recorta y
+ * sigue. Lo que sí se valida estrictamente después es la ESTRUCTURA.
+ */
+function clampToSchema(value: unknown, schema: Record<string, unknown>): unknown {
+  const type = schema.type
+
+  if (type === 'string' && typeof value === 'string') {
+    const max = typeof schema.maxLength === 'number' ? schema.maxLength : null
+    if (max !== null && value.length > max) {
+      // Se corta en el último espacio para no partir una palabra al medio.
+      const cut = value.slice(0, max)
+      const lastSpace = cut.lastIndexOf(' ')
+      return lastSpace > max * 0.7 ? `${cut.slice(0, lastSpace)}…` : cut
+    }
+    return value
+  }
+
+  if (type === 'array' && Array.isArray(value)) {
+    const max = typeof schema.maxItems === 'number' ? schema.maxItems : null
+    const items = (schema.items ?? {}) as Record<string, unknown>
+    const trimmed = max !== null ? value.slice(0, max) : value
+    return trimmed.map((entry) => clampToSchema(entry, items))
+  }
+
+  if (type === 'object' && value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>
+    const out: Record<string, unknown> = {}
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = properties[key] ? clampToSchema(entry, properties[key]) : entry
+    }
+    return out
+  }
+
+  return value
+}
+
+/** Expuesto sólo para los tests. */
+export const __clampToSchemaForTests = clampToSchema
+
 /** Precio por millón de tokens de Claude Opus 5. */
 const PRICE_PER_MTOK = { input: 5, output: 25 }
 
@@ -176,9 +220,16 @@ class AnthropicProvider implements AiProvider {
     if (!response.parsed_output) {
       throw new AiUnavailableError('El modelo no devolvió una respuesta con el formato esperado.')
     }
-    const validated = schema.safeParse(response.parsed_output)
+
+    const clamped = clampToSchema(response.parsed_output, { ...definition, type: 'object' })
+    const validated = schema.safeParse(clamped)
     if (!validated.success) {
-      throw new AiUnavailableError('La respuesta del modelo no cumple el formato esperado.')
+      // El detalle va al registro del análisis, que sólo ve la agencia.
+      const detail = validated.error.issues
+        .slice(0, 3)
+        .map((issue) => `${issue.path.join('.') || 'raíz'}: ${issue.message}`)
+        .join(' · ')
+      throw new AiUnavailableError(`La respuesta del modelo no cumple el formato esperado (${detail}).`)
     }
     return { output: validated.data as z.infer<T>, usage: this.usage(response) }
   }
