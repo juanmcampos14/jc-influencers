@@ -154,6 +154,36 @@ function pickRate(row: Record<string, unknown>, keys: string[]): number | null {
   return null
 }
 
+/**
+ * Traduce el rechazo del proveedor a algo accionable.
+ *
+ * El texto crudo ("Customer is not active") es correcto pero no dice qué hacer,
+ * y quien lo lee en la aplicación no tiene el panel del proveedor abierto. Se
+ * conserva el detalle original al final: sin él no se puede diagnosticar nada
+ * que no esté previsto acá.
+ */
+function explicarRechazo(status: number, detalle: string): string {
+  const texto = detalle.slice(0, 300)
+  const normalizado = texto.toLowerCase()
+
+  if (normalizado.includes('customer is not active')) {
+    return 'La cuenta del proveedor de scouting no está activa. Suele resolverse completando la facturación en su panel; los créditos gratuitos no se pueden usar hasta entonces.'
+  }
+  if (status === 401 || status === 403) {
+    return 'El proveedor no aceptó las credenciales de scouting. Hay que revisar el token de API.'
+  }
+  if (status === 402 || normalizado.includes('insufficient') || normalizado.includes('balance')) {
+    return 'La cuenta del proveedor de scouting se quedó sin saldo.'
+  }
+  if (status === 429) {
+    return 'El proveedor está limitando los pedidos. Conviene reintentar en unos minutos.'
+  }
+  if (normalizado.includes('dataset')) {
+    return `El proveedor no reconoció el dataset configurado. ${texto}`
+  }
+  return `El proveedor rechazó el pedido (${status}). ${texto}`
+}
+
 class BrightDataProvider implements ScoutingProvider {
   readonly name = 'brightdata'
   readonly configured = true
@@ -207,9 +237,7 @@ class BrightDataProvider implements ScoutingProvider {
     )
     if (!response.ok) {
       const detail = await response.text().catch(() => '')
-      throw new ScoutingUnavailableError(
-        `El proveedor rechazó el pedido (${response.status}). ${detail.slice(0, 300)}`,
-      )
+      throw new ScoutingUnavailableError(explicarRechazo(response.status, detail))
     }
     const body = (await response.json()) as { snapshot_id?: string }
     if (!body.snapshot_id) throw new ScoutingUnavailableError('El proveedor no devolvió un identificador de trabajo.')

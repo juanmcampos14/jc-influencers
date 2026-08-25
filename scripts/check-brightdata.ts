@@ -1,4 +1,5 @@
 import 'server-only'
+import '../src/lib/bootstrap-env'
 
 /**
  * Chequea la configuración de Bright Data antes de gastar plata.
