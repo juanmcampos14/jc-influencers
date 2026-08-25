@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
@@ -19,15 +20,32 @@ export default async function ScoutingPage({ searchParams }: { searchParams: Pro
 
   const usable = ctx.clients.filter((client) => can(ctx, 'scouting.run', client.id))
   if (usable.length === 0) {
+    // Sin clientes no hay nada sobre lo que buscar, y decir "no tenés permiso"
+    // sería falso: manda a pedir un acceso que ya se tiene.
+    const sinClientes = ctx.clients.length === 0
     return (
       <>
         <PageHeader title="Scouting" />
         <div className="px-5 py-6 sm:px-8">
           <Card>
-            <EmptyState
-              title="No tenés permiso para ejecutar scouting"
-              description="Esta función tiene costo por uso, así que está limitada a la agencia. Pedísela a un administrador."
-            />
+            {sinClientes ? (
+              <EmptyState
+                title="Todavía no hay clientes"
+                description="El scouting busca perfiles para un cliente concreto. Creá el primero y volvé."
+                action={
+                  can(ctx, 'client.manage', null) ? (
+                    <Link href="/clientes" className="text-sm font-medium text-brand-700 underline underline-offset-2">
+                      Ir a Clientes
+                    </Link>
+                  ) : null
+                }
+              />
+            ) : (
+              <EmptyState
+                title="No tenés permiso para ejecutar scouting"
+                description="Esta función tiene costo por uso, así que está limitada a la agencia. Pedísela a un administrador."
+              />
+            )}
           </Card>
         </div>
       </>

@@ -30,8 +30,12 @@ export default async function ClientsPage() {
         <Card>
           {clients.length === 0 ? (
             <EmptyState
-              title="Todavía no tenés clientes asignados"
-              description="Un administrador de agencia puede darte acceso a los clientes en los que trabajás."
+              title={canManage ? 'Todavía no hay clientes' : 'Todavía no tenés clientes asignados'}
+              description={
+                canManage
+                  ? 'Creá el primero con «Nuevo cliente». Cada uno abre su propio espacio, con sus campañas, sus usuarios y su identidad visual.'
+                  : 'Un administrador de agencia puede darte acceso a los clientes en los que trabajás.'
+              }
             />
           ) : (
             <TableWrap>
