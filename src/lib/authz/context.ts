@@ -142,10 +142,20 @@ export async function buildAuthContext(token: string | null, options: BuildOptio
   }
 
   const accessibleIds = clients.map((c) => c.id)
+  /*
+   * Espacio de trabajo activo.
+   *
+   * Para quien ve todos los clientes, `null` significa "todos" y es una
+   * elección válida: la barra dice "Todos" y las pantallas muestran el
+   * conjunto. Para el resto, `null` no puede quedar así -- siempre trabajan
+   * dentro de un cliente -- y se cae al primero al que tengan acceso.
+   */
   const activeClientId =
     session.activeClientId && accessibleIds.includes(session.activeClientId)
       ? session.activeClientId
-      : (accessibleIds[0] ?? null)
+      : allClients
+        ? null
+        : (accessibleIds[0] ?? null)
 
   const db: DbScope = {
     userId: user.id,

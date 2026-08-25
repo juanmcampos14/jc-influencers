@@ -134,10 +134,28 @@ export async function createInvitation(input: CreateInvitationInput): Promise<Cr
     })
     if (existingUser) {
       if (input.agencyRole && existingUser.agencyMembership) {
-        throw new ValidationError('Ese email ya es usuario de la agencia.')
+        throw new ValidationError('Ese email ya es usuario de la agencia. Cambiale el rol desde «Accesos».')
       }
       if (input.clientId && existingUser.clientMemberships.some((m) => m.clientId === input.clientId)) {
         throw new ValidationError('Ese email ya tiene acceso a este cliente.')
+      }
+      /*
+       * Una persona no puede estar de los dos lados del aislamiento.
+       *
+       * El lado se decide por tener o no rol de agencia, así que alguien con
+       * los dos entra siempre como agencia: la invitación de cliente no le da
+       * el acceso que promete, y encima queda una membresía de cliente colgada
+       * sobre una cuenta que ve todo.
+       */
+      if (input.clientId && existingUser.agencyMembership) {
+        throw new ValidationError(
+          'Ese email es de un empleado de la agencia, que ya ve todos los clientes a los que tiene alcance. Para probar el portal como cliente hace falta otra dirección.',
+        )
+      }
+      if (input.agencyRole && existingUser.clientMemberships.length > 0) {
+        throw new ValidationError(
+          'Ese email pertenece a un usuario de cliente. Quitale primero sus accesos de cliente desde «Accesos».',
+        )
       }
     }
 
@@ -251,17 +269,43 @@ export async function acceptInvitation(input: {
       return invalid
     }
 
-    const user = await tx.user.upsert({
+    /*
+     * Una invitación NUNCA cambia las credenciales de una cuenta que ya existe.
+     *
+     * Antes esto era un `upsert` que en la rama de actualización escribía
+     * `passwordHash`. O sea: quien tuviera el enlace de una invitación dirigida
+     * a un email que ya tenía cuenta le fijaba la contraseña a esa cuenta. Con
+     * un email de un empleado de la agencia, eso es tomar control de su cuenta
+     * desde un enlace. Pasó de verdad: una invitación de cliente le reescribió
+     * la clave al administrador de la agencia.
+     *
+     * Para una cuenta existente la invitación sólo puede sumar una membresía, y
+     * quien entra lo hace con la contraseña que ya tenía.
+     */
+    const existente = await tx.user.findUnique({
       where: { email: invitation.email },
-      create: {
-        email: invitation.email,
-        name: input.name.trim() || invitation.name,
-        passwordHash,
-        passwordSetAt: now,
-        status: 'ACTIVE',
-      },
-      update: { passwordHash, passwordSetAt: now, status: 'ACTIVE', disabledAt: null, failedLoginCount: 0 },
+      include: { agencyMembership: true },
     })
+
+    if (existente && invitation.clientId && existente.agencyMembership) {
+      return {
+        ok: false as const,
+        message:
+          'Ese email ya es de un empleado de la agencia. Entrá con tu contraseña de siempre: como agencia ya ves los clientes que te correspondan.',
+      }
+    }
+
+    const user = existente
+      ? existente
+      : await tx.user.create({
+          data: {
+            email: invitation.email,
+            name: input.name.trim() || invitation.name,
+            passwordHash,
+            passwordSetAt: now,
+            status: 'ACTIVE',
+          },
+        })
 
     if (invitation.agencyRole) {
       await tx.agencyMembership.upsert({

@@ -17,13 +17,31 @@ export const dynamic = 'force-dynamic'
 
 export default async function PanelPage() {
   const ctx = await requireContext()
-  const data = await loadPage(() => dashboard(ctx, null))
+  /*
+   * El panel sigue al selector de espacio de trabajo.
+   *
+   * Antes pedía `null`, que en el repositorio significa "sin filtro de
+   * cliente": la barra decía "Espacio de trabajo: Aikestar" y "los datos nunca
+   * se mezclan" mientras el panel listaba campañas y perfiles de todos los
+   * clientes. Para un producto cuyo centro es el aislamiento, esa contradicción
+   * en la primera pantalla no es un detalle.
+   *
+   * Quien tiene alcance sobre todos los clientes puede elegir "Todos" en el
+   * selector; ahí `activeClientId` es null y el panel muestra el conjunto,
+   * porque eso es lo que se pidió.
+   */
+  const data = await loadPage(() => dashboard(ctx, ctx.activeClientId))
+  const espacio = ctx.clients.find((client) => client.id === ctx.activeClientId)?.name ?? null
 
   return (
     <>
       <PageHeader
         title={`Hola, ${ctx.user.name.split(' ')[0]}`}
-        description="Estado de las campañas activas y lo que está esperando una decisión."
+        description={
+          espacio
+            ? `Estado de ${espacio}: campañas activas y lo que está esperando una decisión.`
+            : 'Estado de todos tus clientes: campañas activas y lo que está esperando una decisión.'
+        }
       />
       <div className="space-y-6 px-5 py-6 sm:px-8">
         {/*

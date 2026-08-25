@@ -62,6 +62,7 @@ export function AppShell({
   nav,
   clients,
   activeClientId,
+  verTodos = false,
   user,
   roleLabel,
   sideLabel,
@@ -73,6 +74,8 @@ export function AppShell({
   nav: NavItem[]
   clients: ShellClient[]
   activeClientId: string | null
+  /** Quien ve todos los clientes puede elegir el conjunto como espacio de trabajo. */
+  verTodos?: boolean
   user: { name: string; email: string }
   roleLabel: string
   sideLabel: string
@@ -103,7 +106,7 @@ export function AppShell({
     return () => window.removeEventListener('keydown', alPresionar)
   }, [open])
 
-  function switchTo(clientId: string) {
+  function switchTo(clientId: string | null) {
     startSwitch(async () => {
       await switchClientAction({ clientId })
       router.refresh()
@@ -163,7 +166,7 @@ export function AppShell({
             <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-nav-text-2">
               Espacio de trabajo
             </p>
-            {clients.length === 1 ? (
+            {clients.length === 1 && !verTodos ? (
               <p className="rounded-lg bg-nav-2 px-3 py-2 text-sm font-medium text-nav-text-strong">
                 {active?.name ?? clients[0]?.name}
               </p>
@@ -173,7 +176,7 @@ export function AppShell({
                   className="flex w-full items-center justify-between gap-2 rounded-lg bg-nav-2 px-3 py-2 text-sm font-medium text-nav-text-strong hover:bg-nav-active disabled:opacity-60"
                   disabled={switching}
                 >
-                  <span className="truncate">{active?.name ?? 'Elegí un cliente'}</span>
+                  <span className="truncate">{active?.name ?? (verTodos ? 'Todos los clientes' : 'Elegí un cliente')}</span>
                   <ChevronsUpDown className="size-3.5 shrink-0 text-nav-text" aria-hidden="true" />
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Portal>
@@ -182,6 +185,25 @@ export function AppShell({
                     align="start"
                     sideOffset={6}
                   >
+                    {verTodos ? (
+                      <>
+                        {/*
+                          * "Todos" es una opción explícita, no el estado por
+                          * defecto disfrazado. Antes la barra nombraba un
+                          * cliente y las pantallas mostraban el conjunto: la
+                          * promesa de que los datos no se mezclan se rompía en
+                          * la primera pantalla.
+                          */}
+                        <DropdownMenu.Item
+                          onSelect={() => switchTo(null)}
+                          className="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm text-ink-800 outline-none data-[highlighted]:bg-ink-100"
+                        >
+                          <span className="truncate">Todos los clientes</span>
+                          {activeClientId === null ? <Check className="size-4 text-ink-900" /> : null}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Separator className="my-1 h-px bg-ink-200" />
+                      </>
+                    ) : null}
                     {clients.map((client) => (
                       <DropdownMenu.Item
                         key={client.id}
