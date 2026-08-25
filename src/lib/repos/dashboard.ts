@@ -1,10 +1,32 @@
 import 'server-only'
+import type { Prisma } from '@/generated/prisma/client'
 import type { AuthContext } from '@/lib/authz/context'
 import { assertCan, capabilitiesFor } from '@/lib/authz/context'
 import { STALE_METRIC_DAYS } from '@/lib/domain/statuses'
 import { scoped } from './base'
 
 export type DashboardData = {
+  /**
+   * Totales contados en la base, sin tope.
+   *
+   * La lista de campañas trae sólo las 25 más recientes por costo. Sumar esa
+   * lista y presentar el resultado como total de la agencia era mentir en
+   * cuanto hubiera 26 campañas, y nadie lo habría notado.
+   */
+  totals: {
+    activeCampaigns: number
+    proposedProfiles: number
+    /** Pendientes que el cliente PUEDE ver. Misma definición que la lista de al lado. */
+    awaitingClient: number
+    /**
+     * Pendientes que el cliente todavía no puede ver. Es trabajo de la agencia,
+     * no del cliente. Null para usuarios de cliente: no es asunto suyo.
+     */
+    notSharedYet: number | null
+    approved: number
+  }
+  /** Cuántas campañas se listan de las que hay. Si no coinciden, la pantalla lo dice. */
+  campaignsShown: number
   campaigns: Array<{
     id: string
     name: string
@@ -91,6 +113,30 @@ export async function dashboard(ctx: AuthContext, clientId?: string | null): Pro
       _count: { _all: true },
     })
 
+    // Los totales se cuentan aparte, sobre todo el conjunto y no sobre la
+    // página que se muestra.
+    const enCampanasVivas: Prisma.CandidacyWhereInput = {
+      ...(clientId ? { clientId } : {}),
+      campaign: { status: { notIn: ['CLOSED', 'CANCELLED'] } },
+      ...(ctx.side === 'CLIENT' ? { clientVisible: true } : {}),
+    }
+
+    const [activeCampaigns, proposedProfiles, awaitingClient, approved, notSharedYet] = await Promise.all([
+      tx.campaign.count({
+        where: { ...(clientId ? { clientId } : {}), status: { notIn: ['CLOSED', 'CANCELLED'] } },
+      }),
+      tx.candidacy.count({ where: enCampanasVivas }),
+      tx.candidacy.count({
+        where: { ...enCampanasVivas, clientApproval: { in: ['PENDING', 'NEEDS_REVIEW'] }, clientVisible: true },
+      }),
+      tx.candidacy.count({ where: { ...enCampanasVivas, clientApproval: 'APPROVED' } }),
+      ctx.side === 'AGENCY'
+        ? tx.candidacy.count({
+            where: { ...enCampanasVivas, clientApproval: { in: ['PENDING', 'NEEDS_REVIEW'] }, clientVisible: false },
+          })
+        : Promise.resolve(null),
+    ])
+
     const [staleMetrics, openDuplicates] = ctx.side === 'AGENCY'
       ? await Promise.all([
           tx.socialProfile.count({ where: { OR: [{ measuredAt: null }, { measuredAt: { lt: staleBefore } }] } }),
@@ -99,6 +145,8 @@ export async function dashboard(ctx: AuthContext, clientId?: string | null): Pro
       : [0, 0]
 
     return {
+      totals: { activeCampaigns, proposedProfiles, awaitingClient, notSharedYet, approved },
+      campaignsShown: campaigns.length,
       campaigns: campaigns.map((campaign) => {
         const rows = visibleOf(campaign.candidacies)
         return {

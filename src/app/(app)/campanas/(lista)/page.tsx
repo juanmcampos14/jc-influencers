@@ -10,8 +10,8 @@ import { loadPage } from '@/lib/actions/page-guard'
 import { can } from '@/lib/authz/context'
 import { listCampaigns } from '@/lib/repos/campaigns'
 import { formatDate, formatMoney } from '@/lib/util/format'
-import { CampaignFilters } from './filters'
-import { NewCampaignDialog } from './new-campaign-dialog'
+import { CampaignFilters } from '../filters'
+import { NewCampaignDialog } from '../new-campaign-dialog'
 
 export const metadata: Metadata = { title: 'Campañas' }
 export const dynamic = 'force-dynamic'

@@ -92,6 +92,7 @@ export default async function CampaignDetailPage({
     <>
       <PageHeader
         title={campaign.name}
+        variant="nombre"
         description={campaign.objective ?? campaign.description ?? undefined}
         breadcrumb={
           <span className="flex gap-1">

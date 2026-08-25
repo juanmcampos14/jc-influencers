@@ -1,44 +1,77 @@
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 @import 'tailwindcss';
 
 /*
- * Paleta neutra de JC. Es el punto de partida y el respaldo: el espacio de cada
- * cliente sobrescribe estas mismas variables con su propia marca, sin tocar un
- * solo componente.
+ * Identidad de JC.
+ *
+ * Negro y lima ácido, tomados de jcmarketing.digital. El lima es luminoso: sobre
+ * blanco no se puede leer, así que nunca lleva texto encima ni hace de color de
+ * texto. Su lugar es el acento -- el ítem activo del menú, el subrayado, el dato
+ * que importa -- y el contraste alto lo da el negro.
+ *
+ * El área de trabajo se mantiene clara a propósito: son tablas densas que se
+ * leen durante horas y se exportan. Lo que ancla visualmente es la barra lateral
+ * oscura.
+ *
+ * Estas mismas variables las sobrescribe el espacio de cada cliente con su
+ * propia marca, sin tocar un solo componente.
  */
 :root {
-  --jc-primary: #3b5bdb;
-  --jc-primary-strong: #2f49ae;
-  --jc-primary-soft: #eef1fd;
-  --jc-primary-soft-2: #dde3fb;
-  --jc-on-primary: #ffffff;
-  --jc-accent: #5c7cfa;
+  --jc-primary: #14151a;
+  --jc-primary-strong: #000000;
+  --jc-primary-soft: #f4f5f7;
+  --jc-primary-soft-2: #e8eaee;
+  /* Los botones sólidos son negros con la etiqueta en lima: 18:1 de contraste. */
+  --jc-on-primary: #eaff3a;
+  --jc-accent: #dff21f;
 
-  --jc-bg: #f8f9fb;
-  --jc-bg-2: #f1f3f7;
+  --jc-bg: #f6f7f9;
+  --jc-bg-2: #eef0f3;
   --jc-surface: #ffffff;
-  --jc-surface-2: #fafbfd;
+  --jc-surface-2: #fbfcfd;
 
-  --jc-border: #e2e6ee;
-  --jc-border-strong: #cdd3df;
+  --jc-border: #e4e7ec;
+  --jc-border-strong: #cfd4dd;
 
-  --jc-muted-2: #8b93a3;
-  --jc-muted: #5b6270;
-  --jc-text-2: #3b414d;
-  --jc-text: #171a21;
-  --jc-text-strong: #0c0e13;
+  /* 4,51:1 sobre el lienzo: es texto que la gente tiene que poder leer, no adorno. */
+  --jc-muted-2: #6b7280;
+  --jc-muted: #616874;
+  --jc-text-2: #3a404b;
+  --jc-text: #16181d;
+  --jc-text-strong: #05070a;
 
-  --jc-radius: 12px;
-  --jc-font-body: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /*
+   * La barra lateral tiene su propia escala porque vive sobre fondo oscuro: los
+   * tonos del área de trabajo ahí no se ven. El tema de cada cliente las deriva
+   * de su marca.
+   */
+  --jc-nav-bg: #0c0d10;
+  --jc-nav-bg-2: #16181d;
+  --jc-nav-border: #23262d;
+  --jc-nav-text: #9aa0ac;
+  /* Segundo nivel de la barra. Antes eran opacidades que caían por debajo de AA. */
+  --jc-nav-text-2: #8b92a0;
+  --jc-nav-text-strong: #f4f5f7;
+  --jc-nav-active-bg: #1c1f26;
+  --jc-nav-active-text: #eaff3a;
+  --jc-nav-accent: #eaff3a;
+
+  /* Color del contorno de foco. Cambia según el fondo sobre el que se dibuja. */
+  --jc-focus: var(--jc-primary);
+
+  --jc-radius: 10px;
+  --jc-font-body: var(--jc-font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --jc-font-heading: var(--jc-font-body);
+  --jc-font-display: var(--jc-font-anton), 'Haettenschweiler', 'Arial Narrow Bold', Impact, sans-serif;
 }
 
 @theme inline {
   --font-sans: var(--jc-font-body);
   --font-heading: var(--jc-font-heading);
+  --font-display: var(--jc-font-display);
 
   /* La escala de grises del producto sale del tema activo, no de constantes. */
   --color-ink-50: var(--jc-bg);
@@ -66,6 +99,16 @@
   --color-brand-800: var(--jc-primary-strong);
 
   --color-on-brand: var(--jc-on-primary);
+  --color-accent: var(--jc-accent);
+
+  --color-nav: var(--jc-nav-bg);
+  --color-nav-2: var(--jc-nav-bg-2);
+  --color-nav-border: var(--jc-nav-border);
+  --color-nav-text: var(--jc-nav-text);
+  --color-nav-text-2: var(--jc-nav-text-2);
+  --color-nav-text-strong: var(--jc-nav-text-strong);
+  --color-nav-active: var(--jc-nav-active-bg);
+  --color-nav-active-text: var(--jc-nav-active-text);
 
   --radius-lg: var(--jc-radius);
   --radius-xl: calc(var(--jc-radius) + 4px);
@@ -83,24 +126,45 @@
     color: var(--jc-text);
     font-family: var(--jc-font-body);
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
   }
-  /* Foco siempre visible: la app tiene que poder usarse con teclado. */
   h1,
   h2,
   h3 {
     font-family: var(--jc-font-heading);
+    letter-spacing: -0.011em;
   }
+  /* Los números de una tabla se comparan de un vistazo sólo si están alineados. */
+  th,
+  td {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Foco siempre visible: la app tiene que poder usarse con teclado. */
   :focus-visible {
-    outline: 2px solid var(--jc-primary);
+    outline: 2px solid var(--jc-focus);
     outline-offset: 2px;
     border-radius: 4px;
   }
   ::selection {
-    background: var(--jc-primary-soft-2);
+    background: var(--jc-accent);
+    color: var(--jc-text-strong);
   }
 }
 
 @layer utilities {
+  /*
+   * Sobre fondo oscuro un contorno negro no se ve, y sobre fondo claro el lima
+   * tampoco. Cada zona declara con qué color se dibuja el foco, y las tarjetas
+   * -- que son claras aunque estén apoyadas sobre una zona oscura -- vuelven al
+   * color del área de trabajo.
+   */
+  .zona-oscura {
+    --jc-focus: var(--jc-nav-accent);
+  }
+  .zona-clara {
+    --jc-focus: var(--jc-primary);
+  }
+
   .sr-only-focusable:not(:focus):not(:focus-within) {
     position: absolute;
     width: 1px;
@@ -111,5 +175,21 @@
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border-width: 0;
+  }
+
+  /* Título de página: condensada, en versales, con el aire justo. */
+  .titulo-display {
+    font-family: var(--jc-font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    line-height: 1.05;
+  }
+
+  /* Cifra grande de tablero. */
+  .cifra {
+    font-family: var(--jc-font-display);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.005em;
+    line-height: 1;
   }
 }

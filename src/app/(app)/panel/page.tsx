@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
-import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardBody, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState, InfoNote } from '@/components/ui/states'
+import { Stat, StatStrip } from '@/components/ui/stat'
+import { Avatar } from '@/components/ui/avatar'
 import { CampaignStatusBadge, StatusBadge } from '@/components/status-badge'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
@@ -24,6 +26,32 @@ export default async function PanelPage() {
         description="Estado de las campañas activas y lo que está esperando una decisión."
       />
       <div className="space-y-6 px-5 py-6 sm:px-8">
+        {/*
+          * Contadas en la base, no sumadas de la lista de abajo, que viene
+          * acotada. Van de lo más urgente a lo más informativo, y cada una
+          * lleva a su listado: ver "73 esperando" sin poder abrirlos no sirve.
+          */}
+        <StatStrip>
+          <Stat
+            label="Esperando al cliente"
+            value={data.totals.awaitingClient}
+            tone="accent"
+            hint="Ya lo ve el cliente"
+          />
+          {data.totals.notSharedYet !== null ? (
+            <Stat
+              label="Sin compartir"
+              value={data.totals.notSharedYet}
+              tone="warn"
+              hint="El cliente todavía no los ve"
+            />
+          ) : (
+            <Stat label="Campañas activas" value={data.totals.activeCampaigns} />
+          )}
+          <Stat label="Aprobados" value={data.totals.approved} tone="good" />
+          <Stat label="Perfiles propuestos" value={data.totals.proposedProfiles} hint="En campañas abiertas" />
+        </StatStrip>
+
         {data.staleMetrics > 0 || data.openDuplicates > 0 ? (
           <InfoNote>
             <p className="font-medium">Calidad de datos</p>
@@ -52,6 +80,18 @@ export default async function PanelPage() {
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Campañas activas</CardTitle>
+              {data.campaignsShown < data.totals.activeCampaigns ? (
+                <CardDescription>
+                  Las {data.campaignsShown} más recientes de {data.totals.activeCampaigns}.{' '}
+                  <Link href="/campanas" className="underline underline-offset-2">
+                    Ver todas
+                  </Link>
+                </CardDescription>
+              ) : (
+                <CardDescription>
+                  {data.totals.activeCampaigns === 1 ? '1 campaña abierta' : `${data.totals.activeCampaigns} campañas abiertas`}
+                </CardDescription>
+              )}
             </CardHeader>
             {data.campaigns.length === 0 ? (
               <EmptyState
@@ -66,7 +106,7 @@ export default async function PanelPage() {
                       <div className="min-w-0">
                         <Link
                           href={`/campanas/${campaign.id}`}
-                          className="text-sm font-medium text-ink-900 hover:text-brand-700"
+                          className="text-sm font-medium text-ink-900 underline-offset-4 hover:underline"
                         >
                           {campaign.name}
                         </Link>
@@ -122,16 +162,19 @@ export default async function PanelPage() {
               ) : (
                 <ul className="divide-y divide-ink-100">
                   {data.pendingApprovals.map((item) => (
-                    <li key={item.candidacyId} className="px-5 py-3">
-                      <Link
-                        href={`/campanas/${item.campaignId}`}
-                        className="text-sm font-medium text-ink-900 hover:text-brand-700"
-                      >
-                        {item.influencerName}
-                      </Link>
-                      <p className="text-xs text-ink-500">
-                        {item.campaignName} · {item.clientName} · propuesto {relativeDays(item.since)}
-                      </p>
+                    <li key={item.candidacyId} className="flex items-center gap-3 px-5 py-3">
+                      <Avatar name={item.influencerName} size="sm" />
+                      <div className="min-w-0">
+                        <Link
+                          href={`/campanas/${item.campaignId}`}
+                          className="block truncate text-sm font-medium text-ink-900 underline-offset-4 hover:underline"
+                        >
+                          {item.influencerName}
+                        </Link>
+                        <p className="truncate text-xs text-ink-500">
+                          {item.campaignName} · {item.clientName} · propuesto {relativeDays(item.since)}
+                        </p>
+                      </div>
                     </li>
                   ))}
                 </ul>

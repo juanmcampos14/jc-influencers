@@ -10,7 +10,7 @@ export default async function PortalLayout({ children }: { children: React.React
   if (!ctx) redirect('/login')
 
   const activeClient = ctx.clients.find((client) => client.id === ctx.activeClientId)
-  const nav: NavItem[] = [{ href: '/portal', label: 'Mis campañas' }]
+  const nav: NavItem[] = [{ href: '/portal', label: 'Mis campañas', icon: 'campanas' }]
 
   // El espacio de cada cliente se ve con su identidad. Si no tiene una aprobada,
   // se usa el tema neutro de JC.

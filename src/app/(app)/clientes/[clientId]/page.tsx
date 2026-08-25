@@ -45,6 +45,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
     <>
       <PageHeader
         title={client.name}
+        variant="nombre"
         description={client.description ?? undefined}
         breadcrumb={
           <Link href="/clientes" className="hover:underline">

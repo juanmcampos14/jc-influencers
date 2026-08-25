@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { Anton, Inter } from 'next/font/google'
 import { Toaster } from 'sonner'
 import './globals.css'
 
@@ -12,6 +13,15 @@ import './globals.css'
  */
 export const dynamic = 'force-dynamic'
 
+/**
+ * Las dos tipografías de JC. Next las sirve desde nuestro propio dominio, así
+ * que no hay pedido a Google en cada carga ni un tercero mirando quién entra.
+ * Las tipografías que elige cada cliente para su espacio sí vienen de Google,
+ * porque no se saben hasta que hay un pedido.
+ */
+const inter = Inter({ subsets: ['latin'], variable: '--jc-font-inter', display: 'swap' })
+const anton = Anton({ subsets: ['latin'], weight: '400', variable: '--jc-font-anton', display: 'swap' })
+
 export const metadata: Metadata = {
   title: { default: 'JC Influencers', template: '%s · JC Influencers' },
   description: 'Plataforma de gestión de campañas de marketing de influencers.',
@@ -21,15 +31,16 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  themeColor: '#0c0d10',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es-AR">
+    <html lang="es-AR" className={`${inter.variable} ${anton.variable}`}>
       <body className="min-h-screen antialiased">
         <a
           href="#contenido"
-          className="sr-only-focusable absolute left-3 top-3 z-50 rounded-md bg-brand-600 px-3 py-2 text-sm text-on-brand"
+          className="sr-only-focusable absolute left-3 top-3 z-50 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-on-brand"
         >
           Saltar al contenido
         </a>

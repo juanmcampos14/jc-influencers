@@ -3,18 +3,19 @@ import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
-import { ExternalLink } from '@/components/status-badge'
+import { ExternalLink, InfluencerStatusBadge } from '@/components/status-badge'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
 import { can } from '@/lib/authz/context'
 import { searchInfluencers } from '@/lib/repos/influencers'
 import { scoped } from '@/lib/repos/base'
 import { formatFollowers, formatPercent } from '@/lib/util/format'
-import { InfluencerFilters } from './filters'
-import { NewInfluencerDialog } from './new-influencer-dialog'
+import { InfluencerFilters } from '../filters'
+import { NewInfluencerDialog } from '../new-influencer-dialog'
 
 export const metadata: Metadata = { title: 'Influencers' }
 export const dynamic = 'force-dynamic'
@@ -116,15 +117,22 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                       return (
                         <Tr key={influencer.id}>
                           <Td>
-                            <Link
-                              href={`/influencers/${influencer.id}`}
-                              className="font-medium text-ink-900 hover:text-brand-700"
-                            >
-                              {influencer.displayName}
-                            </Link>
-                            {influencer.primaryHandle ? (
-                              <p className="text-xs text-ink-500">@{influencer.primaryHandle}</p>
-                            ) : null}
+                            <div className="flex items-center gap-2.5">
+                              <Avatar name={influencer.displayName} />
+                              <div className="min-w-0">
+                                <Link
+                                  href={`/influencers/${influencer.id}`}
+                                  className="block truncate font-medium text-ink-900 underline-offset-4 hover:underline"
+                                >
+                                  {influencer.displayName}
+                                </Link>
+                                {influencer.primaryHandle &&
+                                influencer.primaryHandle.toLowerCase() !==
+                                  influencer.displayName.replace(/^@/, '').toLowerCase() ? (
+                                  <p className="truncate text-xs text-ink-500">@{influencer.primaryHandle}</p>
+                                ) : null}
+                              </div>
+                            </div>
                           </Td>
                           <Td className="text-sm">{influencer.country ?? '—'}</Td>
                           <Td>
@@ -148,11 +156,18 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                           </Td>
                           <Td className="text-right tabular-nums">
                             {formatFollowers(main?.followers)}
-                            {main?.stale ? <span className="block text-[11px] text-amber-700">dato viejo</span> : null}
+                            {main?.stale ? (
+                              <span
+                                className="block text-[11px] font-medium text-amber-700"
+                                title="La última medición tiene más de 45 días"
+                              >
+                                sin actualizar
+                              </span>
+                            ) : null}
                           </Td>
                           <Td className="text-right tabular-nums">{formatPercent(main?.engagementRate)}</Td>
                           <Td>
-                            <Badge tone={influencer.status === 'ACTIVE' ? 'emerald' : 'slate'}>{influencer.status}</Badge>
+                            <InfluencerStatusBadge status={influencer.status} />
                           </Td>
                         </Tr>
                       )

@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge'
 import { CANDIDACY_STATUS_SEED } from '@/lib/domain/statuses'
+import { INFLUENCER_STATUS } from '@/lib/domain/labels'
 
 const STATUS_BY_KEY = new Map(CANDIDACY_STATUS_SEED.map((status) => [status.key, status]))
 
@@ -38,6 +39,24 @@ export function CampaignStatusBadge({ status }: { status: string }) {
   return <Badge tone={entry.tone}>{entry.label}</Badge>
 }
 
+/**
+ * Estado del influencer en la base de la agencia.
+ *
+ * Las etiquetas salen de `domain/labels` para que el badge y el filtro no
+ * puedan desincronizarse: antes la tabla decía "En reserva" y el desplegable
+ * "Backlog" para el mismo valor.
+ */
+export const INFLUENCER_STATUS_LABELS = INFLUENCER_STATUS
+
+export function InfluencerStatusBadge({ status }: { status: string }) {
+  const entry = INFLUENCER_STATUS_LABELS[status] ?? { label: status, tone: 'slate' }
+  return (
+    <Badge tone={entry.tone} dot>
+      {entry.label}
+    </Badge>
+  )
+}
+
 export function StarsLabel({ value }: { value: number | null }) {
   if (!value) return <span className="text-ink-400">—</span>
   return (
@@ -63,7 +82,7 @@ export function ExternalLink({ href, children }: { href: string; children: React
       href={safe}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-brand-600 underline underline-offset-2 hover:text-brand-700"
+      className="text-ink-700 underline decoration-ink-300 underline-offset-2 transition-colors hover:text-ink-950 hover:decoration-ink-900"
     >
       {children}
     </a>

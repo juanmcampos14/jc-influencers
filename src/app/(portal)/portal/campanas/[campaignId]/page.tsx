@@ -69,6 +69,7 @@ export default async function PortalCampaignPage({
     <>
       <PageHeader
         title={campaign.name}
+        variant="nombre"
         description={campaign.objective ?? campaign.description ?? undefined}
         breadcrumb={
           <Link href="/portal" className="hover:underline">

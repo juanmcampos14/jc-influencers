@@ -25,6 +25,7 @@ export default async function BrandPage({ params }: { params: Promise<{ clientId
     <>
       <PageHeader
         title={`Identidad visual · ${client.name}`}
+        variant="nombre"
         description="Define cómo se ve el espacio de este cliente. Se aplica a su portal, no al panel interno de la agencia."
         breadcrumb={
           <span className="flex gap-1">

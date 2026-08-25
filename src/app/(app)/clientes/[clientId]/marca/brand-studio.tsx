@@ -16,6 +16,8 @@ import { extractBrandAction, resetBrandAction, saveBrandAction, type BrandPropos
 import { BrandPreview } from './brand-preview'
 
 type Source = 'WEBSITE' | 'INSTAGRAM' | 'UPLOAD' | 'MANUAL'
+/** Lo que se puede elegir en el selector de fuente. */
+type PickableSource = Exclude<Source, 'MANUAL'>
 
 const COLOR_FIELDS: Array<{ key: keyof ThemeColors; label: string; hint: string }> = [
   { key: 'primary', label: 'Color de marca', hint: 'Botones, enlaces y acentos.' },
@@ -40,7 +42,15 @@ export function BrandStudio({
   instagramAvailable: boolean
 }) {
   const router = useRouter()
-  const [source, setSource] = React.useState<Source>(brand.source)
+  /**
+   * Fuente elegida en el selector. Nunca vale 'MANUAL': ese estado significa
+   * "la paleta se editó a mano" y no es algo que se pueda elegir acá. Mantener
+   * los dos sentidos en una sola variable hacía que el selector mostrara una
+   * opción y el formulario mandara otra.
+   */
+  const [source, setSource] = React.useState<PickableSource>(
+    brand.source === 'MANUAL' ? 'WEBSITE' : brand.source,
+  )
   const [colors, setColors] = React.useState<ThemeColors>(brand.colors)
   const [mode, setMode] = React.useState<'LIGHT' | 'DARK'>(brand.mode)
   const [radius, setRadius] = React.useState(brand.radius)
@@ -152,19 +162,38 @@ export function BrandStudio({
             </p>
           </CardHeader>
           <CardBody className="space-y-4">
-            <form action={extract} className="space-y-3">
-              <input type="hidden" name="kind" value={source === 'MANUAL' ? 'WEBSITE' : source} />
-              <Field label="Fuente" htmlFor="source">
+            {/*
+              * Fuente y Modo eligen QUÉ se pide, no son datos del pedido: por eso
+              * viven fuera del formulario y viajan en campos ocultos.
+              *
+              * Al terminar una acción de servidor, React resetea los controles
+              * del formulario a su valor por defecto. Estando adentro, el
+              * selector volvía a "Sitio web" mientras el estado seguía en
+              * "Subir el logo": la pantalla mostraba una cosa y el formulario
+              * mandaba otra.
+              */}
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label="Fuente" htmlFor="source" className="min-w-56 flex-1">
                 <Select
                   id="source"
-                  value={source === 'MANUAL' ? 'WEBSITE' : source}
-                  onChange={(event) => setSource(event.target.value as Source)}
+                  value={source}
+                  onChange={(event) => setSource(event.target.value as PickableSource)}
                 >
                   <option value="WEBSITE">Sitio web del cliente</option>
                   <option value="INSTAGRAM">Instagram del cliente</option>
                   <option value="UPLOAD">Subir el logo o una captura</option>
                 </Select>
               </Field>
+              <Field label="Modo" htmlFor="mode" className="w-40">
+                <Select id="mode" value={mode} onChange={(event) => setMode(event.target.value as 'LIGHT' | 'DARK')}>
+                  <option value="LIGHT">Claro</option>
+                  <option value="DARK">Oscuro</option>
+                </Select>
+              </Field>
+            </div>
+
+            <form action={extract} className="space-y-3">
+              <input type="hidden" name="kind" value={source} />
 
               {source === 'INSTAGRAM' ? (
                 <>
@@ -200,17 +229,9 @@ export function BrandStudio({
                 </Field>
               )}
 
-              <div className="flex flex-wrap items-end gap-3">
-                <Field label="Modo" htmlFor="mode" className="w-40">
-                  <Select id="mode" value={mode} onChange={(event) => setMode(event.target.value as 'LIGHT' | 'DARK')}>
-                    <option value="LIGHT">Claro</option>
-                    <option value="DARK">Oscuro</option>
-                  </Select>
-                </Field>
-                <Button type="submit" disabled={pending}>
-                  {pending ? 'Analizando…' : 'Analizar y proponer'}
-                </Button>
-              </div>
+              <Button type="submit" disabled={pending}>
+                {pending ? 'Analizando…' : 'Analizar y proponer'}
+              </Button>
             </form>
 
             {error ? <ErrorState title={error} /> : null}

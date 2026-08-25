@@ -4,13 +4,59 @@ import * as React from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Check, ChevronDown, LogOut, Menu, X } from 'lucide-react'
+import {
+  BarChart3,
+  Building2,
+  Check,
+  ChevronsUpDown,
+  ClipboardList,
+  FileUp,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Megaphone,
+  Radar,
+  ShieldCheck,
+  Users,
+  X,
+} from 'lucide-react'
 import { cn } from '@/lib/util/format'
 import { switchClientAction } from '@/app/(app)/actions/session'
 import { logoutAction } from '@/app/(app)/actions/session'
 
-export type NavItem = { href: string; label: string; badge?: number }
+/** Nombres de ícono admitidos. El layout es un componente de servidor y no puede pasar componentes. */
+export type NavIcon =
+  | 'panel'
+  | 'clientes'
+  | 'campanas'
+  | 'influencers'
+  | 'scouting'
+  | 'importacion'
+  | 'usuarios'
+  | 'auditoria'
+
+const ICONOS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
+  panel: LayoutDashboard,
+  clientes: Building2,
+  campanas: Megaphone,
+  influencers: Users,
+  scouting: Radar,
+  importacion: FileUp,
+  usuarios: ShieldCheck,
+  auditoria: ClipboardList,
+}
+
+export type NavItem = { href: string; label: string; badge?: number; icon?: NavIcon }
 export type ShellClient = { id: string; name: string }
+
+/** Iniciales para el avatar de quien está usando la aplicación. */
+function iniciales(nombre: string): string {
+  const partes = nombre.trim().split(/\s+/).filter(Boolean)
+  if (partes.length === 0) return '?'
+  const primera = partes[0]?.[0] ?? ''
+  const ultima = partes.length > 1 ? (partes[partes.length - 1]?.[0] ?? '') : ''
+  return (primera + ultima).toUpperCase()
+}
 
 export function AppShell({
   nav,
@@ -53,21 +99,29 @@ export function AppShell({
     })
   }
 
+  const marca = logoUrl ? (
+    <span className={cn('inline-flex items-center rounded-lg', logoNeedsBackdrop && 'bg-white/10 px-2.5 py-1.5')}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={logoUrl} alt={brandName ?? ''} className="max-h-8 max-w-36 object-contain" />
+    </span>
+  ) : brandName ? (
+    <span className="titulo-display text-lg text-nav-text-strong">{brandName}</span>
+  ) : (
+    <span className="inline-flex items-baseline gap-2">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/jc-monograma.png" alt="JC" className="h-5 w-auto" />
+      <span className="titulo-display text-[15px] leading-none text-nav-text-strong">Influencers</span>
+    </span>
+  )
+
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
-      <header className="flex items-center justify-between border-b border-ink-200 bg-surface px-4 py-3 lg:hidden">
-        {logoUrl ? (
-          <span className={cn('inline-flex items-center rounded-md', logoNeedsBackdrop && 'bg-brand-600 px-2 py-1')}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoUrl} alt={brandName ?? ''} className="max-h-7 max-w-32 object-contain" />
-          </span>
-        ) : (
-          <span className="text-sm font-semibold text-ink-900">{brandName ?? 'JC Influencers'}</span>
-        )}
+      <header className="zona-oscura flex items-center justify-between bg-nav px-4 py-3 lg:hidden">
+        {marca}
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="rounded-md p-2 text-ink-700 hover:bg-ink-100"
+          className="rounded-md p-2 text-nav-text hover:bg-nav-2 hover:text-nav-text-strong"
           aria-expanded={open}
           aria-controls="nav-principal"
           aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
@@ -79,78 +133,64 @@ export function AppShell({
       <nav
         id="nav-principal"
         className={cn(
-          'w-full shrink-0 border-b border-ink-200 bg-surface lg:w-64 lg:border-b-0 lg:border-r',
-          open ? 'block' : 'hidden lg:block',
+          'zona-oscura flex w-full shrink-0 flex-col bg-nav lg:w-[248px] lg:sticky lg:top-0 lg:h-screen',
+          open ? 'block' : 'hidden lg:flex',
         )}
         aria-label="Navegación principal"
       >
-        <div className="hidden px-5 py-4 lg:block">
-          {logoUrl ? (
-            <>
-              <span
-                className={cn(
-                  'inline-flex items-center rounded-lg',
-                  logoNeedsBackdrop && 'bg-brand-600 px-3 py-2',
-                )}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logoUrl} alt={brandName ?? ''} className="max-h-9 max-w-40 object-contain" />
-              </span>
-              <p className="mt-1.5 text-xs text-ink-500">{sideLabel}</p>
-            </>
-          ) : (
-            <>
-              <p className="text-sm font-semibold tracking-tight text-ink-900">{brandName ?? 'JC Influencers'}</p>
-              <p className="text-xs text-ink-500">{sideLabel}</p>
-            </>
-          )}
+        <div className="hidden px-5 pb-4 pt-5 lg:block">
+          {marca}
+          <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-nav-text-2">{sideLabel}</p>
         </div>
 
         {clients.length > 0 ? (
-          <div className="border-y border-ink-200 px-3 py-3">
-            <p className="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-wide text-ink-400">
+          <div className="px-3 pb-3 pt-3 lg:pt-0">
+            <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-nav-text-2">
               Espacio de trabajo
             </p>
             {clients.length === 1 ? (
-              <p className="px-2 text-sm font-medium text-ink-800">{active?.name ?? clients[0]?.name}</p>
+              <p className="rounded-lg bg-nav-2 px-3 py-2 text-sm font-medium text-nav-text-strong">
+                {active?.name ?? clients[0]?.name}
+              </p>
             ) : (
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger
-                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-ink-300 px-3 py-2 text-sm text-ink-800 hover:bg-ink-50 disabled:opacity-60"
+                  className="flex w-full items-center justify-between gap-2 rounded-lg bg-nav-2 px-3 py-2 text-sm font-medium text-nav-text-strong hover:bg-nav-active disabled:opacity-60"
                   disabled={switching}
                 >
                   <span className="truncate">{active?.name ?? 'Elegí un cliente'}</span>
-                  <ChevronDown className="size-4 shrink-0 text-ink-500" aria-hidden="true" />
+                  <ChevronsUpDown className="size-3.5 shrink-0 text-nav-text" aria-hidden="true" />
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Portal>
                   <DropdownMenu.Content
-                    className="z-50 max-h-80 w-64 overflow-y-auto rounded-lg border border-ink-200 bg-surface p-1 shadow-lg"
+                    className="z-50 max-h-80 w-64 overflow-y-auto rounded-xl border border-ink-200 bg-surface p-1 shadow-xl"
                     align="start"
-                    sideOffset={4}
+                    sideOffset={6}
                   >
                     {clients.map((client) => (
                       <DropdownMenu.Item
                         key={client.id}
                         onSelect={() => switchTo(client.id)}
-                        className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm text-ink-800 outline-none data-[highlighted]:bg-ink-100"
+                        className="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm text-ink-800 outline-none data-[highlighted]:bg-ink-100"
                       >
                         <span className="truncate">{client.name}</span>
-                        {client.id === activeClientId ? <Check className="size-4 text-brand-600" /> : null}
+                        {client.id === activeClientId ? <Check className="size-4 text-ink-900" /> : null}
                       </DropdownMenu.Item>
                     ))}
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
             )}
-            <p className="mt-1.5 px-2 text-[11px] text-ink-400">
+            <p className="mt-1.5 px-2 text-[11px] leading-snug text-nav-text-2">
               Se trabaja en un cliente por vez. Los datos nunca se mezclan.
             </p>
           </div>
         ) : null}
 
-        <ul className="space-y-0.5 p-3">
+        <ul className="space-y-0.5 px-3 pb-3">
           {nav.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+            const Icono = item.icon ? ICONOS[item.icon] : BarChart3
             return (
               <li key={item.href}>
                 <Link
@@ -158,13 +198,23 @@ export function AppShell({
                   onClick={() => setOpen(false)}
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm',
-                    isActive ? 'bg-brand-50 font-medium text-brand-700' : 'text-ink-700 hover:bg-ink-100',
+                    'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
+                    isActive
+                      ? 'bg-nav-active font-semibold text-nav-active-text'
+                      : 'text-nav-text hover:bg-nav-2 hover:text-nav-text-strong',
                   )}
                 >
-                  <span>{item.label}</span>
+                  {/* La marca activa no es sólo el color: también esta barra. */}
+                  {isActive ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-nav-active-text"
+                    />
+                  ) : null}
+                  <Icono className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="flex-1 truncate">{item.label}</span>
                   {item.badge && item.badge > 0 ? (
-                    <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-[11px] font-semibold text-on-brand">
+                    <span className="rounded-full bg-nav-active-text px-1.5 py-px text-[11px] font-bold text-nav">
                       {item.badge}
                     </span>
                   ) : null}
@@ -174,17 +224,23 @@ export function AppShell({
           })}
         </ul>
 
-        <div className="mt-auto border-t border-ink-200 p-3">
+        <div className="mt-auto border-t border-nav-border p-3">
           {brandName && logoUrl ? (
-            <p className="mb-2 px-2 text-[11px] text-ink-400">Espacio gestionado por JC Influencers</p>
+            <p className="mb-2 px-2 text-[11px] text-nav-text-2">Espacio gestionado por JC Influencers</p>
           ) : null}
-          <p className="truncate px-2 text-sm font-medium text-ink-800">{user.name}</p>
-          <p className="truncate px-2 text-xs text-ink-500">{user.email}</p>
-          <p className="mt-0.5 truncate px-2 text-xs text-ink-400">{roleLabel}</p>
-          <form action={logoutAction} className="mt-2">
+          <div className="flex items-center gap-2.5 px-2 py-1">
+            <span className="grid size-8 shrink-0 place-items-center rounded-full bg-nav-2 text-[11px] font-bold text-nav-text-strong">
+              {iniciales(user.name)}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium text-nav-text-strong">{user.name}</span>
+              <span className="block truncate text-[11px] text-nav-text-2">{roleLabel || user.email}</span>
+            </span>
+          </div>
+          <form action={logoutAction} className="mt-1.5">
             <button
               type="submit"
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-ink-100"
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-nav-text hover:bg-nav-2 hover:text-nav-text-strong"
             >
               <LogOut className="size-4" aria-hidden="true" />
               Cerrar sesión
@@ -205,19 +261,35 @@ export function PageHeader({
   description,
   actions,
   breadcrumb,
+  variant = 'seccion',
 }: {
   title: string
   description?: string
   actions?: React.ReactNode
   breadcrumb?: React.ReactNode
+  /**
+   * `seccion` es para los títulos fijos del producto (Campañas, Clientes) y va
+   * en condensada mayúscula. `nombre` es para lo que escribió el usuario -- una
+   * campaña, un cliente, un influencer -- y respeta cómo lo tipeó: gritarlo en
+   * mayúsculas borra su decisión y no entra en un teléfono.
+   */
+  variant?: 'seccion' | 'nombre'
 }) {
   return (
     <div className="border-b border-ink-200 bg-surface px-5 py-5 sm:px-8">
       {breadcrumb ? <div className="mb-2 text-xs text-ink-500">{breadcrumb}</div> : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight text-ink-900">{title}</h1>
-          {description ? <p className="mt-0.5 max-w-2xl text-sm text-ink-500">{description}</p> : null}
+        <div className="min-w-0">
+          <h1
+            className={
+              variant === 'seccion'
+                ? 'titulo-display text-[26px] text-ink-950 sm:text-[30px]'
+                : 'text-xl font-semibold tracking-tight text-ink-950 sm:text-2xl'
+            }
+          >
+            {title}
+          </h1>
+          {description ? <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ink-500">{description}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>

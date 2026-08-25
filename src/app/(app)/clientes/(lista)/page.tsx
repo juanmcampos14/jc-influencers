@@ -9,7 +9,7 @@ import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
 import { can } from '@/lib/authz/context'
 import { listClients } from '@/lib/repos/clients'
-import { NewClientDialog } from './new-client-dialog'
+import { NewClientDialog } from '../new-client-dialog'
 
 export const metadata: Metadata = { title: 'Clientes' }
 export const dynamic = 'force-dynamic'

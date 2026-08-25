@@ -290,7 +290,7 @@ export function CandidacyTable({
                               </span>
                             ) : null}
                             {profile?.stale ? (
-                              <span className="block text-[11px] text-amber-700">dato viejo</span>
+                              <span className="block text-[11px] font-medium text-amber-700">sin actualizar</span>
                             ) : null}
                           </Td>
                         ) : null}

@@ -3,15 +3,10 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/field'
+import { INFLUENCER_STATUS, opcionesDe, platformLabel } from '@/lib/domain/labels'
 
 const PLATFORMS = ['INSTAGRAM', 'TIKTOK', 'YOUTUBE', 'LINKTREE', 'WEBSITE', 'X', 'TWITCH']
-const STATUSES = [
-  { value: 'NEW', label: 'Nuevo' },
-  { value: 'ACTIVE', label: 'Activo' },
-  { value: 'BACKLOG', label: 'Backlog' },
-  { value: 'BLOCKED', label: 'Bloqueado' },
-  { value: 'ARCHIVED', label: 'Archivado' },
-]
+const STATUSES = opcionesDe(INFLUENCER_STATUS)
 
 export function InfluencerFilters({
   niches,
@@ -63,7 +58,7 @@ export function InfluencerFilters({
           <option value="">Todas</option>
           {PLATFORMS.map((platform) => (
             <option key={platform} value={platform}>
-              {platform}
+              {platformLabel(platform)}
             </option>
           ))}
         </Select>

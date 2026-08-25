@@ -1,6 +1,8 @@
 import {
+  CONTRAST_MIN_TEXT,
   darken,
   enforceThemeContrast,
+  ensureContrast,
   lighten,
   mix,
   NEUTRAL_DARK,
@@ -67,6 +69,31 @@ export const NEUTRAL_THEME: ThemeInput = { colors: NEUTRAL_LIGHT, mode: 'LIGHT',
  * en oscuro, al revés. Cada paso se mezcla con el color de marca para que el
  * gris del producto tenga el tinte del cliente sin volverse ilegible.
  */
+/**
+ * La barra lateral vive sobre fondo oscuro, así que necesita su propia escala:
+ * los grises del área de trabajo ahí no se distinguen.
+ *
+ * Se deriva de la marca en lugar de fijarse, para que el espacio de cada
+ * cliente tenga su barra y no la de JC. El color del ítem activo se aclara
+ * hasta que se lee de verdad sobre ese fondo; si la marca es muy oscura, el
+ * resultado es un tono claro de la misma familia, no un gris cualquiera.
+ */
+function navVariables(theme: ThemeColors): Record<string, string> {
+  const fondo = mix('#0c0d10', theme.primary, 0.3)
+  const fondo2 = lighten(fondo, 0.06)
+  const activo = ensureContrast(theme.accent, fondo, CONTRAST_MIN_TEXT)
+  return {
+    '--jc-nav-bg': fondo,
+    '--jc-nav-bg-2': fondo2,
+    '--jc-nav-border': lighten(fondo, 0.1),
+    '--jc-nav-text': mix('#ffffff', fondo, 0.38),
+    '--jc-nav-text-strong': mix('#ffffff', fondo, 0.04),
+    '--jc-nav-active-bg': lighten(fondo, 0.1),
+    '--jc-nav-active-text': activo,
+    '--jc-nav-accent': activo,
+  }
+}
+
 export function resolveTheme(input: ThemeInput): ResolvedTheme {
   const safe = input.safeMode === true
   const base = safe ? (input.mode === 'DARK' ? NEUTRAL_DARK : NEUTRAL_LIGHT) : input.colors
@@ -98,9 +125,21 @@ export function resolveTheme(input: ThemeInput): ResolvedTheme {
     '--jc-text': theme.text,
     '--jc-text-strong': dark ? lighten(theme.text, 0.1) : darken(theme.text, 0.25),
 
+    ...navVariables(theme),
+
     '--jc-radius': `${Math.max(0, Math.min(24, input.radius ?? 12))}px`,
     '--jc-font-body': fontStack(safe ? null : input.fontBody),
     '--jc-font-heading': fontStack(safe ? null : (input.fontHeading ?? input.fontBody)),
+    /*
+     * La tipografía de los títulos grandes también es del cliente. Sin esto el
+     * portal salía con los colores de la marca y los títulos en Anton, que es
+     * de JC: un espacio "del cliente" con la tipografía de la agencia.
+     */
+    '--jc-font-display': safe
+      ? SYSTEM_STACK
+      : sanitizeFontName(input.fontHeading)
+        ? fontStack(input.fontHeading)
+        : 'var(--jc-font-anton), Impact, sans-serif',
   }
 
   const googleFonts = safe

@@ -14,7 +14,7 @@ export function Th({ className, ...props }: React.ThHTMLAttributes<HTMLTableCell
     <th
       scope="col"
       className={cn(
-        'sticky top-0 z-10 border-b border-ink-200 bg-ink-50 px-3 py-2 text-left text-xs font-semibold text-ink-600',
+        'sticky top-0 z-10 border-b border-ink-200 bg-surface-2/95 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-500 backdrop-blur',
         className,
       )}
       {...props}
@@ -23,9 +23,9 @@ export function Th({ className, ...props }: React.ThHTMLAttributes<HTMLTableCell
 }
 
 export function Td({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn('border-b border-ink-100 px-3 py-2.5 align-top text-ink-800', className)} {...props} />
+  return <td className={cn('border-b border-ink-100 px-3 py-3 align-middle text-ink-800', className)} {...props} />
 }
 
 export function Tr({ className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn('hover:bg-ink-50', className)} {...props} />
+  return <tr className={cn('transition-colors hover:bg-ink-50/70', className)} {...props} />
 }

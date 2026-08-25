@@ -4,14 +4,15 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/util/format'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 whitespace-nowrap [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-[background-color,color,box-shadow,transform] active:translate-y-px disabled:pointer-events-none disabled:opacity-50 whitespace-nowrap [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        primary: 'bg-brand-600 text-on-brand hover:bg-brand-700',
-        secondary: 'bg-surface text-ink-800 border border-ink-300 hover:bg-ink-100',
-        ghost: 'text-ink-700 hover:bg-ink-100',
-        danger: 'bg-rose-600 text-white hover:bg-rose-700',
+        // Negro con la etiqueta en lima: la firma de JC, y 18:1 de contraste.
+        primary: 'bg-brand-600 text-on-brand shadow-sm hover:bg-brand-700',
+        secondary: 'bg-surface text-ink-800 border border-ink-300 shadow-xs hover:bg-ink-50 hover:border-ink-400',
+        ghost: 'text-ink-600 hover:bg-ink-100 hover:text-ink-900',
+        danger: 'bg-rose-600 text-white shadow-sm hover:bg-rose-700',
         subtle: 'bg-ink-100 text-ink-800 hover:bg-ink-200',
       },
       size: {

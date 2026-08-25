@@ -6,7 +6,7 @@ import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { InfoNote } from '@/components/ui/states'
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
-import { ApprovalBadge, ExternalLink, StatusBadge } from '@/components/status-badge'
+import { ApprovalBadge, ExternalLink, StatusBadge, INFLUENCER_STATUS_LABELS } from '@/components/status-badge'
 import { requireContext } from '@/lib/auth/current'
 import { can } from '@/lib/authz/context'
 import { NotFoundError } from '@/lib/authz/errors'
@@ -42,6 +42,7 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
     <>
       <PageHeader
         title={influencer.displayName}
+        variant="nombre"
         description={influencer.bio ?? undefined}
         breadcrumb={
           <Link href="/influencers" className="hover:underline">
@@ -234,7 +235,7 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
                   <Row label="Ciudad" value={influencer.city} />
                   <Row label="Idioma" value={influencer.language} />
                   <Row label="Representante" value={influencer.representative} />
-                  <Row label="Estado" value={influencer.status} />
+                  <Row label="Estado" value={INFLUENCER_STATUS_LABELS[influencer.status]?.label ?? influencer.status} />
                   <Row label="Edad" value={ADULT_LABELS[influencer.adultStatus] ?? influencer.adultStatus} />
                 </dl>
                 {influencer.niches.length > 0 ? (

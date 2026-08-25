@@ -5,7 +5,7 @@ import { cn } from '@/lib/util/format'
 export function Label({ className, ...props }: React.ComponentProps<typeof LabelPrimitive.Root>) {
   return (
     <LabelPrimitive.Root
-      className={cn('text-sm font-medium text-ink-700', className)}
+      className={cn('text-[13px] font-medium text-ink-700', className)}
       {...props}
     />
   )
@@ -15,7 +15,8 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
   return (
     <input
       className={cn(
-        'h-9 w-full rounded-lg border border-ink-300 bg-surface px-3 text-sm text-ink-900 placeholder:text-ink-400',
+        'h-10 w-full rounded-lg border border-ink-300 bg-surface px-3 text-sm text-ink-900 shadow-xs transition-colors placeholder:text-ink-400',
+        'hover:border-ink-400',
         'disabled:cursor-not-allowed disabled:bg-ink-100',
         'aria-[invalid=true]:border-rose-500',
         className,
@@ -29,7 +30,7 @@ export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<H
   return (
     <textarea
       className={cn(
-        'min-h-[80px] w-full rounded-lg border border-ink-300 bg-surface px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400',
+        'min-h-[88px] w-full rounded-lg border border-ink-300 bg-surface px-3 py-2 text-sm leading-relaxed text-ink-900 shadow-xs transition-colors placeholder:text-ink-400 hover:border-ink-400',
         'aria-[invalid=true]:border-rose-500',
         className,
       )}
@@ -42,7 +43,7 @@ export function Select({ className, ...props }: React.SelectHTMLAttributes<HTMLS
   return (
     <select
       className={cn(
-        'h-9 w-full rounded-lg border border-ink-300 bg-surface px-2 text-sm text-ink-900',
+        'h-10 w-full rounded-lg border border-ink-300 bg-surface px-2.5 text-sm text-ink-900 shadow-xs transition-colors hover:border-ink-400',
         className,
       )}
       {...props}
@@ -54,7 +55,7 @@ export function Checkbox({ className, ...props }: React.InputHTMLAttributes<HTML
   return (
     <input
       type="checkbox"
-      className={cn('size-4 rounded border-ink-300 text-brand-600 accent-[oklch(0.51_0.17_262)]', className)}
+      className={cn('size-4 rounded border-ink-300 text-brand-600 accent-[var(--jc-primary)]', className)}
       {...props}
     />
   )
