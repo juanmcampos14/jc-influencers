@@ -276,12 +276,15 @@ export function PageHeader({
   description,
   actions,
   breadcrumb,
+  badge,
   variant = 'seccion',
 }: {
   title: string
   description?: string
   actions?: React.ReactNode
   breadcrumb?: React.ReactNode
+  /** Estado del objeto, al lado del título. Entre los botones parecía un botón. */
+  badge?: React.ReactNode
   /**
    * `seccion` es para los títulos fijos del producto (Campañas, Clientes) y va
    * en condensada mayúscula. `nombre` es para lo que escribió el usuario -- una
@@ -295,6 +298,7 @@ export function PageHeader({
       {breadcrumb ? <div className="mb-2 text-xs text-ink-500">{breadcrumb}</div> : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5">
           <h1
             className={
               variant === 'seccion'
@@ -304,6 +308,8 @@ export function PageHeader({
           >
             {title}
           </h1>
+          {badge}
+          </div>
           {description ? <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ink-500">{description}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}

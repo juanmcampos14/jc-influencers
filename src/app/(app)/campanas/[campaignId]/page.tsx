@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/app-shell'
 import { Badge } from '@/components/ui/badge'
+import { Stat, StatStrip } from '@/components/ui/stat'
 import { Button } from '@/components/ui/button'
 import { InfoNote } from '@/components/ui/states'
 import { CampaignStatusBadge } from '@/components/status-badge'
@@ -12,6 +13,7 @@ import { NotFoundError } from '@/lib/authz/errors'
 import { getBrief, getCampaign } from '@/lib/repos/campaigns'
 import { candidacySummary, duplicateWarnings, listCandidacies } from '@/lib/repos/candidacies'
 import { listComments } from '@/lib/repos/comments'
+import { platformLabel } from '@/lib/domain/labels'
 import { formatDate, formatMoney } from '@/lib/util/format'
 import { hrefCon } from '@/lib/util/query'
 import { CandidacyTable } from './candidacy-table'
@@ -94,6 +96,7 @@ export default async function CampaignDetailPage({
       <PageHeader
         title={campaign.name}
         variant="nombre"
+        badge={<CampaignStatusBadge status={campaign.status} />}
         description={campaign.objective ?? campaign.description ?? undefined}
         breadcrumb={
           <span className="flex gap-1">
@@ -108,7 +111,6 @@ export default async function CampaignDetailPage({
         }
         actions={
           <>
-            <CampaignStatusBadge status={campaign.status} />
             {canExport ? (
               <Button asChild variant="secondary" size="sm">
                 <a href={`/api/exportar/campana/${campaign.id}`}>Exportar CSV</a>
@@ -119,41 +121,54 @@ export default async function CampaignDetailPage({
         }
       />
 
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-ink-200 bg-surface px-5 pb-3 text-xs text-ink-600 sm:px-8">
-        <span>
-          Perfiles: <strong className="text-ink-900">{summary.total}</strong>
-        </span>
-        <span>
-          En shortlist: <strong className="text-ink-900">{summary.shortlist}</strong>
-        </span>
-        <span>
-          Aprobados: <strong className="text-emerald-700">{summary.byApproval.APPROVED ?? 0}</strong>
-        </span>
-        <span>
-          Pendientes: <strong className="text-amber-700">{summary.byApproval.PENDING ?? 0}</strong>
-        </span>
-        {canSeeBudget && campaign.budget ? (
+      {/*
+        * Antes esto era una tira de texto chico donde todo pesaba igual. Los
+        * números de una campaña son lo primero que se mira al abrirla, así que
+        * van como cifras. "Esperando al cliente" lleva el acento porque es lo
+        * único que exige una acción.
+        */}
+      <div className="border-b border-ink-200 bg-surface px-5 pb-4 sm:px-8">
+        <StatStrip>
+          <Stat label="Perfiles propuestos" value={summary.total} />
+          <Stat
+            label="Esperando al cliente"
+            value={(summary.byApproval.PENDING ?? 0) + (summary.byApproval.NEEDS_REVIEW ?? 0)}
+            tone="accent"
+          />
+          <Stat label="Aprobados" value={summary.byApproval.APPROVED ?? 0} tone="good" />
+          <Stat label="En shortlist" value={summary.shortlist} />
+        </StatStrip>
+
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-ink-600">
           <span>
-            Presupuesto estimado:{' '}
-            <strong className="text-ink-900">{formatMoney(campaign.budget.estimated, campaign.currency)}</strong>
-            {campaign.budget.cache != null ? (
-              <> · caché {formatMoney(campaign.budget.cache, campaign.currency)}</>
-            ) : null}
-            {campaign.budget.barterDescription ? <> · canje: {campaign.budget.barterDescription}</> : null}
+            {campaign.startDate || campaign.endDate ? (
+              <>
+                {formatDate(campaign.startDate, ctx.user.timezone)} → {formatDate(campaign.endDate, ctx.user.timezone)}
+              </>
+            ) : (
+              <span className="text-ink-500">Sin fechas definidas</span>
+            )}
           </span>
-        ) : null}
-        <span>
-          {formatDate(campaign.startDate, ctx.user.timezone)} → {formatDate(campaign.endDate, ctx.user.timezone)}
-        </span>
-        {campaign.platforms.length > 0 ? (
-          <span className="flex items-center gap-1">
-            {campaign.platforms.map((platform) => (
-              <Badge key={platform} tone="slate">
-                {platform}
-              </Badge>
-            ))}
-          </span>
-        ) : null}
+          {canSeeBudget && campaign.budget && campaign.budget.estimated != null ? (
+            <span>
+              Presupuesto estimado:{' '}
+              <strong className="text-ink-900">{formatMoney(campaign.budget.estimated, campaign.currency)}</strong>
+              {campaign.budget.cache != null ? (
+                <> · caché {formatMoney(campaign.budget.cache, campaign.currency)}</>
+              ) : null}
+              {campaign.budget.barterDescription ? <> · canje: {campaign.budget.barterDescription}</> : null}
+            </span>
+          ) : null}
+          {campaign.platforms.length > 0 ? (
+            <span className="flex items-center gap-1">
+              {campaign.platforms.map((platform) => (
+                <Badge key={platform} tone="slate">
+                  {platformLabel(platform)}
+                </Badge>
+              ))}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <nav className="border-b border-ink-200 bg-surface px-5 sm:px-8" aria-label="Secciones de la campaña">
