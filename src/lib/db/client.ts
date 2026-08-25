@@ -40,6 +40,27 @@ function create(): PrismaClient {
   })
 }
 
-export const prisma: PrismaClient = globalForPrisma.__jcPrisma ?? create()
+function instance(): PrismaClient {
+  if (!globalForPrisma.__jcPrisma) globalForPrisma.__jcPrisma = create()
+  return globalForPrisma.__jcPrisma
+}
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.__jcPrisma = prisma
+/**
+ * El cliente se construye la primera vez que se USA, no al importar el módulo.
+ *
+ * Durante `next build` se evalúan los módulos de todas las rutas sin que haya
+ * base de datos: si el cliente se creara al importar, el build fallaría con
+ * "Falta DATABASE_URL" antes de compilar nada. Importar tiene que ser inocuo;
+ * lo que necesita credenciales es conectarse.
+ */
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, property, receiver) {
+    return Reflect.get(instance() as object, property, receiver) as unknown
+  },
+  set(_target, property, value) {
+    return Reflect.set(instance() as object, property, value)
+  },
+  has(_target, property) {
+    return Reflect.has(instance() as object, property)
+  },
+})
