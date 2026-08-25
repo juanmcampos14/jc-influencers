@@ -1,0 +1,1033 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// JC Influencers — esquema de datos
+// Regla de aislamiento: TODA entidad que pertenece a un tenant lleva `clientId`
+// y referencia a su padre por clave compuesta (id, clientId) para que la base
+// impida por sí sola una referencia cruzada entre tenants.
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Identidad y acceso ───────────────────────────────────────────────────────
+
+enum AgencyRole {
+  PLATFORM_SUPERADMIN
+  AGENCY_ADMIN
+  ACCOUNT_MANAGER
+  SCOUT
+  FINANCE
+}
+
+enum ClientRole {
+  CLIENT_ADMIN
+  CLIENT_REVIEWER
+  CLIENT_VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id               String     @id @default(cuid())
+  email            String     @unique
+  name             String
+  passwordHash     String?
+  passwordSetAt    DateTime?
+  status           UserStatus @default(ACTIVE)
+  timezone         String     @default("America/Argentina/Buenos_Aires")
+  locale           String     @default("es-AR")
+  lastLoginAt      DateTime?
+  failedLoginCount Int        @default(0)
+  lockedUntil      DateTime?
+  disabledAt       DateTime?
+  disabledById     String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  sessions           Session[]
+  agencyMembership   AgencyMembership?
+  clientMemberships  ClientMembership[]
+  agencyClientAssignments AgencyClientAssignment[]
+  passwordResets     PasswordReset[]
+  invitationsCreated Invitation[]        @relation("InvitationCreatedBy")
+  invitationAccepted Invitation[]        @relation("InvitationAcceptedBy")
+  assignments        CampaignAssignment[]
+  comments           Comment[]
+  savedViews         SavedView[]
+  ownedCandidacies   Candidacy[]         @relation("CandidacyOwner")
+
+  @@index([status])
+  @@map("users")
+}
+
+model Session {
+  id             String    @id @default(cuid())
+  userId         String
+  tokenHash      String    @unique
+  activeClientId String?
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime  @default(now())
+  lastSeenAt     DateTime  @default(now())
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  revokedReason  String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  ip        String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+model Invitation {
+  id                String           @id @default(cuid())
+  email             String
+  name              String
+  tokenHash         String           @unique
+  status            InvitationStatus @default(PENDING)
+  agencyRole        AgencyRole?
+  clientId          String?
+  clientRole        ClientRole?
+  extraCapabilities String[]         @default([])
+  expiresAt         DateTime
+  acceptedAt        DateTime?
+  acceptedByUserId  String?
+  revokedAt         DateTime?
+  revokedById       String?
+  createdById       String
+  createdAt         DateTime         @default(now())
+
+  client     Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy  User    @relation("InvitationCreatedBy", fields: [createdById], references: [id])
+  acceptedBy User?   @relation("InvitationAcceptedBy", fields: [acceptedByUserId], references: [id])
+
+  @@index([email, status])
+  @@index([clientId])
+  @@map("invitations")
+}
+
+model AgencyMembership {
+  id                String     @id @default(cuid())
+  userId            String     @unique
+  role              AgencyRole
+  extraCapabilities String[]   @default([])
+  createdAt         DateTime   @default(now())
+  createdById       String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("agency_memberships")
+}
+
+/// Asignación de un empleado de agencia a un cliente. Es lo que limita el
+/// alcance de account managers, scouts y finanzas a "sus" clientes.
+model AgencyClientAssignment {
+  id          String   @id @default(cuid())
+  userId      String
+  clientId    String
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId])
+  @@index([clientId])
+  @@map("agency_client_assignments")
+}
+
+model ClientMembership {
+  id                String     @id @default(cuid())
+  userId            String
+  clientId          String
+  role              ClientRole
+  extraCapabilities String[]   @default([])
+  createdAt         DateTime   @default(now())
+  createdById       String?
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId])
+  @@index([clientId])
+  @@map("client_memberships")
+}
+
+// ── Tenants ──────────────────────────────────────────────────────────────────
+
+enum ClientStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model Client {
+  id              String       @id @default(cuid())
+  slug            String       @unique
+  name            String
+  legalName       String?
+  country         String?
+  markets         String[]     @default([])
+  website         String?
+  description     String?
+  status          ClientStatus @default(ACTIVE)
+  timezone        String       @default("America/Argentina/Buenos_Aires")
+  defaultCurrency String       @default("USD")
+  /// Habilita que el administrador del cliente invite a compañeros de su empresa.
+  allowClientUserInvites Boolean @default(false)
+  /// Permite al cliente descargar exportaciones.
+  allowClientExports     Boolean @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  createdById     String?
+  version         Int          @default(1)
+
+  memberships ClientMembership[]
+  agencyAssignments AgencyClientAssignment[]
+  campaigns   Campaign[]
+  invitations Invitation[]
+  candidacies Candidacy[]
+  comments    Comment[]
+  importRuns  ImportRun[]
+
+  @@index([status])
+  @@map("clients")
+}
+
+enum CampaignStatus {
+  DRAFT
+  BRIEFING
+  SCOUTING
+  PROPOSAL
+  NEGOTIATION
+  PRODUCTION
+  LIVE
+  CLOSED
+  CANCELLED
+}
+
+model Campaign {
+  id                  String         @id @default(cuid())
+  clientId            String
+  slug                String
+  name                String
+  description         String?
+  objective           String?
+  status              CampaignStatus @default(DRAFT)
+  countries           String[]       @default([])
+  platforms           String[]       @default([])
+  startDate           DateTime?
+  endDate             DateTime?
+  currency            String         @default("USD")
+  budgetEstimated     Decimal?       @db.Decimal(14, 2)
+  budgetCache         Decimal?       @db.Decimal(14, 2)
+  barterDescription   String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  createdById         String?
+  version             Int            @default(1)
+
+  client      Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  brief       CampaignBrief?
+  assignments CampaignAssignment[]
+  candidacies Candidacy[]
+  links       CampaignLink[]
+  documents   CampaignDocument[]
+  comments    Comment[]
+  importRuns  ImportRun[]
+
+  @@unique([clientId, slug])
+  /// Clave sobre la que cuelgan las FK compuestas de las entidades hijas.
+  @@unique([id, clientId])
+  @@index([clientId, status])
+  @@map("campaigns")
+}
+
+enum CampaignAssignmentRole {
+  OWNER
+  COLLABORATOR
+}
+
+model CampaignAssignment {
+  id         String                 @id @default(cuid())
+  campaignId String
+  clientId   String
+  userId     String
+  role       CampaignAssignmentRole @default(COLLABORATOR)
+  createdAt  DateTime               @default(now())
+
+  campaign Campaign @relation(fields: [campaignId, clientId], references: [id, clientId], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, userId])
+  @@index([clientId])
+  @@map("campaign_assignments")
+}
+
+model CampaignLink {
+  id         String   @id @default(cuid())
+  campaignId String
+  clientId   String
+  label      String
+  url        String
+  kind       String   @default("REFERENCE")
+  createdAt  DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId, clientId], references: [id, clientId], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@map("campaign_links")
+}
+
+model CampaignDocument {
+  id           String   @id @default(cuid())
+  campaignId   String
+  clientId     String
+  storageKey   String
+  filename     String
+  contentType  String
+  sizeBytes    Int
+  clientVisible Boolean @default(false)
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId, clientId], references: [id, clientId], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@map("campaign_documents")
+}
+
+// ── Brief y criterios ────────────────────────────────────────────────────────
+
+model CampaignBrief {
+  id                     String   @id @default(cuid())
+  campaignId             String   @unique
+  clientId               String
+  country                String?
+  language               String?
+  followersMin           Int?
+  followersMax           Int?
+  engagementRateMin      Decimal? @db.Decimal(6, 3)
+  audienceAgeMin         Int?
+  audienceAgeMax         Int?
+  audienceGeoPredominance String?
+  audienceGeoMinPercent  Int?
+  platforms              String[] @default([])
+  idealProfile           String?
+  contentIdeas           String?
+  realProductUses        String?
+  inclusionCriteria      String?
+  exclusionCriteria      String?
+  /// Notas internas del brief. NUNCA se serializan hacia usuarios de cliente.
+  internalNotes          String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  version                Int      @default(1)
+
+  campaign Campaign      @relation(fields: [campaignId, clientId], references: [id, clientId], onDelete: Cascade)
+  niches   BriefNiche[]
+  keywords BriefKeyword[]
+  clusters BriefCluster[]
+
+  @@unique([campaignId, clientId])
+  @@unique([id, clientId])
+  @@map("campaign_briefs")
+}
+
+enum BriefNicheMode {
+  PRIORITY
+  EXCLUDED
+}
+
+model BriefNiche {
+  id       String         @id @default(cuid())
+  briefId  String
+  clientId String
+  label    String
+  mode     BriefNicheMode @default(PRIORITY)
+  priority Int            @default(3)
+  idealProfile String?
+  order    Int            @default(0)
+
+  brief CampaignBrief @relation(fields: [briefId, clientId], references: [id, clientId], onDelete: Cascade)
+
+  @@index([briefId])
+  @@map("brief_niches")
+}
+
+model BriefKeyword {
+  id       String @id @default(cuid())
+  briefId  String
+  clientId String
+  category String
+  term     String
+  order    Int    @default(0)
+
+  brief CampaignBrief @relation(fields: [briefId, clientId], references: [id, clientId], onDelete: Cascade)
+
+  @@unique([briefId, category, term])
+  @@map("brief_keywords")
+}
+
+/// Distribución deseada del squad. Configurable por campaña, nunca fija en el sistema.
+model BriefCluster {
+  id            String  @id @default(cuid())
+  briefId       String
+  clientId      String
+  key           String
+  label         String
+  emoji         String?
+  description   String?
+  targetPercent Int     @default(0)
+  order         Int     @default(0)
+
+  brief       CampaignBrief @relation(fields: [briefId, clientId], references: [id, clientId], onDelete: Cascade)
+  candidacies Candidacy[]
+
+  @@unique([briefId, key])
+  @@unique([id, clientId])
+  @@map("brief_clusters")
+}
+
+// ── Base global de influencers (propiedad de la agencia, sin tenant) ─────────
+
+enum InfluencerStatus {
+  NEW
+  ACTIVE
+  BACKLOG
+  BLOCKED
+  ARCHIVED
+}
+
+enum AdultStatus {
+  CONFIRMED
+  NOT_CONFIRMED
+  NOT_APPLICABLE
+}
+
+model Influencer {
+  id            String           @id @default(cuid())
+  displayName   String
+  realName      String?
+  primaryHandle String?
+  country       String?
+  city          String?
+  language      String?
+  bio           String?
+  status        InfluencerStatus @default(NEW)
+  adultStatus   AdultStatus      @default(NOT_CONFIRMED)
+  representative String?
+  /// Datos de contacto: acceso restringido por la capacidad `influencer.contact.view`.
+  contactEmail  String?
+  contactPhone  String?
+  contactNotes  String?
+  /// Base legal declarada para almacenar el contacto (GDPR/LPDP).
+  contactLegalBasis String?
+  /// Notas internas de agencia. NUNCA se serializan hacia usuarios de cliente.
+  internalNotes String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  createdById   String?
+  version       Int              @default(1)
+
+  profiles    SocialProfile[]
+  niches      InfluencerNiche[]
+  tags        InfluencerTag[]
+  candidacies Candidacy[]
+  sources     SourceReference[]
+  duplicatesA InfluencerDuplicate[] @relation("DuplicateA")
+  duplicatesB InfluencerDuplicate[] @relation("DuplicateB")
+
+  @@index([status])
+  @@index([country])
+  @@map("influencers")
+}
+
+enum Platform {
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+  LINKTREE
+  WEBSITE
+  X
+  TWITCH
+  SPOTIFY
+  FACEBOOK
+  LINKEDIN
+  OTHER
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  VERIFIED
+  STALE
+  FAILED
+}
+
+model SocialProfile {
+  id                 String             @id @default(cuid())
+  influencerId       String
+  platform           Platform
+  url                String
+  urlNormalized      String
+  handle             String?
+  /// Seguidores normalizados a entero. Null si el valor original no se pudo normalizar.
+  followers          Int?
+  /// Valor tal cual venía en el origen ("31,6k", "7,2M", "A verificar").
+  followersRaw       String?
+  followersUnparsed  Boolean            @default(false)
+  engagementRate     Decimal?           @db.Decimal(6, 3)
+  engagementRaw      String?
+  avgViews           Int?
+  audienceLocalPercent Decimal?         @db.Decimal(5, 2)
+  audienceDemographics Json?
+  metricSource       String?
+  metricSourceUrl    String?
+  measuredAt         DateTime?
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  isPrimary          Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  influencer Influencer        @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  snapshots  MetricSnapshot[]
+  sources    SourceReference[]
+
+  @@unique([influencerId, platform, urlNormalized])
+  @@index([platform, urlNormalized])
+  @@index([platform, handle])
+  @@index([followers])
+  @@map("social_profiles")
+}
+
+/// Historial de métricas: las métricas nunca se sobreescriben sin dejar rastro.
+model MetricSnapshot {
+  id                   String   @id @default(cuid())
+  socialProfileId      String
+  followers            Int?
+  followersRaw         String?
+  engagementRate       Decimal? @db.Decimal(6, 3)
+  avgViews             Int?
+  audienceLocalPercent Decimal? @db.Decimal(5, 2)
+  source               String?
+  sourceUrl            String?
+  capturedAt           DateTime @default(now())
+  capturedById         String?
+  raw                  Json?
+
+  socialProfile SocialProfile @relation(fields: [socialProfileId], references: [id], onDelete: Cascade)
+
+  @@index([socialProfileId, capturedAt])
+  @@map("metric_snapshots")
+}
+
+model Niche {
+  id     String  @id @default(cuid())
+  key    String  @unique
+  label  String
+  active Boolean @default(true)
+  order  Int     @default(0)
+
+  influencers InfluencerNiche[]
+
+  @@map("niches")
+}
+
+model InfluencerNiche {
+  influencerId String
+  nicheId      String
+
+  influencer Influencer @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  niche      Niche      @relation(fields: [nicheId], references: [id], onDelete: Cascade)
+
+  @@id([influencerId, nicheId])
+  @@map("influencer_niches")
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  key   String @unique
+  label String
+  color String @default("slate")
+
+  influencers InfluencerTag[]
+
+  @@map("tags")
+}
+
+model InfluencerTag {
+  influencerId String
+  tagId        String
+
+  influencer Influencer @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  tag        Tag        @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([influencerId, tagId])
+  @@map("influencer_tags")
+}
+
+enum DuplicateStatus {
+  OPEN
+  DISMISSED
+  MERGED
+}
+
+/// Posibles duplicados detectados. Nunca se fusionan automáticamente.
+model InfluencerDuplicate {
+  id            String          @id @default(cuid())
+  influencerAId String
+  influencerBId String
+  reason        String
+  score         Int
+  status        DuplicateStatus @default(OPEN)
+  detectedAt    DateTime        @default(now())
+  resolvedAt    DateTime?
+  resolvedById  String?
+  notes         String?
+
+  influencerA Influencer @relation("DuplicateA", fields: [influencerAId], references: [id], onDelete: Cascade)
+  influencerB Influencer @relation("DuplicateB", fields: [influencerBId], references: [id], onDelete: Cascade)
+
+  @@unique([influencerAId, influencerBId])
+  @@index([status])
+  @@map("influencer_duplicates")
+}
+
+// ── Estados configurables de participación ───────────────────────────────────
+
+enum StatusCategory {
+  SCREENING
+  PROPOSAL
+  NEGOTIATION
+  PRODUCTION
+  CLOSED
+}
+
+model CandidacyStatusDef {
+  id              String         @id @default(cuid())
+  key             String         @unique
+  label           String
+  category        StatusCategory
+  color           String         @default("slate")
+  order           Int            @default(0)
+  clientVisible   Boolean        @default(true)
+  isTerminal      Boolean        @default(false)
+  active          Boolean        @default(true)
+
+  @@map("candidacy_status_defs")
+}
+
+// ── Participación de un influencer en una campaña ────────────────────────────
+
+enum ClientApproval {
+  PENDING
+  APPROVED
+  REJECTED
+  NEEDS_REVIEW
+  REPLACEMENT_REQUESTED
+}
+
+enum Availability {
+  UNKNOWN
+  AVAILABLE
+  UNAVAILABLE
+  CONDITIONAL
+}
+
+enum ContactStatus {
+  NOT_CONTACTED
+  CONTACTED
+  RESPONDED
+  NO_RESPONSE
+}
+
+enum NegotiationStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  AGREED
+  DECLINED
+  ON_HOLD
+}
+
+model Candidacy {
+  id           String @id @default(cuid())
+  clientId     String
+  campaignId   String
+  influencerId String
+  clusterId    String?
+
+  rank          Int?
+  statusKey     String
+  fitScore      Int?
+  /// Justificación de la agencia. Visible para el cliente.
+  agencyRationale String?
+  contentIdea     String?
+  deliverablesSummary String?
+
+  storiesCount Int @default(0)
+  reelsCount   Int @default(0)
+  postsCount   Int @default(0)
+  tiktoksCount Int @default(0)
+  videosCount  Int @default(0)
+
+  currency           String   @default("USD")
+  budgetRequested    Decimal? @db.Decimal(14, 2)
+  budgetNegotiated   Decimal? @db.Decimal(14, 2)
+  cacheAmount        Decimal? @db.Decimal(14, 2)
+  barterDescription  String?
+
+  availability      Availability      @default(UNKNOWN)
+  contactStatus     ContactStatus     @default(NOT_CONTACTED)
+  negotiationStatus NegotiationStatus @default(NOT_STARTED)
+
+  clientApproval     ClientApproval @default(PENDING)
+  clientApprovalAt   DateTime?
+  clientApprovalById String?
+
+  ownerUserId String?
+
+  proposedAt  DateTime?
+  contactedAt DateTime?
+  confirmedAt DateTime?
+  publishedAt DateTime?
+  closedAt    DateTime?
+
+  rejectionReason String?
+
+  inShortlist    Boolean @default(false)
+  shortlistOrder Int?
+
+  /// Interruptor de visibilidad: si es false el cliente no ve esta candidatura en absoluto.
+  clientVisible Boolean @default(false)
+
+  /// NUNCA se serializa hacia usuarios de cliente.
+  internalNotes       String?
+  /// NUNCA se serializa hacia usuarios de cliente ni hacia roles sin `budget.view`.
+  budgetPrivateNotes  String?
+
+  sourceSheet String?
+  sourceRow   Int?
+  importRunId String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  version     Int      @default(1)
+
+  client       Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign     Campaign              @relation(fields: [campaignId, clientId], references: [id, clientId], onDelete: Cascade)
+  influencer   Influencer            @relation(fields: [influencerId], references: [id], onDelete: Restrict)
+  cluster      BriefCluster?         @relation(fields: [clusterId, clientId], references: [id, clientId], onDelete: Restrict)
+  owner        User?                 @relation("CandidacyOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  statusEvents CandidacyStatusEvent[]
+  deliverables Deliverable[]
+  comments     Comment[]
+  sources      SourceReference[]
+  importRun    ImportRun?            @relation(fields: [importRunId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, influencerId])
+  @@unique([id, clientId])
+  @@index([clientId, campaignId, statusKey])
+  @@index([clientId, campaignId, clientApproval])
+  @@index([campaignId, inShortlist, shortlistOrder])
+  @@index([influencerId])
+  @@map("candidacies")
+}
+
+model CandidacyStatusEvent {
+  id            String   @id @default(cuid())
+  candidacyId   String
+  clientId      String
+  fromStatusKey String?
+  toStatusKey   String
+  comment       String?
+  actorUserId   String?
+  actorEmail    String?
+  actorRole     String?
+  createdAt     DateTime @default(now())
+
+  candidacy Candidacy @relation(fields: [candidacyId, clientId], references: [id, clientId], onDelete: Cascade)
+
+  @@index([candidacyId, createdAt])
+  @@map("candidacy_status_events")
+}
+
+enum DeliverableType {
+  STORY
+  REEL
+  POST
+  TIKTOK
+  VIDEO
+  YOUTUBE_VIDEO
+  LIVE
+  OTHER
+}
+
+enum DeliverableStatus {
+  PENDING
+  IN_PRODUCTION
+  FOR_APPROVAL
+  APPROVED
+  PUBLISHED
+  CANCELLED
+}
+
+model Deliverable {
+  id          String            @id @default(cuid())
+  candidacyId String
+  clientId    String
+  type        DeliverableType
+  quantity    Int               @default(1)
+  description String?
+  status      DeliverableStatus @default(PENDING)
+  dueDate     DateTime?
+  publishedAt DateTime?
+  url         String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  candidacy Candidacy @relation(fields: [candidacyId, clientId], references: [id, clientId], onDelete: Cascade)
+
+  @@index([candidacyId])
+  @@map("deliverables")
+}
+
+// ── Feedback y notas ─────────────────────────────────────────────────────────
+
+enum CommentVisibility {
+  /// Nota interna de la agencia. Jamás sale hacia el cliente.
+  INTERNAL
+  /// Escrito por la agencia y explícitamente visible para el cliente.
+  CLIENT_VISIBLE
+  /// Escrito por un usuario del cliente.
+  CLIENT_AUTHORED
+  /// Observación privada de presupuesto. Requiere `budget.view`.
+  BUDGET_PRIVATE
+}
+
+enum AuthorSide {
+  AGENCY
+  CLIENT
+}
+
+model Comment {
+  id           String            @id @default(cuid())
+  clientId     String
+  campaignId   String?
+  candidacyId  String?
+  authorUserId String?
+  authorSide   AuthorSide
+  visibility   CommentVisibility
+  body         String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  deletedAt    DateTime?
+
+  client     Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign   Campaign?  @relation(fields: [campaignId, clientId], references: [id, clientId], onDelete: Cascade)
+  candidacy  Candidacy? @relation(fields: [candidacyId, clientId], references: [id, clientId], onDelete: Cascade)
+  author     User?      @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([clientId, campaignId, createdAt])
+  @@index([candidacyId, createdAt])
+  @@index([visibility])
+  @@map("comments")
+}
+
+// ── Procedencia del dato ─────────────────────────────────────────────────────
+
+model SourceReference {
+  id                 String             @id @default(cuid())
+  clientId           String?
+  influencerId       String?
+  socialProfileId    String?
+  candidacyId        String?
+  url                String
+  name               String
+  /// Qué dato respalda esta fuente ("seguidores", "ER", "audiencia argentina").
+  supports           String
+  consultedAt        DateTime
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  verifiedById       String?
+  verifiedAt         DateTime?
+  notes              String?
+  createdAt          DateTime           @default(now())
+  createdById        String?
+
+  influencer    Influencer?    @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  socialProfile SocialProfile? @relation(fields: [socialProfileId], references: [id], onDelete: Cascade)
+  candidacy     Candidacy?     @relation(fields: [candidacyId, clientId], references: [id, clientId], onDelete: Cascade)
+
+  @@index([influencerId])
+  @@index([candidacyId])
+  @@map("source_references")
+}
+
+// ── Auditoría ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  occurredAt    DateTime @default(now())
+  actorUserId   String?
+  actorEmail    String?
+  actorRole     String?
+  clientId      String?
+  action        String
+  entityType    String
+  entityId      String?
+  before        Json?
+  after         Json?
+  ip            String?
+  userAgent     String?
+  correlationId String?
+  metadata      Json?
+
+  @@index([occurredAt])
+  @@index([clientId, occurredAt])
+  @@index([entityType, entityId])
+  @@index([actorUserId, occurredAt])
+  @@map("audit_logs")
+}
+
+// ── Importación ──────────────────────────────────────────────────────────────
+
+enum ImportStatus {
+  PREVIEW
+  CONFIRMED
+  CANCELLED
+  FAILED
+}
+
+enum ImportOutcome {
+  CREATED
+  UPDATED
+  UNCHANGED
+  POSSIBLE_DUPLICATE
+  /// El origen se contradice a sí mismo (p. ej. el texto dice un perfil y el hipervínculo apunta a otro).
+  CONFLICT
+  INCOMPLETE
+  UNPARSEABLE
+  SECTION
+  MULTI_PERSON
+  ERROR
+}
+
+model ImportRun {
+  id          String       @id @default(cuid())
+  clientId    String
+  campaignId  String?
+  filename    String
+  fileHash    String
+  storageKey  String?
+  status      ImportStatus @default(PREVIEW)
+  dryRun      Boolean      @default(true)
+  summary     Json?
+  startedAt   DateTime     @default(now())
+  finishedAt  DateTime?
+  createdById String?
+
+  client      Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign    Campaign?      @relation(fields: [campaignId, clientId], references: [id, clientId], onDelete: Cascade)
+  rows        ImportRowLog[]
+  candidacies Candidacy[]
+
+  @@index([clientId, startedAt])
+  @@map("import_runs")
+}
+
+model ImportRowLog {
+  id          String        @id @default(cuid())
+  importRunId String
+  clientId    String
+  sheetName   String
+  rowNumber   Int
+  outcome     ImportOutcome
+  entityType  String?
+  entityId    String?
+  message     String?
+  rawValues   Json?
+  createdAt   DateTime      @default(now())
+
+  importRun ImportRun @relation(fields: [importRunId], references: [id], onDelete: Cascade)
+
+  @@index([importRunId, outcome])
+  @@map("import_row_logs")
+}
+
+// ── Preferencias de usuario ──────────────────────────────────────────────────
+
+model SavedView {
+  id        String   @id @default(cuid())
+  userId    String
+  clientId  String?
+  resource  String
+  name      String
+  config    Json
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, resource, name])
+  @@map("saved_views")
+}
+
+// ── Infraestructura ──────────────────────────────────────────────────────────
+
+model RateLimitCounter {
+  id          String   @id @default(cuid())
+  bucket      String
+  windowStart DateTime
+  count       Int      @default(0)
+  expiresAt   DateTime
+
+  @@unique([bucket, windowStart])
+  @@index([expiresAt])
+  @@map("rate_limit_counters")
+}
+
+/// Bandeja de salida de email. Con driver `console` es el registro verificable de lo enviado.
+model EmailOutbox {
+  id        String    @id @default(cuid())
+  to        String
+  subject   String
+  bodyText  String
+  bodyHtml  String?
+  createdAt DateTime  @default(now())
+  sentAt    DateTime?
+  error     String?
+
+  @@index([createdAt])
+  @@map("email_outbox")
+}

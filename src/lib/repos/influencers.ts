@@ -1,0 +1,508 @@
+import 'server-only'
+import type { AdultStatus, InfluencerStatus, Platform } from '@/generated/prisma/enums'
+import type { AuthContext } from '@/lib/authz/context'
+import { assertCan, capabilitiesFor } from '@/lib/authz/context'
+import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/authz/errors'
+import { AUDIT, recordAudit } from '@/lib/audit'
+import { fieldPermissionsFor, toInfluencerDto, type InfluencerDto } from '@/lib/domain/dto'
+import { nameSimilarity, normalizeHandle, parseProfileUrl } from '@/lib/domain/normalize'
+import { actorOf, assertUpdated, normalizePagination, paginate, scoped, skipTake, type Paginated, type Tx } from './base'
+
+const INCLUDE = {
+  profiles: { orderBy: [{ isPrimary: 'desc' as const }, { followers: 'desc' as const }] },
+  niches: { include: { niche: true } },
+  tags: { include: { tag: true } },
+}
+
+/** La base global de influencers es de la agencia. Un usuario de cliente no la recorre. */
+function assertAgency(ctx: AuthContext): void {
+  if (ctx.side !== 'AGENCY') throw new NotFoundError()
+}
+
+export type InfluencerFilters = {
+  search?: string | null
+  countries?: string[] | null
+  platforms?: Platform[] | null
+  nicheKeys?: string[] | null
+  tagKeys?: string[] | null
+  minFollowers?: number | null
+  maxFollowers?: number | null
+  minEngagement?: number | null
+  statuses?: InfluencerStatus[] | null
+}
+
+export async function searchInfluencers(
+  ctx: AuthContext,
+  filters: InfluencerFilters = {},
+  pageInput?: { page?: number; pageSize?: number },
+): Promise<Paginated<InfluencerDto>> {
+  assertAgency(ctx)
+  assertCan(ctx, 'influencer.view', null)
+  const pagination = normalizePagination(pageInput)
+
+  const profileConditions = {
+    ...(filters.platforms?.length ? { platform: { in: filters.platforms } } : {}),
+    ...(filters.minFollowers != null || filters.maxFollowers != null
+      ? {
+          followers: {
+            ...(filters.minFollowers != null ? { gte: filters.minFollowers } : {}),
+            ...(filters.maxFollowers != null ? { lte: filters.maxFollowers } : {}),
+          },
+        }
+      : {}),
+    ...(filters.minEngagement != null ? { engagementRate: { gte: String(filters.minEngagement) } } : {}),
+  }
+  const hasProfileFilter = Object.keys(profileConditions).length > 0
+
+  const where = {
+    ...(filters.statuses?.length ? { status: { in: filters.statuses } } : {}),
+    ...(filters.countries?.length ? { country: { in: filters.countries } } : {}),
+    ...(filters.nicheKeys?.length ? { niches: { some: { niche: { key: { in: filters.nicheKeys } } } } } : {}),
+    ...(filters.tagKeys?.length ? { tags: { some: { tag: { key: { in: filters.tagKeys } } } } } : {}),
+    ...(hasProfileFilter ? { profiles: { some: profileConditions } } : {}),
+    ...(filters.search
+      ? {
+          OR: [
+            { displayName: { contains: filters.search, mode: 'insensitive' as const } },
+            { realName: { contains: filters.search, mode: 'insensitive' as const } },
+            { primaryHandle: { contains: filters.search, mode: 'insensitive' as const } },
+            { profiles: { some: { handle: { contains: filters.search.replace(/^@/, ''), mode: 'insensitive' as const } } } },
+          ],
+        }
+      : {}),
+  }
+
+  const perms = fieldPermissionsFor(ctx, null)
+  return scoped(ctx, async (tx) => {
+    const [rows, total] = await Promise.all([
+      tx.influencer.findMany({ where, orderBy: { displayName: 'asc' }, ...skipTake(pagination), include: INCLUDE }),
+      tx.influencer.count({ where }),
+    ])
+    return paginate(rows.map((row) => toInfluencerDto(row, perms)), total, pagination)
+  })
+}
+
+export type InfluencerDetail = InfluencerDto & {
+  campaigns: Array<{
+    candidacyId: string
+    campaignId: string
+    campaignName: string
+    clientName: string
+    statusKey: string
+    clientApproval: string
+    updatedAt: string
+  }>
+  duplicates: Array<{ id: string; otherId: string; otherName: string; reason: string; score: number; status: string }>
+  history: Array<{
+    profileId: string
+    platform: string
+    followers: number | null
+    engagementRate: number | null
+    source: string | null
+    capturedAt: string
+  }>
+}
+
+export async function getInfluencer(ctx: AuthContext, influencerId: string): Promise<InfluencerDetail> {
+  assertAgency(ctx)
+  assertCan(ctx, 'influencer.view', null)
+
+  const row = await scoped(ctx, (tx) =>
+    tx.influencer.findUnique({
+      where: { id: influencerId },
+      include: {
+        ...INCLUDE,
+        candidacies: {
+          include: { campaign: { select: { id: true, name: true, client: { select: { name: true } } } } },
+          orderBy: { updatedAt: 'desc' },
+        },
+        duplicatesA: { include: { influencerB: { select: { id: true, displayName: true } } } },
+        duplicatesB: { include: { influencerA: { select: { id: true, displayName: true } } } },
+      },
+    }),
+  )
+  if (!row) throw new NotFoundError()
+
+  const snapshots = await scoped(ctx, (tx) =>
+    tx.metricSnapshot.findMany({
+      where: { socialProfile: { influencerId } },
+      orderBy: { capturedAt: 'desc' },
+      take: 100,
+      include: { socialProfile: { select: { id: true, platform: true } } },
+    }),
+  )
+
+  const perms = fieldPermissionsFor(ctx, null)
+  return {
+    ...toInfluencerDto(row, perms),
+    campaigns: row.candidacies.map((c) => ({
+      candidacyId: c.id,
+      campaignId: c.campaign.id,
+      campaignName: c.campaign.name,
+      clientName: c.campaign.client.name,
+      statusKey: c.statusKey,
+      clientApproval: c.clientApproval,
+      updatedAt: c.updatedAt.toISOString(),
+    })),
+    duplicates: [
+      ...row.duplicatesA.map((d) => ({
+        id: d.id,
+        otherId: d.influencerB.id,
+        otherName: d.influencerB.displayName,
+        reason: d.reason,
+        score: d.score,
+        status: d.status,
+      })),
+      ...row.duplicatesB.map((d) => ({
+        id: d.id,
+        otherId: d.influencerA.id,
+        otherName: d.influencerA.displayName,
+        reason: d.reason,
+        score: d.score,
+        status: d.status,
+      })),
+    ],
+    history: snapshots.map((s) => ({
+      profileId: s.socialProfile.id,
+      platform: s.socialProfile.platform,
+      followers: s.followers,
+      engagementRate: s.engagementRate === null ? null : Number(s.engagementRate),
+      source: s.source,
+      capturedAt: s.capturedAt.toISOString(),
+    })),
+  }
+}
+
+export type InfluencerWriteInput = {
+  displayName: string
+  realName?: string | null
+  primaryHandle?: string | null
+  country?: string | null
+  city?: string | null
+  language?: string | null
+  bio?: string | null
+  status?: InfluencerStatus
+  adultStatus?: AdultStatus
+  representative?: string | null
+  internalNotes?: string | null
+  contactEmail?: string | null
+  contactPhone?: string | null
+  contactNotes?: string | null
+  contactLegalBasis?: string | null
+  nicheKeys?: string[]
+  tagKeys?: string[]
+}
+
+export async function createInfluencer(ctx: AuthContext, input: InfluencerWriteInput): Promise<{ id: string }> {
+  assertAgency(ctx)
+  assertCan(ctx, 'influencer.manage', null)
+  const caps = capabilitiesFor(ctx, null)
+
+  if (!input.displayName.trim()) throw new ValidationError('El nombre es obligatorio.')
+  if ((input.contactEmail || input.contactPhone) && !caps.has('influencer.contact.view')) {
+    throw new ForbiddenError('No tenés permiso para cargar datos de contacto.')
+  }
+
+  return scoped(ctx, async (tx) => {
+    const created = await tx.influencer.create({
+      data: {
+        displayName: input.displayName.trim(),
+        realName: input.realName ?? null,
+        primaryHandle: normalizeHandle(input.primaryHandle),
+        country: input.country ?? null,
+        city: input.city ?? null,
+        language: input.language ?? null,
+        bio: input.bio ?? null,
+        status: input.status ?? 'NEW',
+        adultStatus: input.adultStatus ?? 'NOT_CONFIRMED',
+        representative: input.representative ?? null,
+        ...(caps.has('internal_notes.view') ? { internalNotes: input.internalNotes ?? null } : {}),
+        ...(caps.has('influencer.contact.view')
+          ? {
+              contactEmail: input.contactEmail ?? null,
+              contactPhone: input.contactPhone ?? null,
+              contactNotes: input.contactNotes ?? null,
+              contactLegalBasis: input.contactLegalBasis ?? null,
+            }
+          : {}),
+        createdById: ctx.user.id,
+      },
+    })
+    await applyTaxonomy(tx, created.id, input)
+    await detectDuplicates(tx, created.id)
+    await recordAudit(tx, actorOf(ctx), {
+      action: AUDIT.INFLUENCER_CREATED,
+      entityType: 'Influencer',
+      entityId: created.id,
+      after: { displayName: created.displayName },
+    })
+    return { id: created.id }
+  })
+}
+
+export async function updateInfluencer(
+  ctx: AuthContext,
+  influencerId: string,
+  input: InfluencerWriteInput & { version: number },
+): Promise<void> {
+  assertAgency(ctx)
+  assertCan(ctx, 'influencer.manage', null)
+  const caps = capabilitiesFor(ctx, null)
+
+  await scoped(ctx, async (tx) => {
+    const before = await tx.influencer.findUnique({ where: { id: influencerId } })
+    if (!before) throw new NotFoundError()
+
+    const result = await tx.influencer.updateMany({
+      where: { id: influencerId, version: input.version },
+      data: {
+        displayName: input.displayName?.trim(),
+        realName: input.realName,
+        primaryHandle: normalizeHandle(input.primaryHandle),
+        country: input.country,
+        city: input.city,
+        language: input.language,
+        bio: input.bio,
+        status: input.status,
+        adultStatus: input.adultStatus,
+        representative: input.representative,
+        ...(caps.has('internal_notes.view') ? { internalNotes: input.internalNotes } : {}),
+        ...(caps.has('influencer.contact.view')
+          ? {
+              contactEmail: input.contactEmail,
+              contactPhone: input.contactPhone,
+              contactNotes: input.contactNotes,
+              contactLegalBasis: input.contactLegalBasis,
+            }
+          : {}),
+        version: { increment: 1 },
+      },
+    })
+    assertUpdated(result.count)
+    await applyTaxonomy(tx, influencerId, input)
+    await recordAudit(tx, actorOf(ctx), {
+      action: AUDIT.INFLUENCER_UPDATED,
+      entityType: 'Influencer',
+      entityId: influencerId,
+      before: { displayName: before.displayName, status: before.status },
+      after: { displayName: input.displayName, status: input.status },
+    })
+  })
+}
+
+async function applyTaxonomy(tx: Tx, influencerId: string, input: InfluencerWriteInput): Promise<void> {
+  if (input.nicheKeys) {
+    const niches = await tx.niche.findMany({ where: { key: { in: input.nicheKeys } }, select: { id: true } })
+    await tx.influencerNiche.deleteMany({ where: { influencerId } })
+    if (niches.length > 0) {
+      await tx.influencerNiche.createMany({ data: niches.map((n) => ({ influencerId, nicheId: n.id })) })
+    }
+  }
+  if (input.tagKeys) {
+    const tags = await tx.tag.findMany({ where: { key: { in: input.tagKeys } }, select: { id: true } })
+    await tx.influencerTag.deleteMany({ where: { influencerId } })
+    if (tags.length > 0) {
+      await tx.influencerTag.createMany({ data: tags.map((t) => ({ influencerId, tagId: t.id })) })
+    }
+  }
+}
+
+export type AddProfileInput = {
+  url: string
+  followersRaw?: string | null
+  followers?: number | null
+  engagementRate?: number | null
+  engagementRaw?: string | null
+  avgViews?: number | null
+  audienceLocalPercent?: number | null
+  metricSource?: string | null
+  metricSourceUrl?: string | null
+  measuredAt?: Date | null
+  isPrimary?: boolean
+}
+
+/** Agrega o actualiza un perfil social y deja siempre un snapshot histórico. */
+export async function upsertSocialProfile(
+  ctx: AuthContext,
+  influencerId: string,
+  input: AddProfileInput,
+): Promise<{ id: string }> {
+  assertAgency(ctx)
+  assertCan(ctx, 'influencer.manage', null)
+
+  const parsed = parseProfileUrl(input.url)
+  if (parsed.kind !== 'value') throw new ValidationError('La URL del perfil no es válida.', { url: [parsed.reason] })
+  const { platform, url, urlNormalized, handle } = parsed.value
+
+  return scoped(ctx, async (tx) => {
+    const influencer = await tx.influencer.findUnique({ where: { id: influencerId }, select: { id: true } })
+    if (!influencer) throw new NotFoundError()
+
+    const profile = await tx.socialProfile.upsert({
+      where: { influencerId_platform_urlNormalized: { influencerId, platform, urlNormalized } },
+      create: {
+        influencerId,
+        platform,
+        url,
+        urlNormalized,
+        handle,
+        followers: input.followers ?? null,
+        followersRaw: input.followersRaw ?? null,
+        followersUnparsed: input.followers == null && Boolean(input.followersRaw),
+        engagementRate: input.engagementRate == null ? null : String(input.engagementRate),
+        engagementRaw: input.engagementRaw ?? null,
+        avgViews: input.avgViews ?? null,
+        audienceLocalPercent: input.audienceLocalPercent == null ? null : String(input.audienceLocalPercent),
+        metricSource: input.metricSource ?? null,
+        metricSourceUrl: input.metricSourceUrl ?? null,
+        measuredAt: input.measuredAt ?? new Date(),
+        isPrimary: input.isPrimary ?? false,
+      },
+      update: {
+        handle,
+        followers: input.followers ?? undefined,
+        followersRaw: input.followersRaw ?? undefined,
+        engagementRate: input.engagementRate == null ? undefined : String(input.engagementRate),
+        engagementRaw: input.engagementRaw ?? undefined,
+        avgViews: input.avgViews ?? undefined,
+        audienceLocalPercent: input.audienceLocalPercent == null ? undefined : String(input.audienceLocalPercent),
+        metricSource: input.metricSource ?? undefined,
+        metricSourceUrl: input.metricSourceUrl ?? undefined,
+        measuredAt: input.measuredAt ?? new Date(),
+        ...(input.isPrimary === undefined ? {} : { isPrimary: input.isPrimary }),
+      },
+    })
+
+    // Las métricas no se pisan sin dejar rastro: cada carga deja su snapshot.
+    if (input.followers != null || input.engagementRate != null) {
+      await tx.metricSnapshot.create({
+        data: {
+          socialProfileId: profile.id,
+          followers: input.followers ?? null,
+          followersRaw: input.followersRaw ?? null,
+          engagementRate: input.engagementRate == null ? null : String(input.engagementRate),
+          avgViews: input.avgViews ?? null,
+          audienceLocalPercent: input.audienceLocalPercent == null ? null : String(input.audienceLocalPercent),
+          source: input.metricSource ?? null,
+          sourceUrl: input.metricSourceUrl ?? null,
+          capturedById: ctx.user.id,
+        },
+      })
+    }
+
+    await detectDuplicates(tx, influencerId)
+    return { id: profile.id }
+  })
+}
+
+/**
+ * Detección de posibles duplicados. Nunca fusiona: sólo deja el par marcado
+ * para que una persona decida.
+ */
+export async function detectDuplicates(tx: Tx, influencerId: string): Promise<number> {
+  const subject = await tx.influencer.findUnique({
+    where: { id: influencerId },
+    include: { profiles: { select: { platform: true, urlNormalized: true, handle: true } } },
+  })
+  if (!subject) return 0
+
+  const candidates = new Map<string, { reason: string; score: number }>()
+
+  for (const profile of subject.profiles) {
+    const sameUrl = await tx.socialProfile.findMany({
+      where: { urlNormalized: profile.urlNormalized, influencerId: { not: influencerId } },
+      select: { influencerId: true },
+    })
+    for (const match of sameUrl) {
+      candidates.set(match.influencerId, { reason: `Misma URL normalizada (${profile.urlNormalized})`, score: 95 })
+    }
+    if (profile.handle) {
+      const sameHandle = await tx.socialProfile.findMany({
+        where: { platform: profile.platform, handle: profile.handle, influencerId: { not: influencerId } },
+        select: { influencerId: true },
+      })
+      for (const match of sameHandle) {
+        if (!candidates.has(match.influencerId)) {
+          candidates.set(match.influencerId, {
+            reason: `Mismo handle @${profile.handle} en ${profile.platform}`,
+            score: 90,
+          })
+        }
+      }
+    }
+  }
+
+  const byName = await tx.influencer.findMany({
+    where: { id: { not: influencerId } },
+    select: { id: true, displayName: true },
+    take: 2000,
+  })
+  for (const other of byName) {
+    const score = nameSimilarity(subject.displayName, other.displayName)
+    if (score >= 0.86 && !candidates.has(other.id)) {
+      candidates.set(other.id, {
+        reason: `Nombre muy parecido a "${other.displayName}" (${Math.round(score * 100)}%)`,
+        score: Math.round(score * 100),
+      })
+    }
+  }
+
+  let created = 0
+  for (const [otherId, info] of candidates) {
+    const [a, b] = influencerId < otherId ? [influencerId, otherId] : [otherId, influencerId]
+    const existing = await tx.influencerDuplicate.findUnique({
+      where: { influencerAId_influencerBId: { influencerAId: a, influencerBId: b } },
+    })
+    if (existing) continue
+    await tx.influencerDuplicate.create({
+      data: { influencerAId: a, influencerBId: b, reason: info.reason, score: info.score },
+    })
+    created += 1
+  }
+  return created
+}
+
+export async function listOpenDuplicates(ctx: AuthContext, pageInput?: { page?: number; pageSize?: number }) {
+  assertAgency(ctx)
+  assertCan(ctx, 'influencer.view', null)
+  const pagination = normalizePagination(pageInput)
+  return scoped(ctx, async (tx) => {
+    const where = { status: 'OPEN' as const }
+    const [rows, total] = await Promise.all([
+      tx.influencerDuplicate.findMany({
+        where,
+        orderBy: { score: 'desc' },
+        ...skipTake(pagination),
+        include: {
+          influencerA: { select: { id: true, displayName: true } },
+          influencerB: { select: { id: true, displayName: true } },
+        },
+      }),
+      tx.influencerDuplicate.count({ where }),
+    ])
+    return paginate(
+      rows.map((row) => ({
+        id: row.id,
+        reason: row.reason,
+        score: row.score,
+        a: row.influencerA,
+        b: row.influencerB,
+        detectedAt: row.detectedAt.toISOString(),
+      })),
+      total,
+      pagination,
+    )
+  })
+}
+
+export async function dismissDuplicate(ctx: AuthContext, duplicateId: string, notes?: string | null): Promise<void> {
+  assertAgency(ctx)
+  assertCan(ctx, 'influencer.manage', null)
+  await scoped(ctx, async (tx) => {
+    const result = await tx.influencerDuplicate.updateMany({
+      where: { id: duplicateId, status: 'OPEN' },
+      data: { status: 'DISMISSED', resolvedAt: new Date(), resolvedById: ctx.user.id, notes: notes ?? null },
+    })
+    if (result.count === 0) throw new NotFoundError()
+  })
+}

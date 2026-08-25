@@ -1,0 +1,199 @@
+import type { Metadata } from 'next'
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { PageHeader } from '@/components/app-shell'
+import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { EmptyState } from '@/components/ui/states'
+import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
+import { CampaignStatusBadge } from '@/components/status-badge'
+import { requireContext } from '@/lib/auth/current'
+import { NotFoundError } from '@/lib/authz/errors'
+import { can } from '@/lib/authz/context'
+import { getClient } from '@/lib/repos/clients'
+import { listCampaigns } from '@/lib/repos/campaigns'
+import { listUsers } from '@/lib/repos/users'
+import { CLIENT_ROLE_LABELS } from '@/lib/authz/capabilities'
+import { formatDate } from '@/lib/util/format'
+import { ClientSettingsForm } from './settings-form'
+
+export const metadata: Metadata = { title: 'Cliente' }
+export const dynamic = 'force-dynamic'
+
+export default async function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
+  const { clientId } = await params
+  const ctx = await requireContext()
+
+  let client
+  try {
+    client = await getClient(ctx, clientId)
+  } catch (error) {
+    if (error instanceof NotFoundError) notFound()
+    throw error
+  }
+
+  const [campaigns, users] = await Promise.all([
+    listCampaigns(ctx, { clientId }, { pageSize: 50 }),
+    can(ctx, 'client.view', clientId) ? listUsers(ctx, clientId) : Promise.resolve([]),
+  ])
+  const canManage = can(ctx, 'client.manage', clientId)
+
+  return (
+    <>
+      <PageHeader
+        title={client.name}
+        description={client.description ?? undefined}
+        breadcrumb={
+          <Link href="/clientes" className="hover:underline">
+            Clientes
+          </Link>
+        }
+      />
+      <div className="grid gap-6 px-5 py-6 sm:px-8 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Campañas</CardTitle>
+            </CardHeader>
+            {campaigns.items.length === 0 ? (
+              <EmptyState title="Sin campañas" description="Todavía no hay campañas para este cliente." />
+            ) : (
+              <TableWrap>
+                <Table>
+                  <thead>
+                    <tr>
+                      <Th>Campaña</Th>
+                      <Th>Estado</Th>
+                      <Th className="text-right">Perfiles</Th>
+                      <Th className="text-right">Aprobados</Th>
+                      <Th>Fechas</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campaigns.items.map((campaign) => (
+                      <Tr key={campaign.id}>
+                        <Td>
+                          <Link href={`/campanas/${campaign.id}`} className="font-medium hover:text-brand-700">
+                            {campaign.name}
+                          </Link>
+                        </Td>
+                        <Td>
+                          <CampaignStatusBadge status={campaign.status} />
+                        </Td>
+                        <Td className="text-right tabular-nums">{campaign.candidacyCount}</Td>
+                        <Td className="text-right tabular-nums">{campaign.approvedCount}</Td>
+                        <Td className="whitespace-nowrap text-xs text-ink-600">
+                          {formatDate(campaign.startDate, ctx.user.timezone)} → {formatDate(campaign.endDate, ctx.user.timezone)}
+                        </Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </TableWrap>
+            )}
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Usuarios del cliente</CardTitle>
+            </CardHeader>
+            {users.length === 0 ? (
+              <EmptyState
+                title="Sin usuarios"
+                description="Invitá a las personas del cliente desde la sección Usuarios."
+              />
+            ) : (
+              <TableWrap>
+                <Table>
+                  <thead>
+                    <tr>
+                      <Th>Persona</Th>
+                      <Th>Rol</Th>
+                      <Th>Estado</Th>
+                      <Th>Último acceso</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((user) => {
+                      const membership = user.clients.find((entry) => entry.clientId === clientId)
+                      return (
+                        <Tr key={user.id}>
+                          <Td>
+                            <p className="font-medium text-ink-900">{user.name}</p>
+                            <p className="text-xs text-ink-500">{user.email}</p>
+                          </Td>
+                          <Td>{membership ? CLIENT_ROLE_LABELS[membership.role] : '—'}</Td>
+                          <Td>
+                            {user.status === 'ACTIVE' ? (
+                              <Badge tone="emerald">Activo</Badge>
+                            ) : (
+                              <Badge tone="rose">Desactivado</Badge>
+                            )}
+                          </Td>
+                          <Td className="text-xs text-ink-600">{formatDate(user.lastLoginAt, ctx.user.timezone)}</Td>
+                        </Tr>
+                      )
+                    })}
+                  </tbody>
+                </Table>
+              </TableWrap>
+            )}
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Datos</CardTitle>
+            </CardHeader>
+            <CardBody>
+              <dl className="space-y-2 text-sm">
+                <div>
+                  <dt className="text-xs text-ink-500">Identificador</dt>
+                  <dd className="font-mono text-xs text-ink-800">{client.slug}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-ink-500">Razón social</dt>
+                  <dd className="text-ink-800">{client.legalName ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-ink-500">País</dt>
+                  <dd className="text-ink-800">{client.country ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-ink-500">Mercados</dt>
+                  <dd className="text-ink-800">{client.markets.length > 0 ? client.markets.join(', ') : '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-ink-500">Moneda</dt>
+                  <dd className="text-ink-800">{client.defaultCurrency}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-ink-500">Zona horaria</dt>
+                  <dd className="text-ink-800">{client.timezone}</dd>
+                </div>
+              </dl>
+            </CardBody>
+          </Card>
+
+          {canManage ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Visibilidad y permisos</CardTitle>
+              </CardHeader>
+              <CardBody>
+                <ClientSettingsForm
+                  clientId={client.id}
+                  version={client.version}
+                  name={client.name}
+                  allowClientUserInvites={client.allowClientUserInvites}
+                  allowClientExports={client.allowClientExports}
+                />
+              </CardBody>
+            </Card>
+          ) : null}
+        </div>
+      </div>
+    </>
+  )
+}

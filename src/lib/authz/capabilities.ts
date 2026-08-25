@@ -1,0 +1,193 @@
+import type { AgencyRole, ClientRole } from '@/generated/prisma/enums'
+
+/**
+ * Capacidades explícitas. La autorización se hace SIEMPRE preguntando por una
+ * capacidad, nunca comparando roles sueltos repartidos por el código.
+ */
+export const CAPABILITIES = [
+  'platform.admin',
+  'client.view',
+  'client.manage',
+  'campaign.view',
+  'campaign.create',
+  'campaign.update',
+  'campaign.delete',
+  'brief.view',
+  'brief.manage',
+  'influencer.view',
+  'influencer.manage',
+  'influencer.contact.view',
+  'candidate.view',
+  'candidate.manage',
+  'candidate.approve',
+  'feedback.create',
+  'feedback.internal.create',
+  'internal_notes.view',
+  'budget.view',
+  'budget.manage',
+  'user.invite',
+  'membership.manage',
+  'audit.view',
+  'export.create',
+  'import.run',
+  'catalog.manage',
+] as const
+
+export type Capability = (typeof CAPABILITIES)[number]
+
+const CAPABILITY_SET = new Set<string>(CAPABILITIES)
+export const isCapability = (value: string): value is Capability => CAPABILITY_SET.has(value)
+
+export const CAPABILITY_LABELS: Record<Capability, string> = {
+  'platform.admin': 'Administración técnica de plataforma',
+  'client.view': 'Ver clientes',
+  'client.manage': 'Administrar clientes',
+  'campaign.view': 'Ver campañas',
+  'campaign.create': 'Crear campañas',
+  'campaign.update': 'Editar campañas',
+  'campaign.delete': 'Archivar/eliminar campañas',
+  'brief.view': 'Ver brief',
+  'brief.manage': 'Editar brief y criterios',
+  'influencer.view': 'Ver base de influencers',
+  'influencer.manage': 'Crear y editar influencers',
+  'influencer.contact.view': 'Ver datos de contacto de influencers',
+  'candidate.view': 'Ver candidaturas',
+  'candidate.manage': 'Gestionar candidaturas y estados',
+  'candidate.approve': 'Aprobar, rechazar o pedir revisión',
+  'feedback.create': 'Dejar feedback',
+  'feedback.internal.create': 'Escribir notas internas',
+  'internal_notes.view': 'Ver notas internas',
+  'budget.view': 'Ver presupuestos y cachés',
+  'budget.manage': 'Editar presupuestos y cachés',
+  'user.invite': 'Invitar usuarios',
+  'membership.manage': 'Asignar roles y clientes',
+  'audit.view': 'Ver auditoría',
+  'export.create': 'Generar exportaciones',
+  'import.run': 'Ejecutar importaciones',
+  'catalog.manage': 'Administrar catálogos y configuración',
+}
+
+/**
+ * Capacidades que un usuario de cliente NUNCA puede tener, se las intente dar
+ * quien se las intente dar. Es el cerrojo contra la escalada de privilegios.
+ */
+export const CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE: ReadonlySet<Capability> = new Set([
+  'platform.admin',
+  'client.manage',
+  'campaign.create',
+  'campaign.update',
+  'campaign.delete',
+  'brief.manage',
+  'influencer.view',
+  'influencer.manage',
+  'influencer.contact.view',
+  'candidate.manage',
+  'feedback.internal.create',
+  'internal_notes.view',
+  'budget.view',
+  'budget.manage',
+  'audit.view',
+  'import.run',
+  'catalog.manage',
+])
+
+const AGENCY_ADMIN_CAPS: Capability[] = CAPABILITIES.filter((c) => c !== 'platform.admin')
+
+export const AGENCY_ROLE_CAPABILITIES: Record<AgencyRole, readonly Capability[]> = {
+  PLATFORM_SUPERADMIN: CAPABILITIES,
+  AGENCY_ADMIN: AGENCY_ADMIN_CAPS,
+  ACCOUNT_MANAGER: [
+    'client.view',
+    'campaign.view',
+    'campaign.create',
+    'campaign.update',
+    'brief.view',
+    'brief.manage',
+    'influencer.view',
+    'influencer.manage',
+    'influencer.contact.view',
+    'candidate.view',
+    'candidate.manage',
+    'feedback.create',
+    'feedback.internal.create',
+    'internal_notes.view',
+    'budget.view',
+    'export.create',
+    'import.run',
+  ],
+  SCOUT: [
+    'client.view',
+    'campaign.view',
+    'brief.view',
+    'influencer.view',
+    'influencer.manage',
+    'candidate.view',
+    'candidate.manage',
+    'feedback.internal.create',
+    'internal_notes.view',
+    'export.create',
+  ],
+  FINANCE: [
+    'client.view',
+    'campaign.view',
+    'brief.view',
+    'influencer.view',
+    'candidate.view',
+    'internal_notes.view',
+    'budget.view',
+    'budget.manage',
+    'export.create',
+  ],
+}
+
+export const CLIENT_ROLE_CAPABILITIES: Record<ClientRole, readonly Capability[]> = {
+  CLIENT_ADMIN: [
+    'client.view',
+    'campaign.view',
+    'brief.view',
+    'candidate.view',
+    'candidate.approve',
+    'feedback.create',
+    'export.create',
+    'membership.manage',
+  ],
+  CLIENT_REVIEWER: [
+    'client.view',
+    'campaign.view',
+    'brief.view',
+    'candidate.view',
+    'candidate.approve',
+    'feedback.create',
+    'export.create',
+  ],
+  // Sólo lectura, incluida la exportación de lo que ya puede ver en pantalla.
+  CLIENT_VIEWER: ['client.view', 'campaign.view', 'brief.view', 'candidate.view', 'export.create'],
+}
+
+export const AGENCY_ROLE_LABELS: Record<AgencyRole, string> = {
+  PLATFORM_SUPERADMIN: 'Superadministrador de plataforma',
+  AGENCY_ADMIN: 'Administrador de agencia',
+  ACCOUNT_MANAGER: 'Account manager',
+  SCOUT: 'Scouting / colaborador',
+  FINANCE: 'Finanzas',
+}
+
+export const CLIENT_ROLE_LABELS: Record<ClientRole, string> = {
+  CLIENT_ADMIN: 'Administrador del cliente',
+  CLIENT_REVIEWER: 'Revisor del cliente',
+  CLIENT_VIEWER: 'Lector del cliente',
+}
+
+/** Capacidades que un rol de agencia puede recibir como permiso extra puntual. */
+export const GRANTABLE_AGENCY_EXTRAS: readonly Capability[] = [
+  'user.invite',
+  'membership.manage',
+  'budget.view',
+  'budget.manage',
+  'audit.view',
+  'influencer.contact.view',
+  'import.run',
+]
+
+/** Capacidades extra que un usuario de cliente sí puede recibir. */
+export const GRANTABLE_CLIENT_EXTRAS: readonly Capability[] = ['user.invite', 'export.create']
