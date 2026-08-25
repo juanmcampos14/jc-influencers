@@ -16,6 +16,7 @@ import {
   Menu,
   Megaphone,
   Radar,
+  Settings,
   ShieldCheck,
   Users,
   X,
@@ -69,6 +70,7 @@ export function AppShell({
   brandName,
   logoUrl,
   logoNeedsBackdrop = false,
+  accountHref,
   children,
 }: {
   nav: NavItem[]
@@ -87,6 +89,8 @@ export function AppShell({
    * muestra sobre un fondo del color de la marca para que siempre se vea.
    */
   logoNeedsBackdrop?: boolean
+  /** Adónde lleva "Mi cuenta". Cada lado tiene la suya, con su propio shell. */
+  accountHref: string
   children: React.ReactNode
 }) {
   const pathname = usePathname()
@@ -265,16 +269,37 @@ export function AppShell({
           {brandName && logoUrl ? (
             <p className="mb-2 px-2 text-[11px] text-nav-text-2">Espacio gestionado por JC Influencers</p>
           ) : null}
+          {/*
+            * El email va siempre, no sólo cuando falta el rol: quien tiene dos
+            * cuentas en el mismo producto no puede distinguirlas por el nombre,
+            * que es el mismo en las dos. El rol pasa a una tercera línea.
+            */}
           <div className="flex items-center gap-2.5 px-2 py-1">
             <span className="grid size-8 shrink-0 place-items-center rounded-full bg-nav-2 text-[11px] font-bold text-nav-text-strong">
               {iniciales(user.name)}
             </span>
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium text-nav-text-strong">{user.name}</span>
-              <span className="block truncate text-[11px] text-nav-text-2">{roleLabel || user.email}</span>
+              <span className="block truncate text-[11px] text-nav-text-2" title={user.email}>
+                {user.email}
+              </span>
+              {roleLabel ? (
+                <span className="block truncate text-[11px] text-nav-text-2">{roleLabel}</span>
+              ) : null}
             </span>
           </div>
-          <form action={logoutAction} className="mt-1.5">
+          <Link
+            href={accountHref}
+            onClick={() => setOpen(false)}
+            className={cn(
+              'mt-1.5 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-nav-text hover:bg-nav-2 hover:text-nav-text-strong',
+              pathname === accountHref && 'bg-nav-2 text-nav-text-strong',
+            )}
+          >
+            <Settings className="size-4" aria-hidden="true" />
+            Mi cuenta
+          </Link>
+          <form action={logoutAction} className="mt-0.5">
             <button
               type="submit"
               className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-nav-text hover:bg-nav-2 hover:text-nav-text-strong"

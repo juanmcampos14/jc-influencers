@@ -113,6 +113,28 @@ export async function revokeAllSessionsForUser(userId: string, reason: string): 
   return result.count
 }
 
+/**
+ * Cierra todas las sesiones del usuario MENOS una.
+ *
+ * Es lo que corresponde cuando alguien cambia su propia contraseña desde
+ * adentro: si había una sesión robada, muere; la de quien hizo el cambio
+ * sobrevive, porque expulsarlo de la pantalla en la que acaba de protegerse no
+ * agrega seguridad y sí lo empuja a no volver a hacerlo.
+ */
+export async function revokeOtherSessionsForUser(
+  userId: string,
+  keepSessionId: string,
+  reason: string,
+): Promise<number> {
+  const result = await withSystemScope((tx) =>
+    tx.session.updateMany({
+      where: { userId, revokedAt: null, id: { not: keepSessionId } },
+      data: { revokedAt: new Date(), revokedReason: reason },
+    }),
+  )
+  return result.count
+}
+
 export async function setActiveClient(sessionId: string, clientId: string | null): Promise<void> {
   await withSystemScope((tx) => tx.session.update({ where: { id: sessionId }, data: { activeClientId: clientId } }))
 }

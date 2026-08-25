@@ -25,6 +25,7 @@ export default async function PortalLayout({ children }: { children: React.React
         user={{ name: ctx.user.name, email: ctx.user.email }}
         roleLabel={activeClient?.role ? CLIENT_ROLE_LABELS[activeClient.role] : ctx.side === 'AGENCY' ? 'Agencia' : ''}
         sideLabel="Portal del cliente"
+        accountHref="/portal/cuenta"
         brandName={activeClient?.name ?? null}
         logoUrl={theme.logoUrl}
         logoNeedsBackdrop={theme.logoUrl !== null && !theme.logoIsDark && theme.mode === 'LIGHT'}

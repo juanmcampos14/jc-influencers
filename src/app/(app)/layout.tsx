@@ -33,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       user={{ name: ctx.user.name, email: ctx.user.email }}
       roleLabel={ctx.agencyRole ? AGENCY_ROLE_LABELS[ctx.agencyRole] : ''}
       sideLabel="Panel de agencia"
+      accountHref="/cuenta"
     >
       {children}
     </AppShell>

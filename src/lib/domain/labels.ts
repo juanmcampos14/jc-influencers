@@ -51,6 +51,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'auth.login.success': 'Acceso',
   'auth.logout': 'Cierre de sesión',
   'auth.password_reset.complete': 'Contraseña cambiada',
+  'auth.password.changed': 'Contraseña cambiada desde la cuenta',
   'auth.password_reset.request': 'Recuperación de contraseña pedida',
   'auth.session.revoked': 'Sesión revocada',
   'brand.extracted': 'Identidad visual analizada',

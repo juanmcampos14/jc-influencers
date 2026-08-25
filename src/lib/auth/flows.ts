@@ -8,7 +8,12 @@ import { ValidationError } from '@/lib/authz/errors'
 import { consumeRateLimit } from './rate-limit'
 import { hashPassword, passwordProblems, verifyPassword } from './password'
 import { generateToken, hashToken, normalizeEmail } from './tokens'
-import { createSession, revokeAllSessionsForUser, type CreatedSession } from './session'
+import {
+  createSession,
+  revokeAllSessionsForUser,
+  revokeOtherSessionsForUser,
+  type CreatedSession,
+} from './session'
 
 export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000
 export const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000
@@ -451,4 +456,58 @@ export async function completePasswordReset(input: {
     await revokeAllSessionsForUser(result.userId, 'password_reset')
   }
   return result
+}
+
+/**
+ * Cambia la contraseña de quien ya inició sesión.
+ *
+ * Pide la actual: la sesión abierta prueba quién entró, no que quien está
+ * frente a la pantalla en este momento sea esa persona. Y como el cambio
+ * invalida cualquier sesión robada, se cierran todas las demás -- la que hizo
+ * el cambio sigue viva, porque cerrarle la puerta a quien acaba de hacer lo
+ * correcto no protege de nada.
+ */
+export async function changeOwnPassword(input: {
+  userId: string
+  sessionId: string
+  currentPassword: string
+  newPassword: string
+  ip: string | null
+  userAgent: string | null
+}): Promise<{ ok: boolean; message?: string; otrasSesionesCerradas?: number }> {
+  await consumeRateLimit('passwordChange', input.userId)
+
+  const user = await withSystemScope((tx) => tx.user.findUnique({ where: { id: input.userId } }))
+  if (!user) return { ok: false, message: 'No encontramos tu cuenta.' }
+
+  if (!(await verifyPassword(input.currentPassword, user.passwordHash))) {
+    return { ok: false, message: 'La contraseña actual no es correcta.' }
+  }
+
+  const problems = passwordProblems(input.newPassword)
+  if (problems.length > 0) {
+    throw new ValidationError('La contraseña nueva no cumple la política.', { newPassword: problems })
+  }
+  if (await verifyPassword(input.newPassword, user.passwordHash)) {
+    return { ok: false, message: 'La contraseña nueva tiene que ser distinta de la actual.' }
+  }
+
+  const now = new Date()
+  const passwordHash = await hashPassword(input.newPassword)
+
+  await withSystemScope(async (tx) => {
+    await tx.user.update({
+      where: { id: input.userId },
+      data: { passwordHash, passwordSetAt: now, failedLoginCount: 0, lockedUntil: null },
+    })
+    await recordAudit(tx, { userId: input.userId, ip: input.ip, userAgent: input.userAgent }, {
+      action: AUDIT.PASSWORD_CHANGED,
+      entityType: 'User',
+      entityId: input.userId,
+    })
+  })
+
+  const cerradas = await revokeOtherSessionsForUser(input.userId, input.sessionId, 'password_changed')
+
+  return { ok: true, otrasSesionesCerradas: cerradas }
 }

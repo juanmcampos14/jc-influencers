@@ -8,6 +8,7 @@ export const RATE_LIMITS = {
   login: { limit: 8, windowSeconds: 15 * 60 },
   loginPerEmail: { limit: 6, windowSeconds: 15 * 60 },
   passwordReset: { limit: 5, windowSeconds: 60 * 60 },
+  passwordChange: { limit: 10, windowSeconds: 15 * 60 },
   invitation: { limit: 30, windowSeconds: 60 * 60 },
   invitationAccept: { limit: 10, windowSeconds: 15 * 60 },
   exportCreate: { limit: 30, windowSeconds: 60 * 60 },

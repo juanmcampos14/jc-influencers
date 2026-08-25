@@ -11,6 +11,7 @@ import { ErrorState, InfoNote } from '@/components/ui/states'
 import { ConfirmButton } from '@/components/ui/confirm'
 import { buildThemeFromBrandColors, contrastBetween, type ThemeColors } from '@/lib/domain/color'
 import { resolveTheme } from '@/lib/domain/theme'
+import { dataUrlToFile } from '@/lib/util/data-url'
 import type { BrandDto } from '@/lib/repos/brand'
 import { extractBrandAction, resetBrandAction, saveBrandAction, type BrandProposal } from '../../../actions/brand'
 import { BrandPreview } from './brand-preview'
@@ -57,6 +58,14 @@ export function BrandStudio({
   const [safeMode, setSafeMode] = React.useState(brand.safeMode)
   const [fontHeading, setFontHeading] = React.useState(brand.fontHeading ?? '')
   const [fontBody, setFontBody] = React.useState(brand.fontBody ?? '')
+  /*
+   * El texto de la fuente también vive fuera del formulario, por lo mismo que
+   * los selectores de acá abajo: al terminar la acción de servidor React
+   * devuelve los controles a su valor por defecto, y el campo quedaba vacío
+   * justo cuando la propuesta aparecía en pantalla.
+   */
+  const [website, setWebsite] = React.useState(brand.sourceUrl ?? '')
+  const [handle, setHandle] = React.useState('')
   const [proposal, setProposal] = React.useState<BrandProposal | null>(null)
   const [logoFile, setLogoFile] = React.useState<File | null>(null)
   const [logoPreview, setLogoPreview] = React.useState<string | null>(
@@ -118,12 +127,17 @@ export function BrandStudio({
         formData.set('logoIsDark', String(proposal?.logoIsDark ?? brand.logoIsDark))
       } else if (proposal?.logoDataUrl && !removeLogo) {
         // El logo de la propuesta viaja como archivo, no como texto.
-        const blob = await (await fetch(proposal.logoDataUrl)).blob()
-        formData.set('logo', new File([blob], 'logo.png', { type: blob.type || 'image/png' }))
+        formData.set('logo', dataUrlToFile(proposal.logoDataUrl, 'logo.png'))
         formData.set('logoIsDark', String(proposal.logoIsDark))
       }
 
-      const result = await saveBrandAction(formData)
+      const result = await saveBrandAction(formData).catch(() => null)
+      if (!result) {
+        const mensaje = 'No se pudo guardar la identidad. Reintentá; si vuelve a pasar, avisale al equipo.'
+        setError(mensaje)
+        toast.error(mensaje)
+        return
+      }
       if (!result.ok) {
         setError(result.message)
         toast.error(result.message)
@@ -198,7 +212,14 @@ export function BrandStudio({
               {source === 'INSTAGRAM' ? (
                 <>
                   <Field label="Usuario de Instagram" htmlFor="handle" required>
-                    <Input id="handle" name="handle" placeholder="lamarca" required />
+                    <Input
+                      id="handle"
+                      name="handle"
+                      placeholder="lamarca"
+                      required
+                      value={handle}
+                      onChange={(event) => setHandle(event.target.value)}
+                    />
                   </Field>
                   {!instagramAvailable ? (
                     <InfoNote>
@@ -225,7 +246,14 @@ export function BrandStudio({
                 </Field>
               ) : (
                 <Field label="Dirección del sitio" htmlFor="website" required>
-                  <Input id="website" name="website" placeholder="lamarca.com" required />
+                  <Input
+                    id="website"
+                    name="website"
+                    placeholder="lamarca.com"
+                    required
+                    value={website}
+                    onChange={(event) => setWebsite(event.target.value)}
+                  />
                 </Field>
               )}
 

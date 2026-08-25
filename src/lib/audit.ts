@@ -80,6 +80,7 @@ export const AUDIT = {
   LOGOUT: 'auth.logout',
   PASSWORD_RESET_REQUEST: 'auth.password_reset.request',
   PASSWORD_RESET_COMPLETE: 'auth.password_reset.complete',
+  PASSWORD_CHANGED: 'auth.password.changed',
   SESSION_REVOKED: 'auth.session.revoked',
   INVITATION_CREATED: 'invitation.created',
   INVITATION_ACCEPTED: 'invitation.accepted',
