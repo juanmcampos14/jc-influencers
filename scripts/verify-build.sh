@@ -21,8 +21,15 @@ if [ -f .env ]; then
   RESTAURAR=1
 fi
 
+# Un servidor de desarrollo corriendo escribe en .next mientras se borra, así
+# que el borrado falla y la comprobación queda contaminada con artefactos
+# viejos. Se corta acá en vez de dar un "OK" que no vale.
+if ! rm -rf .next 2>/dev/null || [ -d .next ]; then
+  echo "FALLA: no se pudo limpiar .next. ¿Hay un servidor de desarrollo corriendo? Pará el dev y volvé a intentar."
+  exit 1
+fi
+
 echo "→ Compilando sin ninguna variable de entorno…"
-rm -rf .next
 if npm run build; then
   echo
   echo "OK: compila sin variables de entorno."
