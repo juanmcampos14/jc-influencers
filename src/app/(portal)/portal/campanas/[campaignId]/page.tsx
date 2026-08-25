@@ -13,6 +13,8 @@ import { candidacySummary, listCandidacies } from '@/lib/repos/candidacies'
 import { listComments } from '@/lib/repos/comments'
 import { formatDate, formatNumber } from '@/lib/util/format'
 import { ActivityPanel } from '@/app/(app)/campanas/[campaignId]/activity-panel'
+import { InsightView } from '@/components/insight-view'
+import { listInsights } from '@/lib/repos/ai'
 import { ProposalList } from './proposal-list'
 
 export const metadata: Metadata = { title: 'Campaña' }
@@ -37,7 +39,7 @@ export default async function PortalCampaignPage({
     throw error
   }
 
-  const [candidacies, summary, brief, comments] = await Promise.all([
+  const [candidacies, summary, brief, comments, insights] = await Promise.all([
     listCandidacies(
       ctx,
       campaignId,
@@ -50,6 +52,7 @@ export default async function PortalCampaignPage({
     candidacySummary(ctx, campaignId),
     getBrief(ctx, campaignId),
     listComments(ctx, { campaignId }),
+    can(ctx, 'ai.view', campaign.clientId) ? listInsights(ctx, { campaignId }) : Promise.resolve([]),
   ])
 
   const canApprove = can(ctx, 'candidate.approve', campaign.clientId)
@@ -140,8 +143,8 @@ export default async function PortalCampaignPage({
                     aria-current={isActive ? 'page' : undefined}
                     className={
                       isActive
-                        ? 'inline-block rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white'
-                        : 'inline-block rounded-lg border border-ink-300 bg-white px-3 py-1.5 text-sm text-ink-700 hover:bg-ink-100'
+                        ? 'inline-block rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-on-brand'
+                        : 'inline-block rounded-lg border border-ink-300 bg-surface px-3 py-1.5 text-sm text-ink-700 hover:bg-ink-100'
                     }
                   >
                     {entry.label}
@@ -158,6 +161,15 @@ export default async function PortalCampaignPage({
           canApprove={canApprove}
           timezone={ctx.user.timezone}
         />
+
+        {insights.length > 0 ? (
+          <section className="space-y-4">
+            <h2 className="text-sm font-semibold text-ink-900">Análisis compartidos por la agencia</h2>
+            {insights.map((insight) => (
+              <InsightView key={insight.id} insight={insight} timezone={ctx.user.timezone} />
+            ))}
+          </section>
+        ) : null}
 
         <ActivityPanel
           campaignId={campaign.id}

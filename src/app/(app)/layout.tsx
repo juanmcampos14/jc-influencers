@@ -15,6 +15,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (can(ctx, 'client.view', clientId)) nav.push({ href: '/clientes', label: 'Clientes' })
   if (can(ctx, 'campaign.view', clientId)) nav.push({ href: '/campanas', label: 'Campañas' })
   if (can(ctx, 'influencer.view', clientId)) nav.push({ href: '/influencers', label: 'Influencers' })
+  if (ctx.clients.some((client) => can(ctx, 'scouting.run', client.id))) {
+    nav.push({ href: '/scouting', label: 'Scouting' })
+  }
   if (can(ctx, 'import.run', clientId)) nav.push({ href: '/importacion', label: 'Importación' })
   if (can(ctx, 'membership.manage', null) || can(ctx, 'user.invite', null)) {
     nav.push({ href: '/usuarios', label: 'Usuarios' })

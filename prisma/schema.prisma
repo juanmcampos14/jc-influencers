@@ -219,6 +219,10 @@ model Client {
   candidacies Candidacy[]
   comments    Comment[]
   importRuns  ImportRun[]
+  brand           ClientBrand?
+  aiInsights      AiInsight[]
+  scoutingRuns    ScoutingRun[]
+  scoutingBudgets ScoutingBudget[]
 
   @@index([status])
   @@map("clients")
@@ -263,8 +267,10 @@ model Campaign {
   candidacies Candidacy[]
   links       CampaignLink[]
   documents   CampaignDocument[]
-  comments    Comment[]
-  importRuns  ImportRun[]
+  comments     Comment[]
+  importRuns   ImportRun[]
+  aiInsights   AiInsight[]
+  scoutingRuns ScoutingRun[]
 
   @@unique([clientId, slug])
   /// Clave sobre la que cuelgan las FK compuestas de las entidades hijas.
@@ -753,6 +759,7 @@ model Candidacy {
   deliverables Deliverable[]
   comments     Comment[]
   sources      SourceReference[]
+  aiInsights   AiInsight[]
   importRun    ImportRun?            @relation(fields: [importRunId], references: [id], onDelete: SetNull)
 
   @@unique([campaignId, influencerId])
@@ -1030,4 +1037,238 @@ model EmailOutbox {
 
   @@index([createdAt])
   @@map("email_outbox")
+}
+
+// ── Identidad visual por cliente ─────────────────────────────────────────────
+
+enum BrandSource {
+  WEBSITE
+  INSTAGRAM
+  UPLOAD
+  MANUAL
+}
+
+enum ThemeMode {
+  LIGHT
+  DARK
+}
+
+enum BrandStatus {
+  DRAFT
+  APPROVED
+}
+
+/// Tema del espacio de trabajo de un cliente.
+/// Los colores se validan por contraste antes de aprobarse: una marca oscura o
+/// de bajo contraste no puede dejar el panel ilegible.
+model ClientBrand {
+  id       String @id @default(cuid())
+  clientId String @unique
+
+  source      BrandSource @default(MANUAL)
+  sourceUrl   String?
+  extractedAt DateTime?
+  /// Lo que devolvió la extracción, tal cual. Sirve para rehacer sin volver a scrapear.
+  rawExtraction Json?
+
+  logoStorageKey    String?
+  logoContentType   String?
+  logoIsDark        Boolean @default(false)
+  faviconStorageKey String?
+
+  /// Paleta en hexadecimal. Se aplica como variables CSS en el espacio del cliente.
+  primary    String @default("#3b5bdb")
+  onPrimary  String @default("#ffffff")
+  accent     String @default("#5c7cfa")
+  background String @default("#f8f9fb")
+  surface    String @default("#ffffff")
+  text       String @default("#171a21")
+  muted      String @default("#5b6270")
+  border     String @default("#e2e6ee")
+
+  fontHeading String?
+  fontBody    String?
+  radius      Int       @default(12)
+  mode        ThemeMode @default(LIGHT)
+
+  /// Ignora fondos y tipografías de marca y usa el tema neutro. Se activa solo
+  /// cuando la paleta no alcanza el contraste mínimo.
+  safeMode       Boolean @default(false)
+  contrastReport Json?
+
+  status      BrandStatus @default(DRAFT)
+  appliedAt   DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  createdById String?
+  version     Int         @default(1)
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("client_brands")
+}
+
+// ── Análisis con IA ──────────────────────────────────────────────────────────
+
+enum AiInsightKind {
+  PROFILE_FIT
+  CREATIVE_IDEAS
+  CAMPAIGN_ANALYSIS
+  CAMPAIGN_REPORT
+}
+
+enum AiJobStatus {
+  RUNNING
+  READY
+  FAILED
+}
+
+/// Resultado de un análisis con IA.
+/// Guarda el modelo, la versión del prompt y QUÉ DATOS se le pasaron, para que
+/// la salida siempre se pueda explicar y auditar.
+model AiInsight {
+  id          String  @id @default(cuid())
+  clientId    String
+  campaignId  String?
+  candidacyId String?
+
+  kind   AiInsightKind
+  status AiJobStatus   @default(RUNNING)
+
+  model         String
+  promptVersion String
+  /// Resumen legible de las entradas: qué perfiles, qué métricas, qué brief.
+  inputsSummary Json
+  /// Huella de las entradas, para no repetir el mismo análisis sin que nada cambie.
+  inputsDigest  String
+
+  output     Json?
+  outputText String?
+  errorMessage String?
+
+  inputTokens  Int?
+  outputTokens Int?
+  costUsd      Decimal? @db.Decimal(12, 6)
+
+  /// La agencia decide si el cliente ve este análisis.
+  clientVisible Boolean @default(false)
+
+  createdAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  createdById String?
+
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign  Campaign?  @relation(fields: [campaignId, clientId], references: [id, clientId], onDelete: Cascade)
+  candidacy Candidacy? @relation(fields: [candidacyId, clientId], references: [id, clientId], onDelete: Cascade)
+
+  @@index([clientId, kind, createdAt])
+  @@index([campaignId, kind])
+  @@index([inputsDigest])
+  @@map("ai_insights")
+}
+
+// ── Scouting con proveedor externo ───────────────────────────────────────────
+
+enum ScoutingMode {
+  /// Descubrir perfiles nuevos por hashtag, palabra clave o similares.
+  DISCOVER
+  /// Traer métricas frescas de perfiles que ya tenemos.
+  ENRICH
+}
+
+enum ScoutingStatus {
+  PREVIEW
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+/// Una corrida de scouting contra el proveedor externo.
+/// Cuesta plata de verdad, así que cada corrida declara su costo estimado antes
+/// de ejecutarse y queda contra un presupuesto con tope duro.
+model ScoutingRun {
+  id         String  @id @default(cuid())
+  clientId   String
+  campaignId String?
+
+  provider String
+  mode     ScoutingMode
+  platform Platform
+  /// Los parámetros de la búsqueda, tal como se enviaron.
+  query    Json
+
+  status ScoutingStatus @default(PREVIEW)
+
+  requestedRecords Int      @default(0)
+  deliveredRecords Int      @default(0)
+  unitCostUsd      Decimal  @db.Decimal(12, 6)
+  estimatedCostUsd Decimal  @db.Decimal(12, 4)
+  actualCostUsd    Decimal? @db.Decimal(12, 4)
+
+  externalJobId String?
+  errorMessage  String?
+  summary       Json?
+
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  createdById String?
+
+  client   Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId, clientId], references: [id, clientId], onDelete: Cascade)
+  results  ScoutingResult[]
+
+  @@index([clientId, startedAt])
+  @@index([status])
+  @@map("scouting_runs")
+}
+
+model ScoutingResult {
+  id       String @id @default(cuid())
+  runId    String
+  clientId String
+
+  platform Platform
+  handle   String?
+  url      String
+  urlNormalized String
+  displayName   String?
+  followers     Int?
+  engagementRate Decimal? @db.Decimal(6, 3)
+  country       String?
+  bio           String?
+  raw           Json?
+
+  /// Influencer existente con el que coincide, si lo hay.
+  matchedInfluencerId String?
+  imported            Boolean @default(false)
+  importedAt          DateTime?
+  discarded           Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  run ScoutingRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, urlNormalized])
+  @@index([clientId, imported])
+  @@map("scouting_results")
+}
+
+/// Tope de gasto por período. `clientId` nulo es el tope global de la agencia.
+model ScoutingBudget {
+  id       String  @id @default(cuid())
+  clientId String?
+  /// Período en formato AAAA-MM.
+  period   String
+  limitUsd Decimal @db.Decimal(12, 2)
+  spentUsd Decimal @default(0) @db.Decimal(12, 4)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  client Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, period])
+  @@map("scouting_budgets")
 }

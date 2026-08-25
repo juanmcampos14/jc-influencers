@@ -25,6 +25,23 @@ const schema = z.object({
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: z.coerce.boolean().default(true),
+
+  // Scouting con proveedor externo. Sin token, la función se muestra deshabilitada.
+  BRIGHTDATA_API_TOKEN: z.string().optional(),
+  BRIGHTDATA_DATASET_INSTAGRAM_PROFILES: z.string().optional(),
+  BRIGHTDATA_DATASET_INSTAGRAM_DISCOVER: z.string().optional(),
+  BRIGHTDATA_DATASET_TIKTOK_PROFILES: z.string().optional(),
+  BRIGHTDATA_DATASET_TIKTOK_DISCOVER: z.string().optional(),
+  /** Costo por registro entregado. Se usa para el tope de gasto y el aviso previo. */
+  BRIGHTDATA_COST_PER_RECORD_USD: z.coerce.number().nonnegative().default(0.0015),
+  /** Tope mensual global de la agencia, en dólares. */
+  SCOUTING_MONTHLY_LIMIT_USD: z.coerce.number().nonnegative().default(50),
+
+  // Análisis con IA. Sin clave, la función se muestra deshabilitada.
+  ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_MODEL: z.string().default('claude-opus-5'),
+  /** Tope mensual de gasto en IA, en dólares. */
+  AI_MONTHLY_LIMIT_USD: z.coerce.number().nonnegative().default(50),
 })
 
 export type Env = z.infer<typeof schema>

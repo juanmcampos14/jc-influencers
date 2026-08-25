@@ -17,9 +17,19 @@ import { formatFollowers, formatMoney, formatPercent } from '@/lib/util/format'
 import type { CandidacyDto } from '@/lib/domain/dto'
 import type { Paginated } from '@/lib/repos/base'
 import { changeStatusAction, updateCandidacyAction, visibilityAction } from '../../actions/candidacies'
+import { analyzeProfileAction } from '../../actions/ai'
+import { InsightView } from '@/components/insight-view'
+import type { InsightDto } from '@/lib/repos/ai'
 
 type Cluster = { id: string; label: string }
-type Permissions = { canManage: boolean; canSeeInternal: boolean; canSeeBudget: boolean; canEditBudget: boolean }
+type Permissions = {
+  canManage: boolean
+  canSeeInternal: boolean
+  canSeeBudget: boolean
+  canEditBudget: boolean
+  canRunAi: boolean
+  aiConfigured: boolean
+}
 
 const ALL_COLUMNS = [
   { key: 'creador', label: 'Creador' },
@@ -153,10 +163,10 @@ export function CandidacyTable({
         </form>
 
         <details className="relative">
-          <summary className="cursor-pointer list-none rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm text-ink-700 hover:bg-ink-50">
+          <summary className="cursor-pointer list-none rounded-lg border border-ink-300 bg-surface px-3 py-2 text-sm text-ink-700 hover:bg-ink-50">
             Columnas
           </summary>
-          <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-ink-200 bg-white p-2 shadow-lg">
+          <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-ink-200 bg-surface p-2 shadow-lg">
             {ALL_COLUMNS.map((column) => (
               <label key={column.key} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-ink-50">
                 <Checkbox checked={shows(column.key)} onChange={() => toggleColumn(column.key)} />
@@ -415,6 +425,21 @@ function CandidacyDialog({
   const router = useRouter()
   const [pending, startTransition] = React.useTransition()
   const [errors, setErrors] = React.useState<Record<string, string[]>>({})
+  const [insight, setInsight] = React.useState<InsightDto | null>(null)
+
+  function analyze() {
+    startTransition(async () => {
+      const result = await analyzeProfileAction({ candidacyId: candidacy.id, campaignId })
+      if (!result.ok) {
+        toast.error(result.message)
+        return
+      }
+      if (result.data.status === 'FAILED') {
+        toast.error(result.data.errorMessage ?? 'No se pudo generar el análisis.')
+      }
+      setInsight(result.data)
+    })
+  }
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -481,6 +506,38 @@ function CandidacyDialog({
         }
         className="w-[min(52rem,calc(100vw-2rem))]"
       >
+        {permissions.canRunAi ? (
+          <div className="mb-4 rounded-lg border border-ink-200 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-medium text-ink-800">Análisis del perfil contra el brief</p>
+                <p className="text-xs text-ink-500">
+                  Usa las métricas cargadas y el brief de la campaña. Si falta un dato, lo dice.
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={analyze}
+                disabled={pending || !permissions.aiConfigured}
+              >
+                {pending ? 'Analizando…' : 'Analizar con IA'}
+              </Button>
+            </div>
+            {!permissions.aiConfigured ? (
+              <p className="mt-2 text-xs text-amber-800">
+                Falta configurar ANTHROPIC_API_KEY para habilitar esta función.
+              </p>
+            ) : null}
+            {insight ? (
+              <div className="mt-3">
+                <InsightView insight={insight} timezone="America/Argentina/Buenos_Aires" />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Cluster" htmlFor="clusterId">

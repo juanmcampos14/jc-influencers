@@ -12,6 +12,8 @@ export const RATE_LIMITS = {
   invitationAccept: { limit: 10, windowSeconds: 15 * 60 },
   exportCreate: { limit: 30, windowSeconds: 60 * 60 },
   importRun: { limit: 10, windowSeconds: 60 * 60 },
+  scoutingRun: { limit: 20, windowSeconds: 60 * 60 },
+  aiRun: { limit: 60, windowSeconds: 60 * 60 },
 } as const satisfies Record<string, RateLimitRule>
 
 export type RateLimitName = keyof typeof RATE_LIMITS

@@ -35,7 +35,7 @@ export function InfluencerFilters({
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3 rounded-xl border border-ink-200 bg-white p-4" role="search">
+    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3 rounded-xl border border-ink-200 bg-surface p-4" role="search">
       <div className="min-w-52 flex-1">
         <label htmlFor="q" className="mb-1 block text-xs font-medium text-ink-600">
           Buscar

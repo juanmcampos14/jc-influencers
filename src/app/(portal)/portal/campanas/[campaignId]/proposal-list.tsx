@@ -106,7 +106,7 @@ export function ProposalList({
           const profile = item.influencer.profiles[0]
           const status = STATUS_BY_KEY.get(item.statusKey)
           return (
-            <li key={item.id} className="flex flex-col rounded-xl border border-ink-200 bg-white p-5">
+            <li key={item.id} className="flex flex-col rounded-xl border border-ink-200 bg-surface p-5">
               <div className="mb-2 flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <h3 className="text-sm font-semibold text-ink-900">{item.influencer.displayName}</h3>

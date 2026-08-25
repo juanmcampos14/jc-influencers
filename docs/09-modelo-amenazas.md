@@ -58,6 +58,14 @@ alcanza una sola fila.
 | Salir del directorio con `..` en la clave | La ruta resuelta se valida contra la raíz | `storage.ts` |
 | XSS | React escapa por defecto; no se usa `dangerouslySetInnerHTML` en ningún lado; CSP sin `unsafe-inline` en producción | `next.config.ts` |
 | Clickjacking | `X-Frame-Options: DENY` + `frame-ancestors 'none'` | E2E |
+| Un cliente genera gasto en scouting o IA | Ambas capacidades están prohibidas para el lado cliente, y hay tope con corte duro | `scouting-ai-brand` |
+| Gasto inesperado por un error del equipo | Aviso previo obligatorio con el costo, y tope mensual que corta antes de llamar al proveedor | `scouting-ai-brand` |
+| SSRF con la URL del sitio de un cliente | Se resuelve el dominio, se rechaza toda IP privada o de metadatos, y cada redirect se revalida | `safe-fetch` |
+| XSS con un SVG subido como logo | Los SVG se rasterizan a PNG; nunca se almacena ni se sirve el original | `brand-extractor` |
+| Inyección por el nombre de una tipografía | Lista blanca aplicada sobre el valor original, no sobre el valor "limpiado" | `color` |
+| Una marca deja el panel del cliente ilegible | El contraste se calcula en el servidor y bloquea la aprobación cuando no hay forma de respetar la marca | `color`, `scouting-ai-brand` |
+| El cliente ve un análisis que la agencia no quiso mostrarle | Los análisis nacen privados; compartirlos es una acción explícita y auditada | `scouting-ai-brand` |
+| La IA inventa un dato y termina en un reporte al cliente | El material declara qué falta y qué está desactualizado; la salida tiene un campo de datos faltantes | `scouting-ai-brand` |
 
 ## Lo que este modelo NO cubre
 
@@ -68,4 +76,10 @@ alcanza una sola fila.
   la invitación.
 - **Denegación de servicio.** El rate limiting cubre los formularios sensibles, no un ataque volumétrico.
   Eso corresponde al proxy o al CDN.
+- **Que la IA se equivoque.** El sistema garantiza que trabaje sólo con datos reales y que se pueda
+  auditar de dónde salió cada recomendación. No garantiza que la recomendación sea buena: es un insumo
+  para una persona, no un reemplazo.
+- **Que un proveedor externo cobre distinto de lo previsto.** El tope se calcula con el costo por
+  registro que se configura en `BRIGHTDATA_COST_PER_RECORD_USD`. Si el precio real del contrato cambia,
+  hay que actualizarlo; el sistema no lo descubre solo.
 - **Multi-factor.** No está implementado. Ver el checklist de seguridad.

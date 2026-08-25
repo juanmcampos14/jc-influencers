@@ -18,10 +18,10 @@ export function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & { title: string; description?: string }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-ink-950/40 backdrop-blur-[1px]" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[color:color-mix(in_srgb,var(--jc-text)_45%,transparent)] backdrop-blur-[1px]" />
       <DialogPrimitive.Content
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 w-[min(38rem,calc(100vw-2rem))] max-h-[calc(100vh-4rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-ink-200 bg-white p-5 shadow-lg',
+          'fixed left-1/2 top-1/2 z-50 w-[min(38rem,calc(100vw-2rem))] max-h-[calc(100vh-4rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-ink-200 bg-surface p-5 shadow-lg',
           className,
         )}
         {...props}

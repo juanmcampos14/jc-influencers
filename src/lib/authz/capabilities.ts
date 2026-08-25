@@ -31,6 +31,11 @@ export const CAPABILITIES = [
   'export.create',
   'import.run',
   'catalog.manage',
+  'brand.manage',
+  'scouting.run',
+  'scouting.budget.manage',
+  'ai.run',
+  'ai.view',
 ] as const
 
 export type Capability = (typeof CAPABILITIES)[number]
@@ -65,6 +70,11 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
   'export.create': 'Generar exportaciones',
   'import.run': 'Ejecutar importaciones',
   'catalog.manage': 'Administrar catálogos y configuración',
+  'brand.manage': 'Configurar la identidad visual de un cliente',
+  'scouting.run': 'Ejecutar scouting con el proveedor externo (tiene costo)',
+  'scouting.budget.manage': 'Fijar el tope de gasto de scouting',
+  'ai.run': 'Generar análisis con IA (tiene costo)',
+  'ai.view': 'Ver análisis generados con IA',
 }
 
 /**
@@ -89,6 +99,12 @@ export const CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE: ReadonlySet<Capability> = n
   'audit.view',
   'import.run',
   'catalog.manage',
+  'brand.manage',
+  // Scouting e IA se pagan por uso. Que sólo la agencia pueda dispararlos es lo
+  // que evita que un cliente genere un gasto que después hay que explicar.
+  'scouting.run',
+  'scouting.budget.manage',
+  'ai.run',
 ])
 
 const AGENCY_ADMIN_CAPS: Capability[] = CAPABILITIES.filter((c) => c !== 'platform.admin')
@@ -114,6 +130,10 @@ export const AGENCY_ROLE_CAPABILITIES: Record<AgencyRole, readonly Capability[]>
     'budget.view',
     'export.create',
     'import.run',
+    'brand.manage',
+    'scouting.run',
+    'ai.run',
+    'ai.view',
   ],
   SCOUT: [
     'client.view',
@@ -126,6 +146,9 @@ export const AGENCY_ROLE_CAPABILITIES: Record<AgencyRole, readonly Capability[]>
     'feedback.internal.create',
     'internal_notes.view',
     'export.create',
+    'scouting.run',
+    'ai.run',
+    'ai.view',
   ],
   FINANCE: [
     'client.view',
@@ -137,6 +160,8 @@ export const AGENCY_ROLE_CAPABILITIES: Record<AgencyRole, readonly Capability[]>
     'budget.view',
     'budget.manage',
     'export.create',
+    'scouting.budget.manage',
+    'ai.view',
   ],
 }
 
@@ -150,6 +175,7 @@ export const CLIENT_ROLE_CAPABILITIES: Record<ClientRole, readonly Capability[]>
     'feedback.create',
     'export.create',
     'membership.manage',
+    'ai.view',
   ],
   CLIENT_REVIEWER: [
     'client.view',
@@ -159,9 +185,10 @@ export const CLIENT_ROLE_CAPABILITIES: Record<ClientRole, readonly Capability[]>
     'candidate.approve',
     'feedback.create',
     'export.create',
+    'ai.view',
   ],
   // Sólo lectura, incluida la exportación de lo que ya puede ver en pantalla.
-  CLIENT_VIEWER: ['client.view', 'campaign.view', 'brief.view', 'candidate.view', 'export.create'],
+  CLIENT_VIEWER: ['client.view', 'campaign.view', 'brief.view', 'candidate.view', 'export.create', 'ai.view'],
 }
 
 export const AGENCY_ROLE_LABELS: Record<AgencyRole, string> = {
@@ -187,6 +214,10 @@ export const GRANTABLE_AGENCY_EXTRAS: readonly Capability[] = [
   'audit.view',
   'influencer.contact.view',
   'import.run',
+  'brand.manage',
+  'scouting.run',
+  'scouting.budget.manage',
+  'ai.run',
 ]
 
 /** Capacidades extra que un usuario de cliente sí puede recibir. */

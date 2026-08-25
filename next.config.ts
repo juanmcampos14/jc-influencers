@@ -14,10 +14,11 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       // Next inyecta estilos inline en RSC; los scripts inline usan nonce en producción vía middleware.
-      "style-src 'self' 'unsafe-inline'",
+      // Google Fonts: las tipografías de marca de cada cliente se cargan desde ahí.
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' data: https://fonts.gstatic.com",
       isProd ? "script-src 'self'" : "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
       "img-src 'self' data: blob:",
-      "font-src 'self' data:",
       "connect-src 'self'",
       "object-src 'none'",
       "base-uri 'self'",

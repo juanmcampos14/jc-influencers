@@ -34,6 +34,11 @@ La autorización se pregunta siempre por una **capacidad**, nunca comparando rol
 | `export.create` — Generar exportaciones | sí | sí | sí | sí | sí |
 | `import.run` — Ejecutar importaciones | sí | sí | sí | — | — |
 | `catalog.manage` — Administrar catálogos y configuración | sí | sí | — | — | — |
+| `brand.manage` — Configurar la identidad visual de un cliente | sí | sí | sí | — | — |
+| `scouting.run` — Ejecutar scouting con el proveedor externo (tiene costo) | sí | sí | sí | sí | — |
+| `scouting.budget.manage` — Fijar el tope de gasto de scouting | sí | sí | — | — | sí |
+| `ai.run` — Generar análisis con IA (tiene costo) | sí | sí | sí | sí | — |
+| `ai.view` — Ver análisis generados con IA | sí | sí | sí | sí | sí |
 
 ## Roles de cliente
 
@@ -47,13 +52,16 @@ La autorización se pregunta siempre por una **capacidad**, nunca comparando rol
 | `feedback.create` — Dejar feedback | sí | sí | — |
 | `membership.manage` — Asignar roles y clientes | sí | — | — |
 | `export.create` — Generar exportaciones | sí | sí | sí |
+| `ai.view` — Ver análisis generados con IA | sí | sí | sí |
 
 ## Cerrojo contra escalada de privilegios
 
 Estas capacidades se eliminan de cualquier usuario del lado cliente, aunque alguien las
 escriba a mano en su membresía o las intente otorgar en una invitación:
 
+- `ai.run` — Generar análisis con IA (tiene costo)
 - `audit.view` — Ver auditoría
+- `brand.manage` — Configurar la identidad visual de un cliente
 - `brief.manage` — Editar brief y criterios
 - `budget.manage` — Editar presupuestos y cachés
 - `budget.view` — Ver presupuestos y cachés
@@ -70,6 +78,8 @@ escriba a mano en su membresía o las intente otorgar en una invitación:
 - `influencer.view` — Ver base de influencers
 - `internal_notes.view` — Ver notas internas
 - `platform.admin` — Administración técnica de plataforma
+- `scouting.budget.manage` — Fijar el tope de gasto de scouting
+- `scouting.run` — Ejecutar scouting con el proveedor externo (tiene costo)
 
 ## Permisos extra otorgables
 
@@ -84,6 +94,10 @@ Se conceden por membresía, encima del rol base. Nadie puede otorgar una capacid
 - `audit.view` — Ver auditoría
 - `influencer.contact.view` — Ver datos de contacto de influencers
 - `import.run` — Ejecutar importaciones
+- `brand.manage` — Configurar la identidad visual de un cliente
+- `scouting.run` — Ejecutar scouting con el proveedor externo (tiene costo)
+- `scouting.budget.manage` — Fijar el tope de gasto de scouting
+- `ai.run` — Generar análisis con IA (tiene costo)
 
 **A un usuario de cliente:**
 

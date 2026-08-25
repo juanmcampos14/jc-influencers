@@ -55,7 +55,7 @@ export default async function PortalHome() {
               <li key={campaign.id}>
                 <Link
                   href={`/portal/campanas/${campaign.id}`}
-                  className="block h-full rounded-xl border border-ink-200 bg-white p-5 hover:border-brand-300 hover:shadow-sm"
+                  className="block h-full rounded-xl border border-ink-200 bg-surface p-5 hover:border-brand-300 hover:shadow-sm"
                 >
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <h2 className="text-sm font-semibold text-ink-900">{campaign.name}</h2>

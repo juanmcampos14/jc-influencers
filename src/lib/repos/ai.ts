@@ -1,0 +1,360 @@
+import 'server-only'
+import { createHash } from 'node:crypto'
+import type { AiInsightKind } from '@/generated/prisma/enums'
+import type { AuthContext } from '@/lib/authz/context'
+import { assertCan, assertClientInScope } from '@/lib/authz/context'
+import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/authz/errors'
+import { AUDIT, recordAudit } from '@/lib/audit'
+import { env } from '@/lib/env'
+import { aiProvider, AiUnavailableError, PROMPT_VERSION } from '@/lib/ports/ai'
+import { buildBriefContext, buildCampaignState, buildProfileContext } from './ai-context'
+import { actorOf, scoped } from './base'
+
+const AI_TIMEOUT_MS = 180_000
+
+export type InsightDto = {
+  id: string
+  kind: AiInsightKind
+  status: string
+  model: string
+  promptVersion: string
+  inputsSummary: unknown
+  output: unknown
+  outputText: string | null
+  errorMessage: string | null
+  costUsd: number | null
+  clientVisible: boolean
+  createdAt: string
+  finishedAt: string | null
+}
+
+function toDto(row: {
+  id: string
+  kind: AiInsightKind
+  status: string
+  model: string
+  promptVersion: string
+  inputsSummary: unknown
+  output: unknown
+  outputText: string | null
+  errorMessage: string | null
+  costUsd: unknown
+  clientVisible: boolean
+  createdAt: Date
+  finishedAt: Date | null
+}): InsightDto {
+  return {
+    id: row.id,
+    kind: row.kind,
+    status: row.status,
+    model: row.model,
+    promptVersion: row.promptVersion,
+    inputsSummary: row.inputsSummary,
+    output: row.output,
+    outputText: row.outputText,
+    errorMessage: row.errorMessage,
+    costUsd: row.costUsd === null || row.costUsd === undefined ? null : Number(row.costUsd),
+    clientVisible: row.clientVisible,
+    createdAt: row.createdAt.toISOString(),
+    finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
+  }
+}
+
+const currentPeriod = (now = new Date()): string => now.toISOString().slice(0, 7)
+
+/** Gasto de IA del mes en curso, en dólares. */
+export async function aiSpendThisMonth(ctx: AuthContext): Promise<{ spent: number; limit: number }> {
+  const from = new Date(`${currentPeriod()}-01T00:00:00.000Z`)
+  const rows = await scoped(ctx, (tx) =>
+    tx.aiInsight.findMany({ where: { createdAt: { gte: from } }, select: { costUsd: true } }),
+  )
+  const spent = rows.reduce((sum, row) => sum + Number(row.costUsd ?? 0), 0)
+  return { spent, limit: env().AI_MONTHLY_LIMIT_USD }
+}
+
+async function assertAiBudget(ctx: AuthContext): Promise<void> {
+  const { spent, limit } = await aiSpendThisMonth(ctx)
+  if (limit > 0 && spent >= limit) {
+    throw new ValidationError(
+      `Se alcanzó el tope mensual de gasto en IA (US$ ${limit.toFixed(2)}). Subilo en la configuración o esperá al mes que viene.`,
+    )
+  }
+}
+
+type RunOptions = {
+  clientId: string
+  campaignId?: string | null
+  candidacyId?: string | null
+  kind: AiInsightKind
+  inputsSummary: Record<string, unknown>
+  inputsDigest: string
+}
+
+/**
+ * Ejecuta un análisis y lo guarda con toda su procedencia.
+ * Si el proveedor falla, el registro queda en FAILED con el motivo: no se
+ * pierde el intento ni se muestra un resultado a medias.
+ */
+async function runInsight<T>(
+  ctx: AuthContext,
+  options: RunOptions,
+  work: () => Promise<{ output: T; usage: { inputTokens: number; outputTokens: number; costUsd: number; model: string } }>,
+  asText?: (output: T) => string | null,
+): Promise<InsightDto> {
+  const provider = aiProvider()
+  if (!provider.configured) throw new AiUnavailableError('El análisis con IA no está configurado.')
+  await assertAiBudget(ctx)
+
+  const created = await scoped(ctx, (tx) =>
+    tx.aiInsight.create({
+      data: {
+        clientId: options.clientId,
+        campaignId: options.campaignId ?? null,
+        candidacyId: options.candidacyId ?? null,
+        kind: options.kind,
+        status: 'RUNNING',
+        model: provider.model,
+        promptVersion: PROMPT_VERSION,
+        inputsSummary: options.inputsSummary as never,
+        inputsDigest: options.inputsDigest,
+        createdById: ctx.user.id,
+      },
+    }),
+  )
+
+  try {
+    const result = await work()
+    const row = await scoped(ctx, async (tx) => {
+      const updated = await tx.aiInsight.update({
+        where: { id: created.id },
+        data: {
+          status: 'READY',
+          output: (typeof result.output === 'string' ? null : (result.output as never)) ?? undefined,
+          outputText: typeof result.output === 'string' ? result.output : (asText?.(result.output) ?? null),
+          inputTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
+          costUsd: result.usage.costUsd.toFixed(6),
+          finishedAt: new Date(),
+        },
+      })
+      await recordAudit(tx, actorOf(ctx), {
+        action: AUDIT.AI_INSIGHT_CREATED,
+        entityType: 'AiInsight',
+        entityId: created.id,
+        clientId: options.clientId,
+        metadata: {
+          kind: options.kind,
+          modelo: result.usage.model,
+          costoUsd: Number(result.usage.costUsd.toFixed(6)),
+          tokens: result.usage.inputTokens + result.usage.outputTokens,
+        },
+      })
+      return updated
+    })
+    return toDto(row)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error desconocido del proveedor.'
+    const row = await scoped(ctx, (tx) =>
+      tx.aiInsight.update({
+        where: { id: created.id },
+        data: { status: 'FAILED', errorMessage: message.slice(0, 500), finishedAt: new Date() },
+      }),
+    )
+    return toDto(row)
+  }
+}
+
+const digest = (parts: unknown[]): string =>
+  createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 32)
+
+// ── Análisis disponibles ─────────────────────────────────────────────────────
+
+export async function analyzeProfileFit(ctx: AuthContext, candidacyId: string): Promise<InsightDto> {
+  const candidacy = await scoped(ctx, (tx) =>
+    tx.candidacy.findUnique({
+      where: { id: candidacyId },
+      select: { clientId: true, campaignId: true, influencer: { select: { displayName: true } } },
+    }),
+  )
+  if (!candidacy) throw new NotFoundError()
+  assertClientInScope(ctx, candidacy.clientId)
+  assertCan(ctx, 'ai.run', candidacy.clientId)
+
+  const { brief, profile } = await scoped(
+    ctx,
+    async (tx) => ({
+      brief: await buildBriefContext(tx, candidacy.campaignId),
+      profile: await buildProfileContext(tx, candidacyId),
+    }),
+    AI_TIMEOUT_MS,
+  )
+
+  return runInsight(
+    ctx,
+    {
+      clientId: candidacy.clientId,
+      campaignId: candidacy.campaignId,
+      candidacyId,
+      kind: 'PROFILE_FIT',
+      inputsSummary: {
+        perfil: candidacy.influencer.displayName,
+        briefIncluido: !brief.includes('todavía no tiene brief'),
+        caracteresDeContexto: brief.length + profile.length,
+      },
+      inputsDigest: digest([brief, profile, PROMPT_VERSION]),
+    },
+    () => aiProvider().analyzeProfileFit({ brief, profile }),
+    (output) => output.veredicto,
+  )
+}
+
+export async function suggestCreatives(ctx: AuthContext, campaignId: string): Promise<InsightDto> {
+  const campaign = await scoped(ctx, (tx) =>
+    tx.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true, name: true } }),
+  )
+  if (!campaign) throw new NotFoundError()
+  assertClientInScope(ctx, campaign.clientId)
+  assertCan(ctx, 'ai.run', campaign.clientId)
+
+  const { brief, squad } = await scoped(
+    ctx,
+    async (tx) => ({
+      brief: await buildBriefContext(tx, campaignId),
+      squad: await buildCampaignState(tx, campaignId),
+    }),
+    AI_TIMEOUT_MS,
+  )
+
+  return runInsight(
+    ctx,
+    {
+      clientId: campaign.clientId,
+      campaignId,
+      kind: 'CREATIVE_IDEAS',
+      inputsSummary: { campania: campaign.name, caracteresDeContexto: brief.length + squad.length },
+      inputsDigest: digest([brief, squad, PROMPT_VERSION]),
+    },
+    () => aiProvider().suggestCreatives({ brief, squad }),
+    (output) => output.conceptoGeneral,
+  )
+}
+
+export async function analyzeCampaign(ctx: AuthContext, campaignId: string): Promise<InsightDto> {
+  const campaign = await scoped(ctx, (tx) =>
+    tx.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true, name: true } }),
+  )
+  if (!campaign) throw new NotFoundError()
+  assertClientInScope(ctx, campaign.clientId)
+  assertCan(ctx, 'ai.run', campaign.clientId)
+
+  const { brief, state } = await scoped(
+    ctx,
+    async (tx) => ({
+      brief: await buildBriefContext(tx, campaignId),
+      state: await buildCampaignState(tx, campaignId),
+    }),
+    AI_TIMEOUT_MS,
+  )
+
+  return runInsight(
+    ctx,
+    {
+      clientId: campaign.clientId,
+      campaignId,
+      kind: 'CAMPAIGN_ANALYSIS',
+      inputsSummary: { campania: campaign.name, caracteresDeContexto: brief.length + state.length },
+      inputsDigest: digest([brief, state, PROMPT_VERSION]),
+    },
+    () => aiProvider().analyzeCampaign({ brief, state }),
+    (output) => output.resumen,
+  )
+}
+
+export async function writeCampaignReport(
+  ctx: AuthContext,
+  campaignId: string,
+  audience: 'AGENCIA' | 'CLIENTE',
+): Promise<InsightDto> {
+  const campaign = await scoped(ctx, (tx) =>
+    tx.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true, name: true } }),
+  )
+  if (!campaign) throw new NotFoundError()
+  assertClientInScope(ctx, campaign.clientId)
+  assertCan(ctx, 'ai.run', campaign.clientId)
+  // Un reporte para el cliente puede llevar cifras: sólo lo pide quien las ve.
+  if (audience === 'CLIENTE') assertCan(ctx, 'candidate.view', campaign.clientId)
+
+  const { brief, state } = await scoped(
+    ctx,
+    async (tx) => ({
+      brief: await buildBriefContext(tx, campaignId),
+      state: await buildCampaignState(tx, campaignId),
+    }),
+    AI_TIMEOUT_MS,
+  )
+
+  return runInsight(
+    ctx,
+    {
+      clientId: campaign.clientId,
+      campaignId,
+      kind: 'CAMPAIGN_REPORT',
+      inputsSummary: { campania: campaign.name, destinatario: audience },
+      inputsDigest: digest([brief, state, audience, PROMPT_VERSION]),
+    },
+    () => aiProvider().writeCampaignReport({ brief, state, audience }),
+  )
+}
+
+// ── Lectura y compartido ─────────────────────────────────────────────────────
+
+export async function listInsights(
+  ctx: AuthContext,
+  filters: { campaignId?: string | null; candidacyId?: string | null },
+): Promise<InsightDto[]> {
+  const anchor = filters.candidacyId
+    ? await scoped(ctx, (tx) =>
+        tx.candidacy.findUnique({ where: { id: filters.candidacyId as string }, select: { clientId: true } }),
+      )
+    : filters.campaignId
+      ? await scoped(ctx, (tx) =>
+          tx.campaign.findUnique({ where: { id: filters.campaignId as string }, select: { clientId: true } }),
+        )
+      : null
+  if (!anchor) throw new NotFoundError()
+  assertClientInScope(ctx, anchor.clientId)
+  assertCan(ctx, 'ai.view', anchor.clientId)
+
+  const rows = await scoped(ctx, (tx) =>
+    tx.aiInsight.findMany({
+      where: {
+        ...(filters.candidacyId ? { candidacyId: filters.candidacyId } : { campaignId: filters.campaignId }),
+        // El cliente sólo ve lo que la agencia compartió explícitamente.
+        ...(ctx.side === 'CLIENT' ? { clientVisible: true, status: 'READY' as const } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    }),
+  )
+  return rows.map(toDto)
+}
+
+export async function shareInsight(ctx: AuthContext, insightId: string, visible: boolean): Promise<void> {
+  if (ctx.side !== 'AGENCY') throw new ForbiddenError('Sólo la agencia decide qué análisis ve el cliente.')
+  const row = await scoped(ctx, (tx) => tx.aiInsight.findUnique({ where: { id: insightId } }))
+  if (!row) throw new NotFoundError()
+  assertClientInScope(ctx, row.clientId)
+  assertCan(ctx, 'ai.run', row.clientId)
+  if (visible && row.status !== 'READY') throw new ValidationError('Sólo se puede compartir un análisis terminado.')
+
+  await scoped(ctx, async (tx) => {
+    await tx.aiInsight.update({ where: { id: insightId }, data: { clientVisible: visible } })
+    await recordAudit(tx, actorOf(ctx), {
+      action: AUDIT.AI_INSIGHT_SHARED,
+      entityType: 'AiInsight',
+      entityId: insightId,
+      clientId: row.clientId,
+      after: { clientVisible: visible },
+    })
+  })
+}

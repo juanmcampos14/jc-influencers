@@ -4,26 +4,71 @@
 
 @import 'tailwindcss';
 
-@theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+/*
+ * Paleta neutra de JC. Es el punto de partida y el respaldo: el espacio de cada
+ * cliente sobrescribe estas mismas variables con su propia marca, sin tocar un
+ * solo componente.
+ */
+:root {
+  --jc-primary: #3b5bdb;
+  --jc-primary-strong: #2f49ae;
+  --jc-primary-soft: #eef1fd;
+  --jc-primary-soft-2: #dde3fb;
+  --jc-on-primary: #ffffff;
+  --jc-accent: #5c7cfa;
 
-  --color-ink-50: oklch(0.985 0.002 250);
-  --color-ink-100: oklch(0.967 0.003 250);
-  --color-ink-200: oklch(0.925 0.005 250);
-  --color-ink-300: oklch(0.86 0.007 250);
-  --color-ink-400: oklch(0.68 0.012 250);
-  --color-ink-500: oklch(0.55 0.015 250);
-  --color-ink-600: oklch(0.44 0.017 250);
-  --color-ink-700: oklch(0.36 0.017 250);
-  --color-ink-800: oklch(0.26 0.016 250);
-  --color-ink-900: oklch(0.19 0.014 250);
-  --color-ink-950: oklch(0.13 0.012 250);
+  --jc-bg: #f8f9fb;
+  --jc-bg-2: #f1f3f7;
+  --jc-surface: #ffffff;
+  --jc-surface-2: #fafbfd;
 
-  --color-brand-50: oklch(0.97 0.02 255);
-  --color-brand-100: oklch(0.93 0.04 255);
-  --color-brand-500: oklch(0.58 0.16 262);
-  --color-brand-600: oklch(0.51 0.17 262);
-  --color-brand-700: oklch(0.44 0.15 262);
+  --jc-border: #e2e6ee;
+  --jc-border-strong: #cdd3df;
+
+  --jc-muted-2: #8b93a3;
+  --jc-muted: #5b6270;
+  --jc-text-2: #3b414d;
+  --jc-text: #171a21;
+  --jc-text-strong: #0c0e13;
+
+  --jc-radius: 12px;
+  --jc-font-body: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --jc-font-heading: var(--jc-font-body);
+}
+
+@theme inline {
+  --font-sans: var(--jc-font-body);
+  --font-heading: var(--jc-font-heading);
+
+  /* La escala de grises del producto sale del tema activo, no de constantes. */
+  --color-ink-50: var(--jc-bg);
+  --color-ink-100: var(--jc-bg-2);
+  --color-ink-200: var(--jc-border);
+  --color-ink-300: var(--jc-border-strong);
+  --color-ink-400: var(--jc-muted-2);
+  --color-ink-500: var(--jc-muted);
+  --color-ink-600: var(--jc-text-2);
+  --color-ink-700: var(--jc-text-2);
+  --color-ink-800: var(--jc-text);
+  --color-ink-900: var(--jc-text);
+  --color-ink-950: var(--jc-text-strong);
+
+  --color-surface: var(--jc-surface);
+  --color-surface-2: var(--jc-surface-2);
+
+  --color-brand-50: var(--jc-primary-soft);
+  --color-brand-100: var(--jc-primary-soft-2);
+  --color-brand-200: var(--jc-primary-soft-2);
+  --color-brand-300: var(--jc-accent);
+  --color-brand-500: var(--jc-accent);
+  --color-brand-600: var(--jc-primary);
+  --color-brand-700: var(--jc-primary-strong);
+  --color-brand-800: var(--jc-primary-strong);
+
+  --color-on-brand: var(--jc-on-primary);
+
+  --radius-lg: var(--jc-radius);
+  --radius-xl: calc(var(--jc-radius) + 4px);
 }
 
 @layer base {
@@ -34,19 +79,24 @@
     -webkit-text-size-adjust: 100%;
   }
   body {
-    background-color: var(--color-ink-50);
-    color: var(--color-ink-900);
-    font-family: var(--font-sans);
+    background-color: var(--jc-bg);
+    color: var(--jc-text);
+    font-family: var(--jc-font-body);
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
   /* Foco siempre visible: la app tiene que poder usarse con teclado. */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--jc-font-heading);
+  }
   :focus-visible {
-    outline: 2px solid var(--color-brand-600);
+    outline: 2px solid var(--jc-primary);
     outline-offset: 2px;
     border-radius: 4px;
   }
   ::selection {
-    background: var(--color-brand-100);
+    background: var(--jc-primary-soft-2);
   }
 }
 

@@ -183,13 +183,19 @@ BEGIN
 END $$;
 
 -- ── Permisos explícitos del rol de aplicación ───────────────────────────────
-GRANT USAGE ON SCHEMA public TO jc_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO jc_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO jc_app;
+-- Los permisos del rol de aplicación se otorgan sólo si el rol ya existe.
+-- En un servidor nuevo (Supabase) el rol se crea con `supabase/setup.sql` antes
+-- de migrar; guardarlo evita que la migración falle a mitad de camino.
+DO $grants$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'jc_app') THEN
+    EXECUTE 'GRANT USAGE ON SCHEMA public TO jc_app';
+    EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO jc_app';
+    EXECUTE 'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO jc_app';
+    EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON audit_logs FROM jc_app';
+  END IF;
+END $grants$;
 
--- El log de auditoría es inmutable también a nivel de base: la app puede
--- insertar y leer, nunca modificar ni borrar.
-REVOKE UPDATE, DELETE, TRUNCATE ON audit_logs FROM jc_app;
 
 -- Las migraciones las corre el rol propietario, no la aplicación.
 -- (En la shadow database de `prisma migrate dev` la tabla puede no existir todavía.)

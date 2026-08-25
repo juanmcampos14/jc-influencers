@@ -13,6 +13,8 @@ import { can } from '@/lib/authz/context'
 import { getClient } from '@/lib/repos/clients'
 import { listCampaigns } from '@/lib/repos/campaigns'
 import { listUsers } from '@/lib/repos/users'
+import { getBrand } from '@/lib/repos/brand'
+import { Button } from '@/components/ui/button'
 import { CLIENT_ROLE_LABELS } from '@/lib/authz/capabilities'
 import { formatDate } from '@/lib/util/format'
 import { ClientSettingsForm } from './settings-form'
@@ -32,9 +34,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
     throw error
   }
 
-  const [campaigns, users] = await Promise.all([
+  const [campaigns, users, brand] = await Promise.all([
     listCampaigns(ctx, { clientId }, { pageSize: 50 }),
     can(ctx, 'client.view', clientId) ? listUsers(ctx, clientId) : Promise.resolve([]),
+    getBrand(ctx, clientId),
   ])
   const canManage = can(ctx, 'client.manage', clientId)
 
@@ -175,6 +178,39 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
               </dl>
             </CardBody>
           </Card>
+
+          {can(ctx, 'brand.manage', clientId) ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Identidad visual</CardTitle>
+                <p className="text-xs text-ink-500">
+                  Define cómo se ve el espacio de este cliente cuando entra a su portal.
+                </p>
+              </CardHeader>
+              <CardBody className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="size-8 rounded-lg border border-ink-200"
+                    style={{ backgroundColor: brand.colors.primary }}
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm text-ink-800">
+                      {brand.status === 'APPROVED' ? 'Identidad propia aplicada' : 'Usando el tema neutro de JC'}
+                    </p>
+                    <p className="truncate text-xs text-ink-500">
+                      {brand.sourceUrl ?? (brand.status === 'APPROVED' ? 'configurada a mano' : 'sin configurar')}
+                    </p>
+                  </div>
+                </div>
+                <Button asChild size="sm" variant="secondary">
+                  <Link href={`/clientes/${clientId}/marca`}>
+                    {brand.status === 'APPROVED' ? 'Editar identidad' : 'Configurar identidad'}
+                  </Link>
+                </Button>
+              </CardBody>
+            </Card>
+          ) : null}
 
           {canManage ? (
             <Card>

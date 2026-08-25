@@ -18,6 +18,9 @@ import { FunnelBoard } from './funnel-board'
 import { ShortlistPanel } from './shortlist-panel'
 import { BriefPanel } from './brief-panel'
 import { ActivityPanel } from './activity-panel'
+import { InsightsPanel } from './insights-panel'
+import { aiSpendThisMonth, listInsights } from '@/lib/repos/ai'
+import { aiProvider } from '@/lib/ports/ai'
 import { AddCandidacyDialog } from './add-candidacy-dialog'
 
 export const metadata: Metadata = { title: 'Campaña' }
@@ -28,6 +31,7 @@ const TABS = [
   { key: 'funnel', label: 'Funnel' },
   { key: 'shortlist', label: 'Shortlist' },
   { key: 'brief', label: 'Brief' },
+  { key: 'analisis', label: 'Análisis IA' },
   { key: 'actividad', label: 'Actividad' },
 ] as const
 
@@ -81,6 +85,9 @@ export default async function CampaignDetailPage({
 
   const comments = tab === 'actividad' ? await listComments(ctx, { campaignId }) : []
 
+  const insights = tab === 'analisis' ? await listInsights(ctx, { campaignId }) : []
+  const aiSpend = tab === 'analisis' ? await aiSpendThisMonth(ctx) : { spent: 0, limit: 0 }
+
   return (
     <>
       <PageHeader
@@ -110,7 +117,7 @@ export default async function CampaignDetailPage({
         }
       />
 
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-ink-200 bg-white px-5 pb-3 text-xs text-ink-600 sm:px-8">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-ink-200 bg-surface px-5 pb-3 text-xs text-ink-600 sm:px-8">
         <span>
           Perfiles: <strong className="text-ink-900">{summary.total}</strong>
         </span>
@@ -147,7 +154,7 @@ export default async function CampaignDetailPage({
         ) : null}
       </div>
 
-      <nav className="border-b border-ink-200 bg-white px-5 sm:px-8" aria-label="Secciones de la campaña">
+      <nav className="border-b border-ink-200 bg-surface px-5 sm:px-8" aria-label="Secciones de la campaña">
         <ul className="flex gap-1 overflow-x-auto">
           {TABS.map((entry) => (
             <li key={entry.key}>
@@ -203,7 +210,14 @@ export default async function CampaignDetailPage({
             data={candidacies}
             clusters={brief?.clusters ?? []}
             team={campaign.team}
-            permissions={{ canManage, canSeeInternal, canSeeBudget, canEditBudget }}
+            permissions={{
+              canManage,
+              canSeeInternal,
+              canSeeBudget,
+              canEditBudget,
+              canRunAi: can(ctx, 'ai.run', clientId),
+              aiConfigured: aiProvider().configured,
+            }}
             filters={{ estado: query.estado ?? '', q: query.q ?? '' }}
           />
         ) : null}
@@ -221,6 +235,17 @@ export default async function CampaignDetailPage({
             canEdit={canEditBrief}
             canSeeInternal={canSeeInternal}
             clusterUsage={summary.byStatus}
+          />
+        ) : null}
+
+        {tab === 'analisis' ? (
+          <InsightsPanel
+            campaignId={campaign.id}
+            insights={insights}
+            canRun={can(ctx, 'ai.run', clientId)}
+            configured={aiProvider().configured}
+            spend={aiSpend}
+            timezone={ctx.user.timezone}
           />
         ) : null}
 

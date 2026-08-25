@@ -54,6 +54,35 @@ Estado al cierre de esta entrega. Lo que no está hecho figura como tal, sin ado
 - [x] Datos de contacto de influencers detrás de una capacidad separada
 - [x] La auditoría redacta contraseñas, tokens y datos de contacto antes de guardarlos
 
+## Integraciones de pago por uso (scouting e IA)
+
+- [x] Sólo la agencia puede dispararlas: `scouting.run` y `ai.run` están en la lista de capacidades
+      prohibidas para el lado cliente
+- [x] Aviso previo obligatorio con el costo estimado antes de ejecutar scouting
+- [x] Tope mensual con **corte duro**, global y por cliente; se comprueba justo antes de gastar
+- [x] Reserva del costo estimado al disparar y ajuste a lo realmente entregado
+- [x] Devolución de lo reservado si el trabajo falla o se cancela
+- [x] Rate limiting propio para ambas
+- [x] Cada corrida y cada análisis quedan auditados con actor, parámetros y costo
+- [x] Sin proveedor configurado, la función se muestra deshabilitada. **Nunca datos simulados**
+- [x] El cliente no ve un análisis de IA hasta que la agencia lo comparte explícitamente
+- [x] Los reportes "para el cliente" se generan con instrucciones que excluyen márgenes y notas internas
+- [ ] **Alerta al llegar al 80% del tope** — hoy sólo se ve la barra en pantalla.
+
+## Descarga de recursos externos (identidad visual)
+
+- [x] Protección contra **SSRF**: se resuelve el dominio y se rechaza toda IP privada, de loopback,
+      de CGNAT o de metadatos de la nube (`169.254.169.254`)
+- [x] Cada salto de redirect se vuelve a validar
+- [x] Sólo `http` y `https`, sólo puertos 80 y 443, sin credenciales en la URL
+- [x] Tope de tamaño y de tiempo en cada descarga
+- [x] Los SVG de terceros **nunca** se almacenan ni se sirven: se rasterizan a PNG
+- [x] El logo se sirve desde la aplicación con `Content-Security-Policy: sandbox`, no desde el bucket
+- [x] Los nombres de tipografía se validan contra lista blanca **sobre el valor original**
+- [x] El contraste se calcula en el servidor antes de aprobar una identidad
+- [ ] **Cabecera del bot y respeto de `robots.txt`** — hoy se identifica como `JCInfluencersBot` pero
+      no se lee `robots.txt` antes de descargar.
+
 ## Entrada y salida
 
 - [x] Validación con Zod en **todas** las server actions, del lado servidor
@@ -113,6 +142,8 @@ Estado al cierre de esta entrega. Lo que no está hecho figura como tal, sin ado
 
 1. Segundo factor para roles de agencia.
 2. Cron de limpieza (sesiones vencidas, contadores de rate limit, invitaciones vencidas).
-3. `npm audit` en integración continua.
-4. Antivirus para archivos subidos, si se habilita la carga de documentos de terceros.
-5. Política de retención del log de auditoría.
+3. Alerta al llegar al 80% del tope de gasto, además de la barra en pantalla.
+4. `npm audit` en integración continua.
+5. Lectura de `robots.txt` antes de descargar un sitio de terceros.
+6. Antivirus para archivos subidos, si se habilita la carga de documentos de terceros.
+7. Política de retención del log de auditoría.

@@ -18,7 +18,7 @@ export function FunnelBoard({ items }: { items: CandidacyDto[] }) {
   return (
     <div className="grid gap-4 lg:grid-cols-5">
       {columns.map((column) => (
-        <section key={column.category} className="rounded-xl border border-ink-200 bg-white">
+        <section key={column.category} className="rounded-xl border border-ink-200 bg-surface">
           <header className="flex items-center justify-between border-b border-ink-200 px-3 py-2">
             <h2 className="text-sm font-semibold text-ink-900">{column.label}</h2>
             <span className="rounded-full bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-700">
