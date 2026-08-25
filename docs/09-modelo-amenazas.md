@@ -56,7 +56,7 @@ alcanza una sola fila.
 | Adulterar la auditoría | `REVOKE UPDATE, DELETE, TRUNCATE ON audit_logs FROM jc_app` | `export-and-audit` |
 | Subir un archivo peligroso | Lista blanca de tipo, coherencia con la extensión, límite de 10 MB, nombre saneado | `storage.ts` |
 | Salir del directorio con `..` en la clave | La ruta resuelta se valida contra la raíz | `storage.ts` |
-| XSS | React escapa por defecto; no se usa `dangerouslySetInnerHTML` en ningún lado; CSP sin `unsafe-inline` en producción | `next.config.ts` |
+| XSS | React escapa por defecto; no se usa `dangerouslySetInnerHTML` en ningún lado; CSP con nonce por respuesta, sin `unsafe-inline` en producción | `src/middleware.ts`, `src/lib/security/csp.ts` |
 | Clickjacking | `X-Frame-Options: DENY` + `frame-ancestors 'none'` | E2E |
 | Un cliente genera gasto en scouting o IA | Ambas capacidades están prohibidas para el lado cliente, y hay tope con corte duro | `scouting-ai-brand` |
 | Gasto inesperado por un error del equipo | Aviso previo obligatorio con el costo, y tope mensual que corta antes de llamar al proveedor | `scouting-ai-brand` |

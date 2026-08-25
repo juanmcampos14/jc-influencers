@@ -101,6 +101,9 @@ Estado al cierre de esta entrega. Lo que no está hecho figura como tal, sin ado
 - [x] `Referrer-Policy: strict-origin-when-cross-origin`
 - [x] `Permissions-Policy` restrictiva
 - [x] Content-Security-Policy (sin `unsafe-eval` ni `unsafe-inline` para scripts en producción)
+- [x] Los scripts inline de Next se habilitan con un nonce distinto por respuesta, generado en `src/middleware.ts`; ninguna página se prerenderiza (`dynamic = 'force-dynamic'` en el layout raíz), porque un HTML de compilación no puede llevar el nonce del pedido
+- [x] Una sola cabecera `Content-Security-Policy` por respuesta: dos se intersectan y anulan el nonce
+- [x] Los tests de punta a punta corren contra una compilación de producción, que es donde existe esta política
 - [x] `Strict-Transport-Security` en producción
 - [x] `X-Powered-By` desactivado
 - [ ] **TLS y renovación de certificado**: responsabilidad del proxy en Donweb.

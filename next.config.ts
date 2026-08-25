@@ -1,33 +1,7 @@
 import type { NextConfig } from 'next'
+import { STATIC_SECURITY_HEADERS } from './src/lib/security/csp'
 
 const isProd = process.env.NODE_ENV === 'production'
-
-/** Cabeceras de seguridad aplicadas a todas las respuestas. */
-const securityHeaders = [
-  { key: 'X-Content-Type-Options', value: 'nosniff' },
-  { key: 'X-Frame-Options', value: 'DENY' },
-  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'X-DNS-Prefetch-Control', value: 'off' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' },
-  {
-    key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      // Next inyecta estilos inline en RSC; los scripts inline usan nonce en producción vía middleware.
-      // Google Fonts: las tipografías de marca de cada cliente se cargan desde ahí.
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' data: https://fonts.gstatic.com",
-      isProd ? "script-src 'self'" : "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
-      "connect-src 'self'",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "frame-ancestors 'none'",
-      'upgrade-insecure-requests',
-    ].join('; '),
-  },
-]
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -38,7 +12,10 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
-      { source: '/:path*', headers: securityHeaders },
+      // La política de contenido no está acá: depende del nonce de cada
+      // respuesta y la pone el middleware. Dos cabeceras CSP se intersectan,
+      // así que declararla en los dos lados anularía el nonce.
+      { source: '/:path*', headers: STATIC_SECURITY_HEADERS },
       ...(isProd
         ? [
             {

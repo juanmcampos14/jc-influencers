@@ -24,13 +24,17 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: `npx next dev -p ${PORT}`,
+    // Contra una compilación de producción, no contra `next dev`. Varias cosas
+    // sólo existen del lado de producción -- la política de contenido con
+    // nonce, el código minificado, las cabeceras -- y en modo desarrollo una
+    // aplicación que no arranca en el navegador real pasaría los tests igual.
+    command: `npx next build && npx next start -p ${PORT}`,
     url: baseURL,
     reuseExistingServer: false,
-    timeout: 180_000,
+    timeout: 300_000,
     env: {
       ...process.env,
-      NODE_ENV: 'development',
+      NODE_ENV: 'production',
       APP_URL: baseURL,
       EMAIL_DRIVER: 'console',
     },
