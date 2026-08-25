@@ -21,16 +21,21 @@ export function Stat({
   tone?: 'neutral' | 'accent' | 'warn' | 'good'
   className?: string
 }) {
-  const colorCifra = {
-    neutral: 'text-ink-950',
-    accent: 'text-ink-950',
-    warn: 'text-amber-700',
-    good: 'text-emerald-700',
-  }[tone]
+  // Un cero no es una advertencia ni un logro: cero pendientes es simplemente
+  // cero. Pintarlo de ámbar o de verde le da un peso que no tiene.
+  const enCero = value === 0
+  const colorCifra = enCero
+    ? 'text-ink-400'
+    : {
+        neutral: 'text-ink-950',
+        accent: 'text-ink-950',
+        warn: 'text-amber-700',
+        good: 'text-emerald-700',
+      }[tone]
 
   const contenido = (
     <>
-      {tone === 'accent' ? (
+      {tone === 'accent' && !enCero ? (
         <span aria-hidden="true" className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-accent" />
       ) : null}
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">{label}</p>
