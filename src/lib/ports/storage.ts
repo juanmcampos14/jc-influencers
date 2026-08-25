@@ -163,6 +163,17 @@ let cached: FileStorage | null = null
 
 export function fileStorage(): FileStorage {
   if (cached) return cached
-  cached = env().STORAGE_DRIVER === 's3' ? new S3FileStorage() : new LocalFileStorage()
+  const driver = env().STORAGE_DRIVER
+  // En un entorno sin disco persistente (Vercel), guardar en local es perder el
+  // archivo en el próximo despliegue. Falla acá, al intentar usarlo, con un
+  // mensaje que dice qué configurar: el resto de la aplicación sigue andando.
+  if (driver === 'local' && process.env.VERCEL) {
+    throw new UnsupportedFileError(
+      'El almacenamiento de archivos no está configurado. En Vercel el disco es efímero, así que los ' +
+        'logos de marca y los Excel importados se perderían en cada despliegue. Configurá STORAGE_DRIVER=s3 ' +
+        'con S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID y S3_SECRET_ACCESS_KEY.',
+    )
+  }
+  cached = driver === 's3' ? new S3FileStorage() : new LocalFileStorage()
   return cached
 }

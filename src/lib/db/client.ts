@@ -1,6 +1,7 @@
 import { Pool } from 'pg'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@/generated/prisma/client'
+import { sslFor } from './ssl'
 
 /**
  * Cliente Prisma único.
@@ -28,8 +29,8 @@ function create(): PrismaClient {
     max: isServerless ? 1 : 10,
     idleTimeoutMillis: isServerless ? 10_000 : 30_000,
     connectionTimeoutMillis: 10_000,
-    // Supabase exige TLS; su certificado no encadena a una CA pública.
-    ssl: /supabase\.(com|co)/.test(connectionString) ? { rejectUnauthorized: false } : undefined,
+    // Supabase firma con su propia CA: se verifica contra ella, no se saltea.
+    ssl: sslFor(connectionString),
     application_name: 'jc-influencers',
   })
 

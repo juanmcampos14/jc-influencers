@@ -9,6 +9,7 @@
  */
 import '../src/lib/bootstrap-env'
 import { Client } from 'pg'
+import { sslFor } from '../src/lib/db/ssl'
 
 type Check = { name: string; ok: boolean; detail: string }
 
@@ -16,10 +17,7 @@ async function main(): Promise<void> {
   const url = process.env.DATABASE_URL
   if (!url) throw new Error('Falta DATABASE_URL')
 
-  const client = new Client({
-    connectionString: url,
-    ssl: /supabase\.(com|co)/.test(url) ? { rejectUnauthorized: false } : undefined,
-  })
+  const client = new Client({ connectionString: url, ssl: sslFor(url) })
   await client.connect()
 
   const checks: Check[] = []
@@ -72,6 +70,12 @@ async function main(): Promise<void> {
     await client.query('BEGIN')
     const blind = await client.query<{ n: string }>('SELECT count(*)::text AS n FROM clients')
     await client.query('COMMIT')
+    checks.push({
+      name: 'La conexión a la base verifica el certificado del servidor',
+      ok: /supabase\.(com|co)/.test(url) ? sslFor(url) !== undefined : true,
+      detail: /supabase\.(com|co)/.test(url) ? 'TLS verificado contra la CA de Supabase' : 'base local sin TLS',
+    })
+
     checks.push({
       name: 'Sin contexto de sesión, la base no devuelve datos de ningún cliente',
       ok: blind.rows[0]?.n === '0',
