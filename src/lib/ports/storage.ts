@@ -3,15 +3,32 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { dirname, extname, resolve } from 'node:path'
 import { env } from '@/lib/env'
+import { withScope, withSystemScope, type Tx } from '@/lib/db/scope'
 
 export type StoredFile = { key: string; size: number; contentType: string; filename: string; sha256: string }
 
-/** Puerto de almacenamiento de archivos. Adaptadores: local (dev) y S3/MinIO. */
+/** Puerto de almacenamiento de archivos. Adaptadores: base de datos, S3/MinIO y disco local. */
+export type PutInput = {
+  filename: string
+  contentType: string
+  data: Buffer
+  prefix?: string
+  /** Dueño del archivo. Es lo que permite que RLS filtre los bytes. */
+  clientId?: string | null
+}
+
+/**
+ * El cliente dueño del archivo. No es un dato de conveniencia: viaja hasta la
+ * consulta para que la política de la base vuelva a comprobar la pertenencia.
+ * Una clave robada de otro espacio no devuelve nada.
+ */
+export type Owner = { clientId?: string | null }
+
 export interface FileStorage {
   readonly name: string
-  put(input: { filename: string; contentType: string; data: Buffer; prefix?: string }): Promise<StoredFile>
-  get(key: string): Promise<Buffer>
-  remove(key: string): Promise<void>
+  put(input: PutInput): Promise<StoredFile>
+  get(key: string, owner?: Owner): Promise<Buffer>
+  remove(key: string, owner?: Owner): Promise<void>
 }
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024 // 10 MB
@@ -79,7 +96,7 @@ class LocalFileStorage implements FileStorage {
     return target
   }
 
-  async put(input: { filename: string; contentType: string; data: Buffer; prefix?: string }): Promise<StoredFile> {
+  async put(input: PutInput): Promise<StoredFile> {
     assertUploadAllowed(input.filename, input.contentType, input.data.byteLength)
     const key = buildKey(input.prefix, input.filename)
     const target = this.pathFor(key)
@@ -94,6 +111,8 @@ class LocalFileStorage implements FileStorage {
     }
   }
 
+  // El disco no sabe de clientes: acá el único cerrojo es el de la aplicación.
+  // Otra razón para no usar este adaptador fuera de desarrollo.
   async get(key: string): Promise<Buffer> {
     return readFile(this.pathFor(key))
   }
@@ -120,7 +139,7 @@ class S3FileStorage implements FileStorage {
     })
   }
 
-  async put(input: { filename: string; contentType: string; data: Buffer; prefix?: string }): Promise<StoredFile> {
+  async put(input: PutInput): Promise<StoredFile> {
     assertUploadAllowed(input.filename, input.contentType, input.data.byteLength)
     const { PutObjectCommand } = await import('@aws-sdk/client-s3')
     const key = buildKey(input.prefix, input.filename)
@@ -159,21 +178,79 @@ class S3FileStorage implements FileStorage {
   }
 }
 
+/**
+ * Guarda los archivos en la misma base que el resto del producto.
+ *
+ * Es el adaptador por defecto, y a propósito: el disco del servidor no
+ * persiste en Vercel, y depender de un bucket externo significa que el
+ * producto no arranca hasta que alguien lo cree. Los archivos que maneja son
+ * chicos y acotados -- un logo, un Excel de hasta 10 MB -- así que la base los
+ * aguanta sin problema, y de yapa quedan cubiertos por RLS, por los backups y
+ * por el borrado en cascada cuando se elimina un cliente.
+ *
+ * Si algún día los archivos crecen, se cambia por el adaptador S3 sin tocar
+ * nada más: el resto de la aplicación depende de la interfaz, no de esto.
+ */
+class DatabaseFileStorage implements FileStorage {
+  readonly name = 'db'
+
+  /**
+   * Corre la consulta con el alcance del cliente dueño, no con permisos de
+   * sistema. Así la política de la base es un cerrojo de verdad y no un adorno
+   * que el propio adaptador esquiva.
+   */
+  private async run<T>(owner: Owner | undefined, fn: (tx: Tx) => Promise<T>): Promise<T> {
+    const clientId = owner?.clientId
+    if (!clientId) return withSystemScope(fn)
+    return withScope({ userId: null, scope: 'client', clientIds: [clientId], allClients: false }, fn)
+  }
+
+  async put(input: PutInput): Promise<StoredFile> {
+    assertUploadAllowed(input.filename, input.contentType, input.data.byteLength)
+    const key = buildKey(input.prefix, input.filename)
+    const stored: StoredFile = {
+      key,
+      size: input.data.byteLength,
+      contentType: input.contentType,
+      filename: sanitizeFilename(input.filename),
+      sha256: createHash('sha256').update(input.data).digest('hex'),
+    }
+    await this.run({ clientId: input.clientId }, (tx) =>
+      tx.storedBlob.create({
+        data: {
+          key,
+          clientId: input.clientId ?? null,
+          filename: stored.filename,
+          contentType: stored.contentType,
+          size: stored.size,
+          sha256: stored.sha256,
+          // Prisma pide Uint8Array; Buffer lo es, pero su tipo declara un
+          // ArrayBufferLike más amplio. La copia es de la vista, no de los bytes.
+          data: new Uint8Array(input.data),
+        },
+      }),
+    )
+    return stored
+  }
+
+  async get(key: string, owner?: Owner): Promise<Buffer> {
+    const row = await this.run(owner, (tx) =>
+      tx.storedBlob.findUnique({ where: { key }, select: { data: true } }),
+    )
+    if (!row) throw new UnsupportedFileError('El archivo ya no está disponible.')
+    return Buffer.from(row.data)
+  }
+
+  async remove(key: string, owner?: Owner): Promise<void> {
+    await this.run(owner, (tx) => tx.storedBlob.deleteMany({ where: { key } }))
+  }
+}
+
 let cached: FileStorage | null = null
 
 export function fileStorage(): FileStorage {
   if (cached) return cached
   const driver = env().STORAGE_DRIVER
-  // En un entorno sin disco persistente (Vercel), guardar en local es perder el
-  // archivo en el próximo despliegue. Falla acá, al intentar usarlo, con un
-  // mensaje que dice qué configurar: el resto de la aplicación sigue andando.
-  if (driver === 'local' && process.env.VERCEL) {
-    throw new UnsupportedFileError(
-      'El almacenamiento de archivos no está configurado. En Vercel el disco es efímero, así que los ' +
-        'logos de marca y los Excel importados se perderían en cada despliegue. Configurá STORAGE_DRIVER=s3 ' +
-        'con S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID y S3_SECRET_ACCESS_KEY.',
-    )
-  }
-  cached = driver === 's3' ? new S3FileStorage() : new LocalFileStorage()
+  cached = driver === 's3' ? new S3FileStorage() : driver === 'local' ? new LocalFileStorage() : new DatabaseFileStorage()
   return cached
 }

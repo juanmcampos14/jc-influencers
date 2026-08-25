@@ -226,6 +226,7 @@ model Client {
 
   @@index([status])
   @@map("clients")
+  storedBlobs StoredBlob[]
 }
 
 enum CampaignStatus {
@@ -1271,4 +1272,30 @@ model ScoutingBudget {
 
   @@unique([clientId, period])
   @@map("scouting_budgets")
+}
+
+/// Archivo guardado en la base.
+///
+/// El logo de una marca y el Excel importado no pueden vivir en el disco del
+/// servidor: en Vercel es efímero y se pierde en cada despliegue. Guardarlos
+/// acá evita depender de un bucket externo para que el producto funcione, y
+/// hace que desarrollo y producción se comporten igual.
+///
+/// `clientId` no es decorativo: es lo que permite que RLS filtre estos bytes
+/// como filtra todo lo demás.
+model StoredBlob {
+  key         String @id
+  clientId    String?
+  filename    String
+  contentType String
+  size        Int
+  sha256      String
+  data        Bytes
+
+  createdAt DateTime @default(now())
+
+  client Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("stored_blobs")
 }

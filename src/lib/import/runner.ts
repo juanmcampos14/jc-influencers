@@ -159,6 +159,7 @@ export async function previewImport(
     contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     data: input.data,
     prefix: `imports/${input.clientId}`,
+    clientId: input.clientId,
   })
 
   return scoped(
@@ -300,7 +301,7 @@ export async function confirmImport(ctx: AuthContext, importRunId: string): Prom
   if (run.status !== 'PREVIEW') throw new ValidationError('Esta importación ya se resolvió.')
   if (!run.storageKey) throw new ValidationError('No se encuentra el archivo original de esta importación.')
 
-  const data = await fileStorage().get(run.storageKey)
+  const data = await fileStorage().get(run.storageKey, { clientId: run.clientId })
   const fileHash = createHash('sha256').update(data).digest('hex')
   if (fileHash !== run.fileHash) throw new ValidationError('El archivo cambió desde la previsualización. Volvé a subirlo.')
 

@@ -34,7 +34,7 @@ export default defineConfig({
       SESSION_SECRET: process.env.SESSION_SECRET ?? 'secreto-de-test-suficientemente-largo-1234567890',
       APP_URL: 'http://localhost:3100',
       EMAIL_DRIVER: 'console',
-      STORAGE_DRIVER: 'local',
+      STORAGE_DRIVER: 'db',
       STORAGE_LOCAL_DIR: './.test-storage',
     },
   },

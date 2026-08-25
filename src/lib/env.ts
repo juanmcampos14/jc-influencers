@@ -17,7 +17,10 @@ const schema = z.object({
   SMTP_SECURE: z.coerce.boolean().default(false),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
-  STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  // Por defecto en la base: es lo único que funciona igual en desarrollo y en
+  // producción sin configurar nada aparte. 'local' sigue disponible para
+  // desarrollo, y 's3' para cuando los archivos justifiquen un bucket.
+  STORAGE_DRIVER: z.enum(['db', 'local', 's3']).default('db'),
   STORAGE_LOCAL_DIR: z.string().default('./storage'),
   S3_ENDPOINT: z.string().optional(),
   S3_REGION: z.string().default('us-east-1'),

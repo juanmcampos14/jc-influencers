@@ -208,6 +208,7 @@ export async function saveBrand(ctx: AuthContext, clientId: string, input: Brand
       contentType: input.logo.contentType,
       data: input.logo.data,
       prefix: `marca/${clientId}`,
+      clientId,
     })
     logoStorageKey = stored.key
     logoContentType = input.logo.contentType
@@ -253,7 +254,7 @@ export async function saveBrand(ctx: AuthContext, clientId: string, input: Brand
       }
       // El logo viejo deja de referenciarse: se borra para no acumular archivos huérfanos.
       if (logoStorageKey !== undefined && before.logoStorageKey && before.logoStorageKey !== logoStorageKey) {
-        await fileStorage().remove(before.logoStorageKey).catch(() => undefined)
+        await fileStorage().remove(before.logoStorageKey, { clientId }).catch(() => undefined)
       }
     } else {
       await tx.clientBrand.create({ data: { ...data, clientId, createdById: ctx.user.id } })
@@ -281,7 +282,7 @@ export async function resetBrand(ctx: AuthContext, clientId: string): Promise<vo
     const before = await tx.clientBrand.findUnique({ where: { clientId } })
     if (!before) return
     await tx.clientBrand.delete({ where: { clientId } })
-    if (before.logoStorageKey) await fileStorage().remove(before.logoStorageKey).catch(() => undefined)
+    if (before.logoStorageKey) await fileStorage().remove(before.logoStorageKey, { clientId }).catch(() => undefined)
     await recordAudit(tx, actorOf(ctx), {
       action: AUDIT.BRAND_RESET,
       entityType: 'ClientBrand',
@@ -299,7 +300,7 @@ export async function readLogo(
   assertClientInScope(ctx, clientId)
   const row = await scoped(ctx, (tx) => tx.clientBrand.findUnique({ where: { clientId } }))
   if (!row?.logoStorageKey) return null
-  const data = await fileStorage().get(row.logoStorageKey).catch(() => null)
+  const data = await fileStorage().get(row.logoStorageKey, { clientId }).catch(() => null)
   if (!data) throw new NotFoundError()
   return { data, contentType: row.logoContentType ?? 'image/png' }
 }
