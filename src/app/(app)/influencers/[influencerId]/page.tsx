@@ -213,7 +213,7 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
                       {influencer.campaigns.map((row) => (
                         <Tr key={row.candidacyId}>
                           <Td>
-                            <Link href={`/campanas/${row.campaignId}`} className="font-medium hover:text-brand-700">
+                            <Link href={`/campanas/${row.campaignId}`} className="font-medium underline-offset-4 hover:underline">
                               {row.campaignName}
                             </Link>
                           </Td>

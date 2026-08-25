@@ -64,7 +64,7 @@ export default async function ImportPage() {
                   <tr>
                     <Th>Archivo</Th>
                     <Th>Estado</Th>
-                    <Th className="text-right">Filas</Th>
+                    <Th className="text-right">Personas en el archivo</Th>
                     <Th>Inicio</Th>
                     <Th>Fin</Th>
                   </tr>
@@ -78,7 +78,9 @@ export default async function ImportPage() {
                         <Td>
                           <Badge tone={status.tone}>{status.label}</Badge>
                         </Td>
-                        <Td className="text-right tabular-nums">{run.rowCount}</Td>
+                        <Td className="text-right tabular-nums">
+                          {run.rowCount ?? <span className="text-ink-400">—</span>}
+                        </Td>
                         <Td className="whitespace-nowrap text-xs text-ink-600">
                           {formatDateTime(run.startedAt, ctx.user.timezone)}
                         </Td>

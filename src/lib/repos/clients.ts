@@ -151,3 +151,27 @@ export async function updateClient(ctx: AuthContext, clientId: string, input: Up
     })
   })
 }
+
+/**
+ * Perfiles esperando decisión, por cliente.
+ *
+ * Es lo que ordena el día: qué cliente tiene gente esperando que le respondan.
+ * No estaba en ningún lado, ni como cifra ni como columna.
+ */
+export async function pendientesPorCliente(ctx: AuthContext): Promise<Map<string, number>> {
+  assertCan(ctx, 'client.view', null)
+  return scoped(ctx, async (tx) => {
+    const filas = await tx.candidacy.groupBy({
+      by: ['clientId'],
+      where: {
+        clientApproval: { in: ['PENDING', 'NEEDS_REVIEW'] },
+        // Sólo lo que el cliente puede ver: lo que todavía no le compartimos es
+        // trabajo nuestro, no suyo.
+        clientVisible: true,
+        campaign: { status: { notIn: ['CLOSED', 'CANCELLED'] } },
+      },
+      _count: { _all: true },
+    })
+    return new Map(filas.map((fila) => [fila.clientId, fila._count._all]))
+  })
+}

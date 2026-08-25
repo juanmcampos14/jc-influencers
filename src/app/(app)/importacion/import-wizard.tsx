@@ -7,18 +7,23 @@ import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Field, Input, Select } from '@/components/ui/field'
+import { Stat, StatStrip } from '@/components/ui/stat'
 import { InfoNote } from '@/components/ui/states'
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { formatNumber } from '@/lib/util/format'
 import type { ImportSummary } from '@/lib/import/runner'
 import { cancelImportAction, confirmImportAction, previewImportAction } from '../actions/imports'
 
-const OUTCOME_TONES: Record<string, string> = {
-  CONFLICT: 'rose',
-  UNPARSEABLE: 'amber',
-  INCOMPLETE: 'slate',
-  MULTI_PERSON: 'violet',
-  SECTION: 'slate',
+/*
+ * Qué le pasó a esa fila. Salía el valor del enum en mayúsculas -- CONFLICT,
+ * MULTI_PERSON -- al lado de columnas escritas en castellano.
+ */
+const OUTCOMES: Record<string, { label: string; tone: string }> = {
+  CONFLICT: { label: 'Contradicción en el origen', tone: 'rose' },
+  UNPARSEABLE: { label: 'Valor sin normalizar', tone: 'amber' },
+  INCOMPLETE: { label: 'Fila incompleta', tone: 'slate' },
+  MULTI_PERSON: { label: 'Varias personas en la fila', tone: 'violet' },
+  SECTION: { label: 'Encabezado de sección', tone: 'slate' },
 }
 
 export function ImportWizard({
@@ -130,16 +135,22 @@ export function ImportWizard({
           <p className="text-xs text-ink-500">Todavía no se creó nada. Revisá y decidí.</p>
         </CardHeader>
         <CardBody className="space-y-5">
-          <dl className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            <Stat label="Filas de personas" value={counts.totalRows} />
-            <Stat label="Altas nuevas" value={counts.newInfluencers} tone="emerald" />
-            <Stat label="Ya existen" value={counts.existingInfluencers} />
-            <Stat label="Posibles duplicados" value={counts.possibleDuplicates} tone="amber" />
-            <Stat label="Filas incompletas" value={counts.incompleteRows} />
-            <Stat label="Valores sin normalizar" value={counts.unparseableValues} tone="amber" />
-            <Stat label="Contradicciones del origen" value={counts.conflictRows} tone="rose" />
-            <Stat label="Filas con más de una persona" value={counts.multiPersonRows} tone="violet" />
-          </dl>
+          {/* Dos tiras del sistema en vez de un componente copiado con otros
+              tamaños y colores. Salen del reporte del propio archivo. */}
+          <div className="space-y-3">
+            <StatStrip>
+              <Stat label="Personas en el archivo" value={counts.totalRows} />
+              <Stat label="Altas nuevas" value={counts.newInfluencers} tone="good" />
+              <Stat label="Ya existen" value={counts.existingInfluencers} />
+              <Stat label="Posibles duplicados" value={counts.possibleDuplicates} tone="warn" />
+            </StatStrip>
+            <StatStrip>
+              <Stat label="Filas incompletas" value={counts.incompleteRows} />
+              <Stat label="Valores sin normalizar" value={counts.unparseableValues} tone="warn" />
+              <Stat label="Contradicciones del origen" value={counts.conflictRows} tone="warn" />
+              <Stat label="Filas con más de una persona" value={counts.multiPersonRows} />
+            </StatStrip>
+          </div>
 
           <div>
             <h3 className="mb-2 text-sm font-semibold text-ink-900">Hojas leídas</h3>
@@ -196,8 +207,16 @@ export function ImportWizard({
 
           {summary.duplicates.length > 0 ? (
             <div>
+              {/*
+                * El título decía la cantidad de la lista, que viene acotada a
+                * 200, mientras la cifra de arriba mostraba el total real: con
+                * 340 duplicados la pantalla decía 340 arriba y 200 acá.
+                */}
               <h3 className="mb-2 text-sm font-semibold text-ink-900">
-                Posibles duplicados ({summary.duplicates.length})
+                Posibles duplicados
+                {summary.counts.possibleDuplicates > summary.duplicates.length
+                  ? ` · se listan ${summary.duplicates.length} de ${summary.counts.possibleDuplicates}`
+                  : ` (${summary.duplicates.length})`}
               </h3>
               <InfoNote className="mb-2">
                 No se fusionan automáticamente. Se importan por separado y quedan marcados para que una persona decida.
@@ -230,7 +249,10 @@ export function ImportWizard({
           {summary.issues.length > 0 ? (
             <details>
               <summary className="cursor-pointer text-sm font-semibold text-ink-900">
-                Filas con problemas ({summary.issues.length})
+                Filas con problemas
+                {summary.counts.incompleteRows > summary.issues.length
+                  ? ` · se listan ${summary.issues.length} de ${summary.counts.incompleteRows}`
+                  : ` (${summary.issues.length})`}
               </summary>
               <TableWrap className="mt-2 max-h-80">
                 <Table>
@@ -246,7 +268,9 @@ export function ImportWizard({
                     {summary.issues.map((issue, index) => (
                       <Tr key={index}>
                         <Td>
-                          <Badge tone={OUTCOME_TONES[issue.outcome] ?? 'slate'}>{issue.outcome}</Badge>
+                          <Badge tone={OUTCOMES[issue.outcome]?.tone ?? 'slate'} title={issue.outcome} dot>
+                            {OUTCOMES[issue.outcome]?.label ?? issue.outcome}
+                          </Badge>
                         </Td>
                         <Td className="text-xs">{issue.sheetName}</Td>
                         <Td className="text-xs tabular-nums">{issue.rowNumber}</Td>
@@ -272,16 +296,6 @@ export function ImportWizard({
           Se puede volver a ejecutar sobre el mismo archivo sin duplicar registros.
         </p>
       </div>
-    </div>
-  )
-}
-
-function Stat({ label, value, tone }: { label: string; value: number; tone?: string }) {
-  const color = tone === 'emerald' ? 'text-emerald-700' : tone === 'amber' ? 'text-amber-700' : tone === 'rose' ? 'text-rose-700' : tone === 'violet' ? 'text-violet-700' : 'text-ink-900'
-  return (
-    <div className="rounded-lg border border-ink-200 px-3 py-2">
-      <dt className="text-xs text-ink-500">{label}</dt>
-      <dd className={`text-lg font-semibold tabular-nums ${color}`}>{value}</dd>
     </div>
   )
 }

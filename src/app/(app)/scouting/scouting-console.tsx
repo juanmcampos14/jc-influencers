@@ -11,6 +11,7 @@ import { EmptyState, ErrorState, InfoNote } from '@/components/ui/states'
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { ConfirmButton } from '@/components/ui/confirm'
 import { ExternalLink } from '@/components/status-badge'
+import { platformLabel } from '@/lib/domain/labels'
 import { formatDateTime, formatFollowers, formatMoney, formatPercent } from '@/lib/util/format'
 import type { BudgetState, PreviewResult, ScoutingResultDto } from '@/lib/repos/scouting'
 import {
@@ -230,9 +231,12 @@ export function ScoutingConsole({
       {!provider.configured ? (
         <InfoNote>
           <p className="font-medium">El proveedor de scouting no está conectado.</p>
+          {/* El nombre de una variable de entorno no es información para quien
+              usa el producto: es para quien lo configura, y ése ya sabe dónde
+              buscarlo. */}
           <p className="mt-1 text-xs">
-            Podés armar la búsqueda y ver cuánto costaría, pero no se va a poder ejecutar hasta cargar{' '}
-            <code>BRIGHTDATA_API_TOKEN</code> y los identificadores de dataset. No mostramos datos simulados.
+            Podés armar la búsqueda y ver cuánto costaría, pero no se va a poder ejecutar hasta que un administrador
+            técnico conecte las credenciales del proveedor. No mostramos datos simulados.
           </p>
         </InfoNote>
       ) : null}
@@ -430,7 +434,7 @@ export function ScoutingConsole({
 
       <Card>
         <CardHeader>
-          <CardTitle>Corridas</CardTitle>
+          <CardTitle>Búsquedas</CardTitle>
         </CardHeader>
         {runs.length === 0 ? (
           <EmptyState title="Todavía no hiciste ninguna búsqueda" description="Armá una arriba para empezar." />
@@ -445,7 +449,7 @@ export function ScoutingConsole({
                   <Th className="text-right">Pedidos</Th>
                   <Th className="text-right">Entregados</Th>
                   <Th className="text-right">Costo</Th>
-                  <Th />
+                  <Th><span className="sr-only">Acciones</span></Th>
                 </tr>
               </thead>
               <tbody>
@@ -453,7 +457,7 @@ export function ScoutingConsole({
                   <Tr key={run.id}>
                     <Td className="whitespace-nowrap text-xs text-ink-600">{formatDateTime(run.startedAt)}</Td>
                     <Td className="text-xs">
-                      {run.mode === 'DISCOVER' ? 'Descubrir' : 'Actualizar'} · {run.platform}
+                      {run.mode === 'DISCOVER' ? 'Descubrir' : 'Actualizar'} · {platformLabel(run.platform)}
                     </Td>
                     <Td>
                       <Badge tone={STATUS_TONES[run.status] ?? 'slate'}>{STATUS_LABELS[run.status] ?? run.status}</Badge>

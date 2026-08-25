@@ -61,7 +61,7 @@ export function LoginForm() {
         </form>
 
         <div className="mt-4 text-center">
-          <Link href="/recuperar" className="text-sm text-brand-600 underline underline-offset-2">
+          <Link href="/recuperar" className="text-sm text-ink-700 underline decoration-ink-300 underline-offset-4 hover:decoration-ink-900">
             No puedo entrar
           </Link>
         </div>

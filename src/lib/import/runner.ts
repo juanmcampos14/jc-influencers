@@ -701,7 +701,16 @@ export async function listImportRuns(ctx: AuthContext, clientId: string) {
       status: row.status,
       startedAt: row.startedAt.toISOString(),
       finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
-      rowCount: row._count.rows,
+      /*
+       * Las personas del archivo, no las filas del registro interno.
+       *
+       * `_count.rows` cuenta el log: una fila por persona MÁS una por problema
+       * en la previsualización, y otra por persona al confirmar. Un Excel de
+       * 120 personas con 15 problemas mostraba "Filas: 135" antes de confirmar
+       * y "255" después. Ninguno de los dos era la cantidad de filas del
+       * archivo, que es lo que alguien lee ahí.
+       */
+      rowCount: (row.summary as ImportSummary | null)?.counts?.totalRows ?? null,
       summary: row.summary as ImportSummary | null,
     }))
   })

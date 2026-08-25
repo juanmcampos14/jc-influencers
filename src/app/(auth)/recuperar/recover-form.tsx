@@ -31,7 +31,7 @@ export function RecoverForm() {
               Si ese email tiene una cuenta activa, te mandamos un enlace para definir una contraseña nueva. Revisá tu
               bandeja de entrada. El enlace vence en una hora.
             </p>
-            <Link href="/login" className="text-sm text-brand-600 underline underline-offset-2">
+            <Link href="/login" className="text-sm text-ink-700 underline decoration-ink-300 underline-offset-4 hover:decoration-ink-900">
               Volver a ingresar
             </Link>
           </>
@@ -47,7 +47,7 @@ export function RecoverForm() {
               </Button>
             </form>
             <div className="mt-4 text-center">
-              <Link href="/login" className="text-sm text-brand-600 underline underline-offset-2">
+              <Link href="/login" className="text-sm text-ink-700 underline decoration-ink-300 underline-offset-4 hover:decoration-ink-900">
                 Volver
               </Link>
             </div>

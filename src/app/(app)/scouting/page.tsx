@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
 import { requireContext } from '@/lib/auth/current'
@@ -34,9 +35,9 @@ export default async function ScoutingPage({ searchParams }: { searchParams: Pro
                 description="El scouting busca perfiles para un cliente concreto. Creá el primero y volvé."
                 action={
                   can(ctx, 'client.manage', null) ? (
-                    <Link href="/clientes" className="text-sm font-medium text-brand-700 underline underline-offset-2">
-                      Ir a Clientes
-                    </Link>
+                    <Button asChild variant="secondary" size="sm">
+                      <Link href="/clientes">Ir a Clientes</Link>
+                    </Button>
                   ) : null
                 }
               />

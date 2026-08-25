@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/app-shell'
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
+import { Stat, StatStrip } from '@/components/ui/stat'
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { CampaignStatusBadge } from '@/components/status-badge'
 import { requireContext } from '@/lib/auth/current'
@@ -13,6 +14,7 @@ import { can } from '@/lib/authz/context'
 import { getClient } from '@/lib/repos/clients'
 import { listCampaigns } from '@/lib/repos/campaigns'
 import { listUsers } from '@/lib/repos/users'
+import { dashboard } from '@/lib/repos/dashboard'
 import { getBrand } from '@/lib/repos/brand'
 import { Button } from '@/components/ui/button'
 import { CLIENT_ROLE_LABELS } from '@/lib/authz/capabilities'
@@ -34,10 +36,13 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
     throw error
   }
 
-  const [campaigns, users, brand] = await Promise.all([
+  const [campaigns, users, brand, resumen] = await Promise.all([
     listCampaigns(ctx, { clientId }, { pageSize: 50 }),
     can(ctx, 'client.view', clientId) ? listUsers(ctx, clientId) : Promise.resolve([]),
     getBrand(ctx, clientId),
+    // Ya existe y cuenta con `count` sobre todo, sin topes: no hace falta
+    // inventar una consulta nueva para tener las cifras de este cliente.
+    dashboard(ctx, clientId),
   ])
   const canManage = can(ctx, 'client.manage', clientId)
 
@@ -54,13 +59,33 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
         }
       />
       <div className="grid gap-6 px-5 py-6 sm:px-8 lg:grid-cols-3">
+        <StatStrip>
+          <Stat label="Campañas activas" value={resumen.totals.activeCampaigns} />
+          <Stat
+            label="Esperando al cliente"
+            value={resumen.totals.awaitingClient}
+            tone="accent"
+            hint="Ya lo ve el cliente"
+          />
+          <Stat label="Aprobados" value={resumen.totals.approved} tone="good" />
+          <Stat label="Perfiles propuestos" value={resumen.totals.proposedProfiles} />
+        </StatStrip>
+
         <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>Campañas</CardTitle>
             </CardHeader>
             {campaigns.items.length === 0 ? (
-              <EmptyState title="Sin campañas" description="Todavía no hay campañas para este cliente." />
+              <EmptyState
+                title="Sin campañas"
+                description="Cuando crees la primera va a aparecer acá, con sus perfiles y su brief."
+                action={
+                  <Button asChild variant="secondary" size="sm">
+                    <Link href="/campanas">Ir a Campañas</Link>
+                  </Button>
+                }
+              />
             ) : (
               <TableWrap>
                 <Table>
@@ -77,7 +102,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                     {campaigns.items.map((campaign) => (
                       <Tr key={campaign.id}>
                         <Td>
-                          <Link href={`/campanas/${campaign.id}`} className="font-medium hover:text-brand-700">
+                          <Link href={`/campanas/${campaign.id}`} className="font-medium underline-offset-4 hover:underline">
                             {campaign.name}
                           </Link>
                         </Td>
@@ -104,7 +129,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
             {users.length === 0 ? (
               <EmptyState
                 title="Sin usuarios"
-                description="Invitá a las personas del cliente desde la sección Usuarios."
+                description="Sin nadie del lado del cliente, nadie puede aprobar los perfiles que le propongas."
+                action={
+                  <Button asChild variant="secondary" size="sm">
+                    <Link href="/usuarios">Invitar a alguien</Link>
+                  </Button>
+                }
               />
             ) : (
               <TableWrap>
@@ -129,9 +159,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                           <Td>{membership ? CLIENT_ROLE_LABELS[membership.role] : '—'}</Td>
                           <Td>
                             {user.status === 'ACTIVE' ? (
-                              <Badge tone="emerald">Activo</Badge>
+                              <Badge tone="emerald" dot>Activo</Badge>
                             ) : (
-                              <Badge tone="rose">Desactivado</Badge>
+                              <Badge tone="rose" dot>Desactivado</Badge>
                             )}
                           </Td>
                           <Td className="text-xs text-ink-600">{formatDate(user.lastLoginAt, ctx.user.timezone)}</Td>

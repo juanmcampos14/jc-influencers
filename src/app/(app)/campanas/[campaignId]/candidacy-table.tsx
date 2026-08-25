@@ -282,7 +282,7 @@ export function CandidacyTable({
                     {shows('entregables') ? <Th>Entregables</Th> : null}
                     {shows('presupuesto') && permissions.canSeeBudget ? <Th className="text-right">Presupuesto</Th> : null}
                     {shows('visible') ? <Th>Ve el cliente</Th> : null}
-                    <Th className="w-20" />
+                    <Th className="w-20"><span className="sr-only">Acciones</span></Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -351,11 +351,18 @@ export function CandidacyTable({
                           <Td className="text-right tabular-nums">
                             {formatFollowers(profile?.followers)}
                             {profile?.followersUnparsed ? (
+                              /*
+                               * Antes era un "!" con `title`. El `title` no
+                               * existe en pantalla táctil ni se alcanza con el
+                               * teclado, y un signo de exclamación no es una
+                               * etiqueta: quien usa lector de pantalla oía
+                               * "signo de admiración" y nada más.
+                               */
                               <span
-                                className="ml-1 text-amber-600"
-                                title={`Valor original sin normalizar: ${profile.followersRaw ?? ''}`}
+                                className="block text-[11px] font-medium text-amber-700"
+                                title={`Valor original: ${profile.followersRaw ?? ''}`}
                               >
-                                !
+                                sin normalizar
                               </span>
                             ) : null}
                             {profile?.stale ? (
@@ -671,7 +678,7 @@ function CandidacyDialog({
           <Field label="Justificación de la agencia" htmlFor="agencyRationale" hint="La ve el cliente.">
             <Textarea id="agencyRationale" name="agencyRationale" defaultValue={candidacy.agencyRationale ?? ''} />
           </Field>
-          <Field label="Idea de contenido" htmlFor="contentIdea">
+          <Field label="Idea de contenido" htmlFor="contentIdea" hint="La ve el cliente.">
             <Textarea id="contentIdea" name="contentIdea" defaultValue={candidacy.contentIdea ?? ''} />
           </Field>
           <Field label="Entregables" htmlFor="deliverablesSummary">
@@ -733,7 +740,7 @@ function CandidacyDialog({
             </Field>
           </div>
 
-          <Field label="Motivo de rechazo o baja" htmlFor="rejectionReason">
+          <Field label="Motivo de rechazo o baja" htmlFor="rejectionReason" hint="Sólo agencia.">
             <Input id="rejectionReason" name="rejectionReason" defaultValue={candidacy.rejectionReason ?? ''} />
           </Field>
 

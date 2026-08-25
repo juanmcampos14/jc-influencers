@@ -79,7 +79,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                     {campaigns.items.map((campaign) => (
                       <Tr key={campaign.id}>
                         <Td>
-                          <Link href={`/campanas/${campaign.id}`} className="font-medium hover:text-brand-700">
+                          <Link href={`/campanas/${campaign.id}`} className="font-medium underline-offset-4 hover:underline">
                             {campaign.name}
                           </Link>
                         </Td>

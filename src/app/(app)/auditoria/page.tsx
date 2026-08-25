@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card'
 import { Pagination } from '@/components/ui/pagination'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
-import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
+import { columnaFija, Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
 import { listAudit } from '@/lib/repos/audit'
@@ -66,7 +66,7 @@ export default async function AuditPage({
                 <Table>
                   <thead>
                     <tr>
-                      <Th>Fecha</Th>
+                      <Th className={columnaFija}>Fecha</Th>
                       <Th>Actor</Th>
                       <Th>Acción</Th>
                       <Th>Entidad</Th>
@@ -78,7 +78,9 @@ export default async function AuditPage({
                   <tbody>
                     {page.items.map((row) => (
                       <Tr key={row.id}>
-                        <Td className="whitespace-nowrap text-xs">{formatDateTime(row.occurredAt, ctx.user.timezone)}</Td>
+                        <Td className={`${columnaFija} whitespace-nowrap text-xs`}>
+                          {formatDateTime(row.occurredAt, ctx.user.timezone)}
+                        </Td>
                         <Td className="text-xs">
                           <p className="text-ink-800">{row.actorEmail ?? 'sistema'}</p>
                           {row.actorRole ? <p className="text-ink-500">{rolLegible(row.actorRole)}</p> : null}

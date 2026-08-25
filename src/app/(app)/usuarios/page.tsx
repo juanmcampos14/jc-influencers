@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Stat, StatStrip } from '@/components/ui/stat'
 import { EmptyState } from '@/components/ui/states'
-import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
+import { columnaFija, Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
 import { can } from '@/lib/authz/context'
@@ -77,24 +77,31 @@ export default async function UsersPage() {
             <CardTitle>Personas con acceso</CardTitle>
           </CardHeader>
           {users.length === 0 ? (
-            <EmptyState title="Sin usuarios" description="Invitá a la primera persona." />
+            <EmptyState
+              title="Sin usuarios"
+              description="El acceso se habilita por invitación: no hay registro público."
+            />
           ) : (
             <TableWrap>
               <Table>
                 <thead>
                   <tr>
-                    <Th>Persona</Th>
+                    <Th className={columnaFija}>Persona</Th>
                     <Th>Rol de agencia</Th>
                     <Th>Clientes</Th>
                     <Th>Estado</Th>
                     <Th>Último acceso</Th>
-                    {canManageMemberships ? <Th /> : null}
+                    {canManageMemberships ? (
+                      <Th>
+                        <span className="sr-only">Acciones</span>
+                      </Th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
                   {users.map((user) => (
                     <Tr key={user.id}>
-                      <Td>
+                      <Td className={columnaFija}>
                         <p className="font-medium text-ink-900">{user.name}</p>
                         <p className="text-xs text-ink-500">{user.email}</p>
                       </Td>
@@ -133,9 +140,9 @@ export default async function UsersPage() {
                       </Td>
                       <Td>
                         {user.status === 'ACTIVE' ? (
-                          <Badge tone="emerald">Activo</Badge>
+                          <Badge tone="emerald" dot>Activo</Badge>
                         ) : (
-                          <Badge tone="rose">Desactivado</Badge>
+                          <Badge tone="rose" dot>Desactivado</Badge>
                         )}
                       </Td>
                       <Td className="whitespace-nowrap text-xs text-ink-600">
@@ -195,7 +202,9 @@ export default async function UsersPage() {
                       <Th>Destino</Th>
                       <Th>Estado</Th>
                       <Th>Vence</Th>
-                      <Th />
+                      <Th>
+                        <span className="sr-only">Acciones</span>
+                      </Th>
                     </tr>
                   </thead>
                   <tbody>
