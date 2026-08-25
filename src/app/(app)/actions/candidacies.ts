@@ -11,6 +11,8 @@ import {
   setShortlist,
   updateCandidacy,
   addInfluencersToCampaign,
+  bulkChangeStatus,
+  bulkShortlist,
 } from '@/lib/repos/candidacies'
 
 const id = z.string().min(1).max(60)
@@ -128,6 +130,32 @@ export const addToCampaignAction = defineAction(
     const resultado = await addInfluencersToCampaign(ctx, input.campaignId, input.influencerIds)
     revalidatePath(`/campanas/${input.campaignId}`)
     revalidatePath('/influencers')
+    return resultado
+  },
+)
+
+export const bulkStatusAction = defineAction(
+  z.object({
+    campaignId: id,
+    candidacyIds: z.array(id).min(1).max(200),
+    statusKey: z.string().trim().min(1).max(60),
+  }),
+  async (input, ctx) => {
+    const resultado = await bulkChangeStatus(ctx, input.campaignId, input.candidacyIds, input.statusKey)
+    revalidatePath(`/campanas/${input.campaignId}`)
+    return resultado
+  },
+)
+
+export const bulkShortlistAction = defineAction(
+  z.object({
+    campaignId: id,
+    candidacyIds: z.array(id).min(1).max(200),
+    inShortlist: z.boolean(),
+  }),
+  async (input, ctx) => {
+    const resultado = await bulkShortlist(ctx, input.campaignId, input.candidacyIds, input.inShortlist)
+    revalidatePath(`/campanas/${input.campaignId}`)
     return resultado
   },
 )

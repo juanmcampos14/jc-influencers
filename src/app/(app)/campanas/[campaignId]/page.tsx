@@ -250,7 +250,12 @@ export default async function CampaignDetailPage({
           />
         ) : null}
 
-        {tab === 'funnel' && candidacies ? <FunnelBoard items={candidacies.items} /> : null}
+        {tab === 'funnel' && candidacies ? <FunnelBoard
+            items={candidacies.items}
+            byStatus={summary.byStatus}
+            mostrando={candidacies.items.length}
+            total={summary.total}
+          /> : null}
 
         {tab === 'shortlist' && candidacies ? (
           <ShortlistPanel campaignId={campaign.id} items={candidacies.items} canManage={canManage} />

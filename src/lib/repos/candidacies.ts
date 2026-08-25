@@ -704,3 +704,104 @@ export async function addInfluencersToCampaign(
   const notFound = unicos.length - added - alreadyThere
   return { added, alreadyThere, notFound }
 }
+
+/**
+ * Cambia el estado de varias candidaturas de una vez.
+ *
+ * "Estos doce pasan a Contactado" es lo más repetido de la pantalla que más se
+ * usa, y se hacía de a una sobre una tabla de cincuenta filas.
+ *
+ * Cada una pasa por `changeCandidacyStatus`, así que conserva su evento de
+ * cambio con autor y fecha: el historial no se pierde por hacerlo en lote.
+ */
+export async function bulkChangeStatus(
+  ctx: AuthContext,
+  campaignId: string,
+  candidacyIds: string[],
+  statusKey: string,
+): Promise<{ changed: number; unchanged: number }> {
+  const clientId = await resolveCampaignClient(ctx, campaignId)
+  assertCan(ctx, 'candidate.manage', clientId)
+
+  const unicos = [...new Set(candidacyIds)]
+  if (unicos.length === 0) throw new ValidationError('No elegiste ninguna candidatura.')
+  if (unicos.length > 200) {
+    throw new ValidationError(`Elegiste ${unicos.length} y el máximo por vez es 200. Hacelo en tandas.`)
+  }
+
+  let changed = 0
+  let unchanged = 0
+  for (const candidacyId of unicos) {
+    try {
+      await changeCandidacyStatus(ctx, candidacyId, statusKey)
+      changed += 1
+    } catch (error) {
+      // Ya estaba en ese estado, o alguien la movió mientras tanto: no es un
+      // fallo del lote, pero se informa en vez de contarla como cambiada.
+      if (error instanceof ValidationError || error instanceof NotFoundError) unchanged += 1
+      else throw error
+    }
+  }
+  return { changed, unchanged }
+}
+
+/**
+ * Suma o saca varias candidaturas de la shortlist, sin tocar el resto.
+ *
+ * A diferencia de `setShortlist`, que reordena, esto es un delta: agrega al
+ * final o quita, y nunca reescribe la lista entera.
+ */
+export async function bulkShortlist(
+  ctx: AuthContext,
+  campaignId: string,
+  candidacyIds: string[],
+  inShortlist: boolean,
+): Promise<{ count: number }> {
+  const clientId = await resolveCampaignClient(ctx, campaignId)
+  assertCan(ctx, 'candidate.manage', clientId)
+  const unicos = [...new Set(candidacyIds)].slice(0, 200)
+  if (unicos.length === 0) throw new ValidationError('No elegiste ninguna candidatura.')
+
+  return scoped(ctx, async (tx) => {
+    if (!inShortlist) {
+      const result = await tx.candidacy.updateMany({
+        where: { id: { in: unicos }, campaignId, clientId },
+        data: { inShortlist: false, shortlistOrder: null },
+      })
+      await recordAudit(tx, actorOf(ctx), {
+        action: AUDIT.SHORTLIST_CHANGED,
+        entityType: 'Campaign',
+        entityId: campaignId,
+        clientId,
+        after: { quitados: result.count },
+      })
+      return { count: result.count }
+    }
+
+    // Se agregan al final: el orden que ya tenían los demás no se toca.
+    const ultimo = await tx.candidacy.aggregate({
+      where: { campaignId, clientId, inShortlist: true },
+      _max: { shortlistOrder: true },
+    })
+    let orden = (ultimo._max.shortlistOrder ?? 0) + 1
+    let count = 0
+    for (const id of unicos) {
+      const result = await tx.candidacy.updateMany({
+        where: { id, campaignId, clientId, inShortlist: false },
+        data: { inShortlist: true, shortlistOrder: orden },
+      })
+      if (result.count > 0) {
+        orden += 1
+        count += 1
+      }
+    }
+    await recordAudit(tx, actorOf(ctx), {
+      action: AUDIT.SHORTLIST_CHANGED,
+      entityType: 'Campaign',
+      entityId: campaignId,
+      clientId,
+      after: { agregados: count },
+    })
+    return { count }
+  })
+}

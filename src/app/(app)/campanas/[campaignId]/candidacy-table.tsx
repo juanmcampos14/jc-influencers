@@ -21,7 +21,7 @@ const STATUS_LABEL = new Map(CANDIDACY_STATUS_SEED.map((status) => [status.key, 
 import { cn, formatFollowers, formatMoney, formatPercent } from '@/lib/util/format'
 import type { CandidacyDto } from '@/lib/domain/dto'
 import type { Paginated } from '@/lib/repos/base'
-import { changeStatusAction, updateCandidacyAction, visibilityAction } from '../../actions/candidacies'
+import { changeStatusAction, updateCandidacyAction, visibilityAction, bulkShortlistAction, bulkStatusAction } from '../../actions/candidacies'
 import { analyzeProfileAction } from '../../actions/ai'
 import { InsightView } from '@/components/insight-view'
 import type { InsightDto } from '@/lib/repos/ai'
@@ -84,6 +84,7 @@ export function CandidacyTable({
   const [optimista, setOptimista] = React.useState<Record<string, string>>({})
   /** Qué fila se está guardando. Antes se deshabilitaba la tabla entera. */
   const [guardando, setGuardando] = React.useState<string | null>(null)
+  const [estadoEnLote, setEstadoEnLote] = React.useState('')
   const [visible, setVisible] = React.useState<ColumnKey[]>(() =>
     ALL_COLUMNS.map((column) => column.key).filter((key) => key !== 'entregables'),
   )
@@ -132,6 +133,47 @@ export function CandidacyTable({
         return
       }
       toast.success(value ? `${result.data.count} perfiles ahora los ve el cliente.` : `${result.data.count} perfiles ocultos.`)
+      setSelected(new Set())
+      router.refresh()
+    })
+  }
+
+  function cambiarEstadoEnLote() {
+    if (!estadoEnLote) return
+    const ids = [...selected]
+    const etiqueta = STATUS_LABEL.get(estadoEnLote) ?? estadoEnLote
+    startTransition(async () => {
+      const resultado = await bulkStatusAction({ campaignId, candidacyIds: ids, statusKey: estadoEnLote })
+      if (!resultado.ok) {
+        toast.error(resultado.message)
+        return
+      }
+      const { changed, unchanged } = resultado.data
+      // Los que no cambiaron se dicen: ya estaban así, o alguien los movió.
+      toast.success(
+        unchanged > 0
+          ? `${changed} pasaron a ${etiqueta}. ${unchanged} quedaron como estaban.`
+          : `${changed} pasaron a ${etiqueta}.`,
+      )
+      setSelected(new Set())
+      setEstadoEnLote('')
+      router.refresh()
+    })
+  }
+
+  function enShortlist(agregar: boolean) {
+    const ids = [...selected]
+    startTransition(async () => {
+      const resultado = await bulkShortlistAction({ campaignId, candidacyIds: ids, inShortlist: agregar })
+      if (!resultado.ok) {
+        toast.error(resultado.message)
+        return
+      }
+      toast.success(
+        agregar
+          ? `${resultado.data.count} agregados a la shortlist.`
+          : `${resultado.data.count} sacados de la shortlist.`,
+      )
       setSelected(new Set())
       router.refresh()
     })
@@ -204,20 +246,6 @@ export function CandidacyTable({
         </details>
       </div>
 
-      {permissions.canManage && selected.size > 0 ? (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5">
-          <span className="text-sm font-medium text-brand-800">{selected.size} seleccionados</span>
-          <Button size="sm" onClick={() => setVisibility(true)} disabled={pending}>
-            Mostrar al cliente
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => setVisibility(false)} disabled={pending}>
-            Ocultar del cliente
-          </Button>
-          <button type="button" className="text-sm text-brand-700 underline" onClick={() => setSelected(new Set())}>
-            Limpiar
-          </button>
-        </div>
-      ) : null}
 
       <Card>
         {data.items.length === 0 ? (
@@ -234,7 +262,8 @@ export function CandidacyTable({
                     {permissions.canManage ? (
                       <Th className="w-10">
                         <Checkbox
-                          aria-label="Seleccionar todos"
+                          aria-label={`Elegir los ${data.items.length} de esta página`}
+                          title={`Elegir los ${data.items.length} de esta página`}
                           checked={selected.size === data.items.length && data.items.length > 0}
                           onChange={(event) =>
                             setSelected(event.target.checked ? new Set(data.items.map((item) => item.id)) : new Set())
@@ -419,6 +448,57 @@ export function CandidacyTable({
           </>
         )}
       </Card>
+
+      {permissions.canManage && selected.size > 0 ? (
+        /*
+         * Flotante y abajo: la barra vivía arriba de la tabla, así que después
+         * de tildar la fila cuarenta había que volver al principio para actuar.
+         */
+        <div className="sticky bottom-4 z-30 mx-auto flex w-fit max-w-full flex-wrap items-center gap-2 rounded-xl border border-ink-300 bg-surface px-4 py-3 shadow-lg">
+          <span className="text-sm font-medium text-ink-900">
+            {selected.size} {selected.size === 1 ? 'elegido' : 'elegidos'}
+          </span>
+
+          <Select
+            aria-label="Pasar a estado"
+            value={estadoEnLote}
+            onChange={(event) => setEstadoEnLote(event.target.value)}
+            className="h-9 w-44"
+          >
+            <option value="">Pasar a estado…</option>
+            {CANDIDACY_STATUS_SEED.map((status) => (
+              <option key={status.key} value={status.key}>
+                {status.label}
+              </option>
+            ))}
+          </Select>
+          <Button size="sm" onClick={cambiarEstadoEnLote} disabled={pending || !estadoEnLote}>
+            Aplicar
+          </Button>
+
+          <span aria-hidden="true" className="h-6 w-px bg-ink-200" />
+
+          <Button size="sm" variant="secondary" onClick={() => enShortlist(true)} disabled={pending}>
+            A shortlist
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => enShortlist(false)} disabled={pending}>
+            Sacar de shortlist
+          </Button>
+
+          <span aria-hidden="true" className="h-6 w-px bg-ink-200" />
+
+          <Button size="sm" variant="secondary" onClick={() => setVisibility(true)} disabled={pending}>
+            Mostrar al cliente
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setVisibility(false)} disabled={pending}>
+            Ocultar
+          </Button>
+
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())} disabled={pending}>
+            Quitar selección
+          </Button>
+        </div>
+      ) : null}
 
       {detail ? (
         <CandidacyDialog
