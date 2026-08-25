@@ -8,10 +8,25 @@ import { loadPage } from '@/lib/actions/page-guard'
 import { can } from '@/lib/authz/context'
 import { listOpenDuplicates } from '@/lib/repos/influencers'
 import { formatDate } from '@/lib/util/format'
-import { DismissButton } from './dismiss-button'
+import { ResolverDuplicado, type LadoDelPar } from './resolver'
 
 export const metadata: Metadata = { title: 'Posibles duplicados' }
 export const dynamic = 'force-dynamic'
+
+/** Adapta lo que devuelve el repositorio a lo que la pantalla necesita mostrar. */
+type LadoCrudo = Awaited<ReturnType<typeof listOpenDuplicates>>['items'][number]['a']
+const aLado = (lado: LadoCrudo): LadoParaPantalla => ({
+  id: lado.id,
+  displayName: lado.displayName,
+  primaryHandle: lado.primaryHandle,
+  country: lado.country,
+  status: lado.status,
+  createdAt: lado.createdAt.toISOString(),
+  profiles: lado.profiles,
+  candidacies: lado._count.candidacies,
+  totalProfiles: lado._count.profiles,
+})
+type LadoParaPantalla = LadoDelPar
 
 export default async function DuplicatesPage({ searchParams }: { searchParams: Promise<{ pagina?: string }> }) {
   const params = await searchParams
@@ -37,25 +52,20 @@ export default async function DuplicatesPage({ searchParams }: { searchParams: P
           ) : (
             <ul className="divide-y divide-ink-100">
               {page.items.map((duplicate) => (
-                <li key={duplicate.id} className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-                  <div className="min-w-64">
-                    <p className="text-sm font-medium text-ink-900">
-                      <Link href={`/influencers/${duplicate.a.id}`} className="hover:text-brand-700">
-                        {duplicate.a.displayName}
-                      </Link>
-                      <span className="mx-2 text-ink-400">vs</span>
-                      <Link href={`/influencers/${duplicate.b.id}`} className="hover:text-brand-700">
-                        {duplicate.b.displayName}
-                      </Link>
-                    </p>
-                    <p className="text-xs text-ink-500">
-                      {duplicate.reason} · detectado {formatDate(duplicate.detectedAt, ctx.user.timezone)}
-                    </p>
+                <li key={duplicate.id} className="px-5 py-4">
+                  <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-ink-500">
+                    <span className="font-semibold tabular-nums text-ink-800">{duplicate.score}% de parecido</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{duplicate.reason}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>detectado {formatDate(duplicate.detectedAt, ctx.user.timezone)}</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold tabular-nums text-ink-600">{duplicate.score}%</span>
-                    {canManage ? <DismissButton duplicateId={duplicate.id} /> : null}
-                  </div>
+                  <ResolverDuplicado
+                    duplicateId={duplicate.id}
+                    puedeGestionar={canManage}
+                    a={aLado(duplicate.a)}
+                    b={aLado(duplicate.b)}
+                  />
                 </li>
               ))}
             </ul>

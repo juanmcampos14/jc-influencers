@@ -10,6 +10,7 @@ import {
   setClientApproval,
   setShortlist,
   updateCandidacy,
+  addInfluencersToCampaign,
 } from '@/lib/repos/candidacies'
 
 const id = z.string().min(1).max(60)
@@ -113,5 +114,18 @@ export const shortlistAction = defineAction(
     await setShortlist(ctx, input.campaignId, input.entries)
     revalidatePath(`/campanas/${input.campaignId}`)
     return { ok: true }
+  },
+)
+
+export const addToCampaignAction = defineAction(
+  z.object({
+    campaignId: z.string().min(1).max(60),
+    influencerIds: z.array(z.string().min(1).max(60)).min(1).max(200),
+  }),
+  async (input, ctx) => {
+    const resultado = await addInfluencersToCampaign(ctx, input.campaignId, input.influencerIds)
+    revalidatePath(`/campanas/${input.campaignId}`)
+    revalidatePath('/influencers')
+    return resultado
   },
 )

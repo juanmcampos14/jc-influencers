@@ -31,6 +31,9 @@ import {
 
 const BASE = 'https://api.apify.com/v2'
 
+/** Apify rechaza un techo de gasto por debajo de esto. */
+const MINIMO_TECHO_USD = 0.5
+
 export type ApifyActors = {
   instagramProfiles?: string
   instagramDiscover?: string
@@ -173,30 +176,61 @@ export function apifyInput(
 
   if (modo === 'ENRICH') {
     const urls = params.urls ?? []
+    const usuarios = urls.map((u) => u.replace(/\/+$/, '').split('/').pop()?.replace(/^@/, '') ?? u)
+    // clockworks~tiktok-scraper
     if (plataforma === 'TIKTOK') {
-      return { profiles: urls.map((u) => u.replace(/^.*@/, '')), resultsPerPage: 1, shouldDownloadVideos: false }
+      return {
+        profiles: usuarios,
+        resultsPerPage: 1,
+        profileScrapeSections: ['videos'],
+        shouldDownloadVideos: false,
+        shouldDownloadCovers: false,
+        shouldDownloadAvatars: false,
+      }
     }
-    if (plataforma === 'YOUTUBE') return { startUrls: urls.map((url) => ({ url })), maxResults: tope }
-    return { directUrls: urls, resultsType: 'details', resultsLimit: 1 }
+    // streamers~youtube-channel-scraper
+    if (plataforma === 'YOUTUBE') return { startUrls: urls.map((url) => ({ url })), maxResults: 1 }
+    // apify~instagram-profile-scraper
+    return { usernames: usuarios }
   }
 
   const keywords = params.keywords ?? []
+  const porPalabra = Math.max(1, Math.ceil(tope / Math.max(1, keywords.length)))
+
   if (plataforma === 'TIKTOK') {
-    // Los hashtags van sin almohadilla en `hashtags`; lo demás como búsqueda.
-    const hashtags = keywords.filter((k) => k.startsWith('#')).map((k) => k.slice(1))
-    const busquedas = keywords.filter((k) => !k.startsWith('#'))
+    /*
+     * `searchSection: 'Profile'` es la diferencia con Bright Data: TikTok
+     * devuelve PERFILES en vez de posts de los que haya que deducir el autor.
+     * `maxProfilesPerQuery` es el tope que aplica el actor.
+     */
     return {
-      ...(hashtags.length > 0 ? { hashtags } : {}),
-      ...(busquedas.length > 0 ? { searchQueries: busquedas } : {}),
-      resultsPerPage: Math.max(1, Math.ceil(tope / Math.max(1, keywords.length))),
+      searchQueries: keywords.map((k) => k.replace(/^#/, '')),
+      searchSection: '/user',
+      maxProfilesPerQuery: porPalabra,
+      resultsPerPage: 1,
       shouldDownloadVideos: false,
       shouldDownloadCovers: false,
+      shouldDownloadAvatars: false,
     }
   }
+
+  // streamers~youtube-scraper: busca videos, y de cada uno sale su canal.
   if (plataforma === 'YOUTUBE') {
-    return { searchQueries: keywords, maxResults: tope, maxResultsShorts: 0 }
+    return { searchQueries: keywords, maxResults: porPalabra, maxResultsShorts: 0, maxResultStreams: 0 }
   }
-  return { search: keywords.join(' '), searchType: 'hashtag', resultsType: 'details', resultsLimit: tope }
+
+  /*
+   * apify~instagram-hashtag-scraper. `hashtags` es obligatorio y va sin
+   * almohadilla. `keywordSearch` permite buscar texto libre en vez de hashtag,
+   * que es lo que hace falta cuando la palabra no es un hashtag.
+   */
+  const soloHashtags = keywords.every((k) => k.startsWith('#'))
+  return {
+    hashtags: keywords.map((k) => k.replace(/^#/, '')),
+    keywordSearch: !soloHashtags,
+    resultsType: 'posts',
+    resultsLimit: porPalabra,
+  }
 }
 
 export class ApifyScoutingProvider implements ScoutingProvider {
@@ -258,12 +292,22 @@ export class ApifyScoutingProvider implements ScoutingProvider {
     }
 
     const tope = Math.max(1, Math.min(500, params.limit))
-    // Techo de gasto del lado del proveedor: aunque el actor devuelva de más,
-    // Apify corta. Un margen del 10% evita que corte por redondeo.
-    const techoUsd = (this.costPerRecord * tope * 1.1).toFixed(4)
+
+    /*
+     * Dos frenos, y hacen falta los dos.
+     *
+     * `maxItems` acota la cantidad de resultados, que es lo que se cobra.
+     * `maxTotalChargeUsd` es el techo en dólares, pero Apify NO acepta un techo
+     * menor a US$ 0,50: mandarlo en una búsqueda chica hace fallar el pedido
+     * entero. Así que sólo se manda cuando el techo llega a ese mínimo, y en el
+     * resto de los casos el que manda es `maxItems`.
+     */
+    const techoUsd = this.costPerRecord * tope * 1.1
+    const parametros = new URLSearchParams({ maxItems: String(tope) })
+    if (techoUsd >= MINIMO_TECHO_USD) parametros.set('maxTotalChargeUsd', techoUsd.toFixed(4))
 
     const response = await this.pedir(
-      `/actors/${encodeURIComponent(actor)}/runs?maxItems=${tope}&maxTotalChargeUsd=${techoUsd}`,
+      `/actors/${encodeURIComponent(actor)}/runs?${parametros.toString()}`,
       { method: 'POST', body: JSON.stringify(apifyInput(plataforma, modo, params)) },
     )
     if (!response.ok) {

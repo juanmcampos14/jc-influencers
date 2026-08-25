@@ -1,5 +1,6 @@
 import 'server-only'
 import type { AdultStatus, InfluencerStatus, Platform } from '@/generated/prisma/enums'
+import type { Prisma } from '@/generated/prisma/client'
 import type { AuthContext } from '@/lib/authz/context'
 import { assertCan, capabilitiesFor } from '@/lib/authz/context'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/authz/errors'
@@ -474,8 +475,13 @@ export async function listOpenDuplicates(ctx: AuthContext, pageInput?: { page?: 
         orderBy: { score: 'desc' },
         ...skipTake(pagination),
         include: {
-          influencerA: { select: { id: true, displayName: true } },
-          influencerB: { select: { id: true, displayName: true } },
+          /*
+           * Con el nombre solo no se puede decidir. Para elegir cuál sobrevive
+           * hace falta ver quién tiene más información y quién participó de
+           * campañas: fusionar hacia el vacío pierde trabajo hecho.
+           */
+          influencerA: { select: RESUMEN_PARA_COMPARAR },
+          influencerB: { select: RESUMEN_PARA_COMPARAR },
         },
       }),
       tx.influencerDuplicate.count({ where }),
@@ -495,6 +501,22 @@ export async function listOpenDuplicates(ctx: AuthContext, pageInput?: { page?: 
   })
 }
 
+/** Lo mínimo para poder decidir cuál de los dos se queda. */
+const RESUMEN_PARA_COMPARAR = {
+  id: true,
+  displayName: true,
+  primaryHandle: true,
+  country: true,
+  status: true,
+  createdAt: true,
+  profiles: {
+    select: { platform: true, url: true, handle: true, followers: true },
+    orderBy: [{ isPrimary: 'desc' }, { followers: 'desc' }],
+    take: 3,
+  },
+  _count: { select: { candidacies: true, profiles: true } },
+} satisfies Prisma.InfluencerSelect
+
 export async function dismissDuplicate(ctx: AuthContext, duplicateId: string, notes?: string | null): Promise<void> {
   assertAgency(ctx)
   assertCan(ctx, 'influencer.manage', null)
@@ -504,5 +526,148 @@ export async function dismissDuplicate(ctx: AuthContext, duplicateId: string, no
       data: { status: 'DISMISSED', resolvedAt: new Date(), resolvedById: ctx.user.id, notes: notes ?? null },
     })
     if (result.count === 0) throw new NotFoundError()
+  })
+}
+
+/**
+ * Fusiona dos influencers que resultaron ser la misma persona.
+ *
+ * La pantalla de duplicados sólo dejaba decir "no son la misma persona". Cuando
+ * sí lo eran, no había nada que hacer: el par volvía a aparecer para siempre.
+ *
+ * No se borra nada. El que absorbe se queda con los perfiles sociales, los
+ * nichos, las etiquetas y las candidaturas del otro; el otro queda ARCHIVADO
+ * con una nota que dice en quién se fusionó. Borrar a alguien que participó de
+ * campañas destruiría la historia de esas campañas, que es lo que el producto
+ * existe para conservar.
+ *
+ * Lo que no se puede mover se informa en vez de forzarse:
+ *  - Un perfil social que el sobreviviente ya tiene (misma red y misma URL).
+ *  - Una candidatura en una campaña donde el sobreviviente ya participa. Son
+ *    dos participaciones distintas de la misma persona en la misma campaña:
+ *    elegir cuál sobrevive no es algo que deba decidir un script.
+ */
+export type MergeResult = {
+  survivorId: string
+  movedProfiles: number
+  movedCandidacies: number
+  /** Candidaturas que quedaron en el archivado porque ya existía una equivalente. */
+  conflictedCandidacies: number
+  conflictedProfiles: number
+}
+
+export async function mergeInfluencers(
+  ctx: AuthContext,
+  input: { keepId: string; mergeId: string; duplicateId?: string | null },
+): Promise<MergeResult> {
+  assertAgency(ctx)
+  assertCan(ctx, 'influencer.manage', null)
+  if (input.keepId === input.mergeId) throw new ValidationError('No se puede fusionar un influencer consigo mismo.')
+
+  return scoped(ctx, async (tx) => {
+    const [sobrevive, absorbido] = await Promise.all([
+      tx.influencer.findUnique({ where: { id: input.keepId }, select: { id: true, displayName: true } }),
+      tx.influencer.findUnique({ where: { id: input.mergeId }, select: { id: true, displayName: true } }),
+    ])
+    if (!sobrevive || !absorbido) throw new NotFoundError()
+
+    // Perfiles sociales: se mueven los que el sobreviviente no tenga ya.
+    const perfilesDestino = await tx.socialProfile.findMany({
+      where: { influencerId: sobrevive.id },
+      select: { platform: true, urlNormalized: true },
+    })
+    const yaTiene = new Set(perfilesDestino.map((p) => `${p.platform}|${p.urlNormalized}`))
+    const perfilesOrigen = await tx.socialProfile.findMany({
+      where: { influencerId: absorbido.id },
+      select: { id: true, platform: true, urlNormalized: true },
+    })
+    const perfilesAMover = perfilesOrigen.filter((p) => !yaTiene.has(`${p.platform}|${p.urlNormalized}`))
+    if (perfilesAMover.length > 0) {
+      await tx.socialProfile.updateMany({
+        where: { id: { in: perfilesAMover.map((p) => p.id) } },
+        // El principal del absorbido deja de serlo: ya hay uno en el destino.
+        data: { influencerId: sobrevive.id, isPrimary: false },
+      })
+    }
+
+    // Candidaturas: se mueven las de campañas donde el sobreviviente no esté.
+    const campanasDestino = await tx.candidacy.findMany({
+      where: { influencerId: sobrevive.id },
+      select: { campaignId: true },
+    })
+    const yaParticipa = new Set(campanasDestino.map((c) => c.campaignId))
+    const candidaturasOrigen = await tx.candidacy.findMany({
+      where: { influencerId: absorbido.id },
+      select: { id: true, campaignId: true },
+    })
+    const aMover = candidaturasOrigen.filter((c) => !yaParticipa.has(c.campaignId))
+    for (const candidatura of aMover) {
+      await tx.candidacy.update({ where: { id: candidatura.id }, data: { influencerId: sobrevive.id } })
+    }
+
+    // Nichos y etiquetas: se suman los que falten.
+    const [nichosOrigen, nichosDestino] = await Promise.all([
+      tx.influencerNiche.findMany({ where: { influencerId: absorbido.id }, select: { nicheId: true } }),
+      tx.influencerNiche.findMany({ where: { influencerId: sobrevive.id }, select: { nicheId: true } }),
+    ])
+    const nichosYa = new Set(nichosDestino.map((n) => n.nicheId))
+    for (const nicho of nichosOrigen.filter((n) => !nichosYa.has(n.nicheId))) {
+      await tx.influencerNiche.create({ data: { influencerId: sobrevive.id, nicheId: nicho.nicheId } })
+    }
+
+    const [etiquetasOrigen, etiquetasDestino] = await Promise.all([
+      tx.influencerTag.findMany({ where: { influencerId: absorbido.id }, select: { tagId: true } }),
+      tx.influencerTag.findMany({ where: { influencerId: sobrevive.id }, select: { tagId: true } }),
+    ])
+    const etiquetasYa = new Set(etiquetasDestino.map((t) => t.tagId))
+    for (const etiqueta of etiquetasOrigen.filter((t) => !etiquetasYa.has(t.tagId))) {
+      await tx.influencerTag.create({ data: { influencerId: sobrevive.id, tagId: etiqueta.tagId } })
+    }
+
+    await tx.influencer.update({
+      where: { id: absorbido.id },
+      data: {
+        status: 'ARCHIVED',
+        internalNotes: `Fusionado en ${sobrevive.displayName} (${sobrevive.id}) el ${new Date().toISOString()}.`,
+      },
+    })
+
+    // Cualquier par abierto entre estos dos deja de tener sentido.
+    await tx.influencerDuplicate.updateMany({
+      where: {
+        status: 'OPEN',
+        OR: [
+          { influencerAId: sobrevive.id, influencerBId: absorbido.id },
+          { influencerAId: absorbido.id, influencerBId: sobrevive.id },
+          ...(input.duplicateId ? [{ id: input.duplicateId }] : []),
+        ],
+      },
+      data: {
+        status: 'MERGED',
+        resolvedAt: new Date(),
+        resolvedById: ctx.user.id,
+        notes: `Fusionado en ${sobrevive.displayName}.`,
+      },
+    })
+
+    await recordAudit(tx, actorOf(ctx), {
+      action: AUDIT.INFLUENCER_MERGED,
+      entityType: 'Influencer',
+      entityId: sobrevive.id,
+      before: { archivado: absorbido.displayName, archivadoId: absorbido.id },
+      after: {
+        perfilesMovidos: perfilesAMover.length,
+        candidaturasMovidas: aMover.length,
+        candidaturasEnConflicto: candidaturasOrigen.length - aMover.length,
+      },
+    })
+
+    return {
+      survivorId: sobrevive.id,
+      movedProfiles: perfilesAMover.length,
+      movedCandidacies: aMover.length,
+      conflictedCandidacies: candidaturasOrigen.length - aMover.length,
+      conflictedProfiles: perfilesOrigen.length - perfilesAMover.length,
+    }
   })
 }

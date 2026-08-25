@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { defineAction } from '@/lib/actions/define'
-import { createInfluencer, dismissDuplicate, updateInfluencer, upsertSocialProfile } from '@/lib/repos/influencers'
+import { createInfluencer, dismissDuplicate, mergeInfluencers, updateInfluencer, upsertSocialProfile } from '@/lib/repos/influencers'
 
 const influencerFields = {
   displayName: z.string().trim().min(2, 'El nombre es obligatorio.').max(160),
@@ -73,5 +73,21 @@ export const dismissDuplicateAction = defineAction(
     await dismissDuplicate(ctx, input.duplicateId, input.notes)
     revalidatePath('/influencers/duplicados')
     return { ok: true }
+  },
+)
+
+export const mergeInfluencersAction = defineAction(
+  z.object({
+    /** El que sobrevive y absorbe al otro. */
+    keepId: z.string().min(1).max(60),
+    mergeId: z.string().min(1).max(60),
+    duplicateId: z.string().min(1).max(60).nullish(),
+  }),
+  async (input, ctx) => {
+    const resultado = await mergeInfluencers(ctx, input)
+    revalidatePath('/influencers/duplicados')
+    revalidatePath('/influencers')
+    revalidatePath(`/influencers/${resultado.survivorId}`)
+    return resultado
   },
 )

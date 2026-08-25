@@ -29,16 +29,26 @@ class ConsoleEmailSender implements EmailSender {
         data: { to: message.to, subject: message.subject, bodyText: message.text, bodyHtml: message.html ?? null },
       }),
     )
-    const dir = join(process.cwd(), '.mail')
-    await mkdir(dir, { recursive: true })
-    const body = [
-      `To: ${message.to}`,
-      `From: ${env().EMAIL_FROM}`,
-      `Subject: ${message.subject}`,
-      '',
-      message.text,
-    ].join('\n')
-    await writeFile(join(dir, `${record.id}.eml`), body, 'utf8')
+    /*
+     * El archivo .eml es una comodidad de desarrollo: se abre con doble clic y
+     * se ve el mail. En un servidor sin disco de escritura (Vercel) el intento
+     * fallaba y hacía fracasar la invitación entera, cuando lo que importa --
+     * el registro en `email_outbox` -- ya estaba guardado.
+     */
+    try {
+      const dir = join(process.cwd(), '.mail')
+      await mkdir(dir, { recursive: true })
+      const body = [
+        `To: ${message.to}`,
+        `From: ${env().EMAIL_FROM}`,
+        `Subject: ${message.subject}`,
+        '',
+        message.text,
+      ].join('\n')
+      await writeFile(join(dir, `${record.id}.eml`), body, 'utf8')
+    } catch {
+      /* sin disco de escritura: alcanza con el registro en la base */
+    }
     await withSystemScope((tx) => tx.emailOutbox.update({ where: { id: record.id }, data: { sentAt: new Date() } }))
     if (process.env.NODE_ENV !== 'test') {
       console.info(`[email:console] -> ${message.to} | ${message.subject} | .mail/${record.id}.eml`)

@@ -12,10 +12,12 @@ import { ExternalLink, InfluencerStatusBadge } from '@/components/status-badge'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
 import { can } from '@/lib/authz/context'
+import { listCampaigns } from '@/lib/repos/campaigns'
 import { searchInfluencers } from '@/lib/repos/influencers'
 import { scoped } from '@/lib/repos/base'
 import { formatFollowers, formatPercent } from '@/lib/util/format'
 import { InfluencerFilters } from '../filters'
+import { CasillaDeFila, SeleccionDeInfluencers } from '../seleccion'
 import { NewInfluencerDialog } from '../new-influencer-dialog'
 
 export const metadata: Metadata = { title: 'Influencers' }
@@ -38,7 +40,7 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
   const ctx = await requireContext()
 
   // Un usuario sin acceso a la base global recibe 404, no una pantalla vacía.
-  const { niches, countries, page } = await loadPage(async () => {
+  const { niches, countries, page, campanas } = await loadPage(async () => {
     const [nicheRows, countryRows] = await Promise.all([
       scoped(ctx, (tx) => tx.niche.findMany({ where: { active: true }, orderBy: { order: 'asc' } })),
       scoped(ctx, (tx) =>
@@ -65,10 +67,17 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
       },
       { page: Number(params.pagina ?? 1) || 1, pageSize: 30 },
     )
-    return { niches: nicheRows, countries: countryRows, page: results }
+    // Campañas abiertas donde este usuario puede sumar gente. Sin esto la base
+    // era una lista para mirar: encontrabas a alguien útil y no podías hacer
+    // nada con eso.
+    const campanas = await listCampaigns(ctx, { status: ['DRAFT', 'BRIEFING', 'SCOUTING', 'PROPOSAL'] as never }, { pageSize: 50 })
+    return { niches: nicheRows, countries: countryRows, page: results, campanas }
   })
 
   const canManage = can(ctx, 'influencer.manage', null)
+  const campanasElegibles = campanas.items
+    .filter((campana) => can(ctx, 'candidate.manage', campana.clientId))
+    .map((campana) => ({ id: campana.id, name: campana.name, clientName: campana.clientName }))
   const query = new URLSearchParams(Object.entries(params).filter(([, value]) => Boolean(value)) as [string, string][])
 
   return (
@@ -98,11 +107,15 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
               description="Probá con menos filtros, o importá el Excel de scouting desde Importación."
             />
           ) : (
-            <>
+            <SeleccionDeInfluencers
+              campanas={campanasElegibles}
+              idsDeLaPagina={page.items.map((influencer) => influencer.id)}
+            >
               <TableWrap>
                 <Table>
                   <thead>
                     <tr>
+                      {campanasElegibles.length > 0 ? <Th className="w-10" aria-label="Elegir" /> : null}
                       <Th className={columnaFija}>Creador</Th>
                       <Th>País</Th>
                       <Th>Nichos</Th>
@@ -117,6 +130,11 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                       const main = influencer.profiles[0]
                       return (
                         <Tr key={influencer.id}>
+                          {campanasElegibles.length > 0 ? (
+                            <Td>
+                              <CasillaDeFila id={influencer.id} nombre={influencer.displayName} />
+                            </Td>
+                          ) : null}
                           <Td className={columnaFija}>
                             <div className="flex items-center gap-2.5">
                               <Avatar name={influencer.displayName} />
@@ -184,7 +202,7 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                 total={page.total}
                 unidad="influencers"
               />
-            </>
+            </SeleccionDeInfluencers>
           )}
         </Card>
       </div>

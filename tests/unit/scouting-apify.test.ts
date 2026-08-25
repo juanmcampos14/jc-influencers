@@ -11,21 +11,35 @@ import { apifyInput, apifyToRecord, explicarRechazoApify } from '@/lib/ports/sco
  */
 
 describe('Apify · entrada de cada actor', () => {
-  it('separa hashtags de búsquedas libres en TikTok', () => {
+  it('busca perfiles y no videos en TikTok', () => {
+    // La diferencia con Bright Data: el actor puede devolver PERFILES, así que
+    // no hay que deducir el autor a partir de sus posts.
     const entrada = apifyInput('TIKTOK', 'DISCOVER', { keywords: ['#fitness', 'entrenamiento'], limit: 10 })
-    expect(entrada.hashtags).toEqual(['fitness'])
-    expect(entrada.searchQueries).toEqual(['entrenamiento'])
+    expect(entrada.searchSection).toBe('/user')
+    expect(entrada.searchQueries).toEqual(['fitness', 'entrenamiento'])
   })
 
   it('reparte el tope entre las palabras clave', () => {
     const entrada = apifyInput('TIKTOK', 'DISCOVER', { keywords: ['#a', '#b'], limit: 10 })
-    expect(entrada.resultsPerPage).toBe(5)
+    expect(entrada.maxProfilesPerQuery).toBe(5)
+  })
+
+  it('en Instagram avisa cuando la palabra no es un hashtag', () => {
+    // `keywordSearch` cambia el modo del actor: sin esto, buscar texto libre
+    // devolvía vacío en vez de decir que no encontró nada.
+    expect(apifyInput('INSTAGRAM', 'DISCOVER', { keywords: ['#fitness'], limit: 5 }).keywordSearch).toBe(false)
+    expect(apifyInput('INSTAGRAM', 'DISCOVER', { keywords: ['fitness arg'], limit: 5 }).keywordSearch).toBe(true)
+  })
+
+  it('manda usuarios, no URLs, cuando el actor pide usuarios', () => {
+    const entrada = apifyInput('INSTAGRAM', 'ENRICH', { urls: ['https://www.instagram.com/nasa'], limit: 1 })
+    expect(entrada.usernames).toEqual(['nasa'])
   })
 
   it('nunca pide sin tope', () => {
     for (const plataforma of ['TIKTOK', 'YOUTUBE', 'INSTAGRAM'] as const) {
       const entrada = apifyInput(plataforma, 'DISCOVER', { keywords: ['x'], limit: 25 })
-      const tope = entrada.resultsPerPage ?? entrada.maxResults ?? entrada.resultsLimit
+      const tope = entrada.maxProfilesPerQuery ?? entrada.maxResults ?? entrada.resultsLimit
       expect(tope, `${plataforma} sin tope`).toBeTypeOf('number')
     }
   })

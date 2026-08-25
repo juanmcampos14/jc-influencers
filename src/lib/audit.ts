@@ -102,6 +102,8 @@ export const AUDIT = {
   SHORTLIST_CHANGED: 'candidacy.shortlist.changed',
   INFLUENCER_CREATED: 'influencer.created',
   INFLUENCER_UPDATED: 'influencer.updated',
+  INFLUENCER_MERGED: 'influencer.merged',
+  INFLUENCER_DELETED: 'influencer.deleted',
   COMMENT_CREATED: 'comment.created',
   IMPORT_PREVIEW: 'import.preview',
   IMPORT_CONFIRMED: 'import.confirmed',

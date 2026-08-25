@@ -636,3 +636,42 @@ export async function listStatusEvents(ctx: AuthContext, candidacyId: string): P
     createdAt: row.createdAt.toISOString(),
   }))
 }
+
+/**
+ * Suma varios influencers a una campaña de una vez.
+ *
+ * Desde la base de influencers no se podía hacer nada con lo que uno encontraba:
+ * había que anotarse el nombre, ir a la campaña y buscarlo de nuevo.
+ *
+ * Los que ya estaban NO son un error, pero tampoco se ocultan: se informan
+ * aparte. "Agregué 12" cuando en realidad agregaste 7 es una mentira chica que
+ * después cuesta cara.
+ */
+export async function addInfluencersToCampaign(
+  ctx: AuthContext,
+  campaignId: string,
+  influencerIds: string[],
+): Promise<{ added: number; alreadyThere: number; notFound: number }> {
+  const clientId = await resolveCampaignClient(ctx, campaignId)
+  assertCan(ctx, 'candidate.manage', clientId)
+
+  const unicos = [...new Set(influencerIds)].slice(0, 200)
+  if (unicos.length === 0) throw new ValidationError('No elegiste ningún influencer.')
+
+  let added = 0
+  let alreadyThere = 0
+  for (const influencerId of unicos) {
+    try {
+      await createCandidacy(ctx, campaignId, influencerId)
+      added += 1
+    } catch (error) {
+      // Ya estaba en la campaña: no es un fallo, es información.
+      if (error instanceof ValidationError) alreadyThere += 1
+      else if (error instanceof NotFoundError) continue
+      else throw error
+    }
+  }
+
+  const notFound = unicos.length - added - alreadyThere
+  return { added, alreadyThere, notFound }
+}
