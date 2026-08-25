@@ -805,3 +805,28 @@ export async function bulkShortlist(
     return { count }
   })
 }
+
+/**
+ * Cuántos perfiles hay en cada cluster de la campaña.
+ *
+ * La pantalla del brief dibujaba barras de progreso con el porcentaje DESEADO
+ * bajo el título "Distribución del squad", sin ningún número real al lado: el
+ * deseo dibujado como si fuera la realidad. Con esto se pueden mostrar los dos.
+ */
+export async function perfilesPorCluster(ctx: AuthContext, campaignId: string): Promise<Record<string, number>> {
+  const clientId = await resolveCampaignClient(ctx, campaignId)
+  assertCan(ctx, 'campaign.view', clientId)
+
+  return scoped(ctx, async (tx) => {
+    const filas = await tx.candidacy.groupBy({
+      by: ['clusterId'],
+      where: { campaignId, clientId },
+      _count: { _all: true },
+    })
+    const porCluster: Record<string, number> = {}
+    for (const fila of filas) {
+      if (fila.clusterId) porCluster[fila.clusterId] = fila._count._all
+    }
+    return porCluster
+  })
+}

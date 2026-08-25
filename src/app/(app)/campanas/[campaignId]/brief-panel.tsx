@@ -21,12 +21,17 @@ export function BriefPanel({
   brief,
   canEdit,
   canSeeInternal,
+  clusterUsage,
+  totalCandidaturas,
 }: {
   campaignId: string
   brief: BriefDto | null
   canEdit: boolean
   canSeeInternal: boolean
+  /** Cuántas candidaturas hay en cada cluster. Indexado por id del cluster. */
   clusterUsage: Record<string, number>
+  /** Total de candidaturas de la campaña, para poder calcular el porcentaje real. */
+  totalCandidaturas: number
 }) {
   const router = useRouter()
   const [editing, setEditing] = React.useState(brief === null && canEdit)
@@ -185,30 +190,58 @@ export function BriefPanel({
           <Card>
             <CardHeader>
               <CardTitle>Distribución del squad</CardTitle>
-              <p className="text-xs text-ink-500">Configurable por campaña. No son valores fijos del sistema.</p>
+              <p className="text-xs text-ink-500">
+                Lo que buscás contra lo que hay. Configurable por campaña, no son valores fijos del sistema.
+              </p>
             </CardHeader>
             <CardBody>
               {brief.clusters.length === 0 ? (
                 <p className="text-sm text-ink-500">Sin clusters definidos.</p>
               ) : (
                 <ul className="space-y-3">
-                  {brief.clusters.map((cluster) => (
-                    <li key={cluster.id}>
-                      <div className="mb-1 flex items-center justify-between text-sm">
-                        <span className="text-ink-800">
-                          {cluster.emoji ? `${cluster.emoji} ` : ''}
-                          {cluster.label}
-                        </span>
-                        <span className="font-medium tabular-nums text-ink-700">{cluster.targetPercent}%</span>
-                      </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-ink-100">
-                        <div
-                          className="h-full rounded-full bg-brand-500"
-                          style={{ width: `${Math.min(100, cluster.targetPercent)}%` }}
-                        />
-                      </div>
-                    </li>
-                  ))}
+                  {brief.clusters.map((cluster) => {
+                    const cuantos = clusterUsage[cluster.id] ?? 0
+                    const real = totalCandidaturas > 0 ? Math.round((cuantos / totalCandidaturas) * 100) : null
+                    return (
+                      <li key={cluster.id}>
+                        <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                          <span className="text-ink-800">
+                            {cluster.emoji ? `${cluster.emoji} ` : ''}
+                            {cluster.label}
+                          </span>
+                          <span className="whitespace-nowrap tabular-nums text-ink-700">
+                            {/* El número real primero: es el que responde "¿cómo vamos?" */}
+                            {real === null ? (
+                              <span className="text-ink-500">sin perfiles todavía</span>
+                            ) : (
+                              <>
+                                <span className="font-semibold text-ink-950">{real}%</span>
+                                <span className="text-ink-500"> de {cluster.targetPercent}% buscado</span>
+                              </>
+                            )}
+                          </span>
+                        </div>
+                        {/*
+                          * Dos barras superpuestas: la clara es lo buscado, la
+                          * oscura lo que hay. Antes había una sola, dibujada con
+                          * el deseo, y se leía como si fuera la realidad.
+                          */}
+                        <div className="relative h-2 w-full overflow-hidden rounded-full bg-ink-100">
+                          <div
+                            className="absolute inset-y-0 left-0 rounded-full bg-ink-200"
+                            style={{ width: `${Math.min(100, cluster.targetPercent)}%` }}
+                          />
+                          <div
+                            className="absolute inset-y-0 left-0 rounded-full bg-ink-900"
+                            style={{ width: `${Math.min(100, real ?? 0)}%` }}
+                          />
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-ink-500">
+                          {cuantos === 1 ? '1 perfil' : `${cuantos} perfiles`}
+                        </p>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </CardBody>

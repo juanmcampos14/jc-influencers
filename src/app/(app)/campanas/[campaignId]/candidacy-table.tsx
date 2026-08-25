@@ -51,7 +51,12 @@ const ALL_COLUMNS = [
 ] as const
 
 type ColumnKey = (typeof ALL_COLUMNS)[number]['key']
-const STORAGE_KEY = 'jc-columnas-candidaturas'
+/*
+ * La clave incluye la campaña: era global, así que la vista que armaba una
+ * persona para una campaña se aplicaba a todas, y en una máquina compartida
+ * -- que en una agencia pasa -- una heredaba la vista de la otra.
+ */
+const STORAGE_KEY_BASE = 'jc-columnas-candidaturas'
 
 export function CandidacyTable({
   campaignId,
@@ -85,20 +90,33 @@ export function CandidacyTable({
   /** Qué fila se está guardando. Antes se deshabilitaba la tabla entera. */
   const [guardando, setGuardando] = React.useState<string | null>(null)
   const [estadoEnLote, setEstadoEnLote] = React.useState('')
+  // Por campaña: la vista que armás para una no tiene por qué aplicarse a todas.
+  const STORAGE_KEY = `${STORAGE_KEY_BASE}:${campaignId}`
+
   const [visible, setVisible] = React.useState<ColumnKey[]>(() =>
     ALL_COLUMNS.map((column) => column.key).filter((key) => key !== 'entregables'),
   )
 
+  /*
+   * En un teléfono, once columnas son cinco pantallas de scroll lateral para
+   * leer una fila. Al entrar desde una pantalla angosta se arranca con lo
+   * mínimo para decidir; el selector de columnas sigue estando para el resto.
+   */
   React.useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY)
-    if (!stored) return
-    try {
-      const parsed = JSON.parse(stored) as ColumnKey[]
-      if (Array.isArray(parsed) && parsed.length > 0) setVisible(parsed)
-    } catch {
-      /* preferencia corrupta: se ignora */
+    const guardada = window.localStorage.getItem(STORAGE_KEY)
+    if (guardada) {
+      try {
+        const parsed = JSON.parse(guardada) as ColumnKey[]
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setVisible(parsed)
+          return
+        }
+      } catch {
+        /* preferencia corrupta: se ignora y se decide por ancho */
+      }
     }
-  }, [])
+    if (window.innerWidth < 768) setVisible(['creador', 'seguidores', 'estado', 'aprobacion'])
+  }, [STORAGE_KEY])
 
   function toggleColumn(key: ColumnKey) {
     setVisible((current) => {

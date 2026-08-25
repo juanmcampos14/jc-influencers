@@ -93,7 +93,19 @@ export async function getActiveTheme(ctx: AuthContext, clientId: string | null):
     return { ...resolveTheme({ colors: NEUTRAL_LIGHT, mode: 'LIGHT' }), logoUrl: null, logoIsDark: false, clientId: null }
   }
 
-  const row = await scoped(ctx, (tx) => tx.clientBrand.findUnique({ where: { clientId } })).catch(() => null)
+  /*
+   * El `.catch(() => null)` que había acá convertía cualquier error de base en
+   * "este cliente no tiene marca configurada", y la pantalla lo pintaba como
+   * un estado normal. Un error disfrazado de vacío es el peor de los dos: nadie
+   * lo investiga.
+   *
+   * Se atrapa igual -- que falle el tema no puede tumbar la pantalla entera --
+   * pero queda registrado, así que existe en algún lado.
+   */
+  const row = await scoped(ctx, (tx) => tx.clientBrand.findUnique({ where: { clientId } })).catch((error: unknown) => {
+    console.error('[marca] no se pudo leer la identidad visual del cliente', { clientId, error })
+    return null
+  })
   if (!row || row.status !== 'APPROVED') {
     return { ...resolveTheme({ colors: NEUTRAL_LIGHT, mode: 'LIGHT' }), logoUrl: null, logoIsDark: false, clientId }
   }

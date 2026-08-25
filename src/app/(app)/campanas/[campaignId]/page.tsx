@@ -12,7 +12,7 @@ import { requireContext } from '@/lib/auth/current'
 import { can } from '@/lib/authz/context'
 import { NotFoundError } from '@/lib/authz/errors'
 import { getBrief, getCampaign } from '@/lib/repos/campaigns'
-import { candidacySummary, duplicateWarnings, listCandidacies } from '@/lib/repos/candidacies'
+import { candidacySummary, duplicateWarnings, listCandidacies, perfilesPorCluster } from '@/lib/repos/candidacies'
 import { listComments } from '@/lib/repos/comments'
 import { platformLabel } from '@/lib/domain/labels'
 import { formatDate, formatMoney } from '@/lib/util/format'
@@ -95,6 +95,10 @@ export default async function CampaignDetailPage({
           { page: Number(query.pagina ?? 1) || 1, pageSize: tab === 'perfiles' ? 50 : 200 },
         )
       : null
+
+  // El brief compara lo buscado contra lo que hay, así que necesita el conteo
+  // real por cluster -- que no es lo mismo que el conteo por estado.
+  const porCluster = tab === 'brief' ? await perfilesPorCluster(ctx, campaignId) : {}
 
   const comments = tab === 'actividad' ? await listComments(ctx, { campaignId }) : []
 
@@ -267,7 +271,8 @@ export default async function CampaignDetailPage({
             brief={brief}
             canEdit={canEditBrief}
             canSeeInternal={canSeeInternal}
-            clusterUsage={summary.byStatus}
+            clusterUsage={porCluster}
+            totalCandidaturas={summary.total}
           />
         ) : null}
 
