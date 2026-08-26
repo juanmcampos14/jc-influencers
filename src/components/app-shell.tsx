@@ -71,6 +71,7 @@ export function AppShell({
   logoUrl,
   logoNeedsBackdrop = false,
   accountHref,
+  muralUrl,
   children,
 }: {
   nav: NavItem[]
@@ -91,6 +92,13 @@ export function AppShell({
   logoNeedsBackdrop?: boolean
   /** Adónde lleva "Mi cuenta". Cada lado tiene la suya, con su propio shell. */
   accountHref: string
+  /**
+   * Mural de la marca, como data URI de un SVG ya saneado. Es DECORACIÓN pura:
+   * va detrás del contenido, no recibe clics y sale del árbol de accesibilidad
+   * con `alt=""`. Describírselo a un lector de pantalla sería ruido, no ayuda.
+   * Si falta, no falta ningún dato.
+   */
+  muralUrl?: string | null
   children: React.ReactNode
 }) {
   const pathname = usePathname()
@@ -316,8 +324,21 @@ export function AppShell({
         </div>
       </nav>
 
-      <main id="contenido" className="min-w-0 flex-1 bg-ink-50">
-        {children}
+      <main id="contenido" className="relative min-w-0 flex-1 bg-ink-50">
+        {muralUrl ? (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none fixed inset-y-0 right-0 z-0 hidden w-[min(52vw,760px)] select-none items-center justify-center overflow-hidden lg:flex"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={muralUrl}
+              alt=""
+              className="size-full max-h-[80vh] object-contain opacity-[0.07] dark:opacity-[0.10]"
+            />
+          </span>
+        ) : null}
+        <div className="relative z-10">{children}</div>
       </main>
     </div>
   )

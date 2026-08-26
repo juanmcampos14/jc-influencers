@@ -56,6 +56,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'auth.session.revoked': 'Sesión revocada',
   'brand.extracted': 'Identidad visual analizada',
   'brand.reset': 'Identidad visual restablecida',
+  'brand.mural.drawn': 'Mural de marca dibujado',
+  'brand.mural.removed': 'Mural de marca quitado',
   'brand.updated': 'Identidad visual actualizada',
   'brief.updated': 'Brief actualizado',
   'budget.changed': 'Presupuesto modificado',
