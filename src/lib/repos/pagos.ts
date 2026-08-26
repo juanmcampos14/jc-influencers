@@ -78,19 +78,6 @@ const CUENTA_COMO_COSTO = new Set([
   'FINALIZADO',
 ])
 
-/**
- * Las migraciones de este proyecto se aplican a mano, a propósito. Entre que
- * sale el código y alguien corre el SQL puede haber minutos, y en esos minutos
- * la pantalla tiene que decir qué pasa en vez de tirar un 500 sin explicación.
- *
- * `42P01` es "la tabla no existe" en PostgreSQL. Cualquier otro error se deja
- * pasar: un fallo real disfrazado de "falta la migración" es peor que el 500.
- */
-function esTablaQueFalta(error: unknown): boolean {
-  const codigo = (error as { code?: string } | null)?.code
-  return codigo === '42P01' || codigo === 'P2021' || codigo === 'P2022'
-}
-
 export async function getPlan(ctx: AuthContext, campaignId: string): Promise<PlanDeCampana> {
   const campaign = await scoped(ctx, (tx) =>
     tx.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true, currency: true } }),
@@ -117,14 +104,7 @@ export async function getPlan(ctx: AuthContext, campaignId: string): Promise<Pla
         orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
         include: { candidacy: { select: { influencer: { select: { displayName: true } } } } },
       }),
-    ]).catch((error: unknown) => {
-      if (esTablaQueFalta(error)) {
-        throw new ValidationError(
-          'La sección de Pagos todavía no está habilitada en esta base: falta correr la migración. Avisale al equipo.',
-        )
-      }
-      throw error
-    })
+    ])
 
     const terminos = finance
       ? {

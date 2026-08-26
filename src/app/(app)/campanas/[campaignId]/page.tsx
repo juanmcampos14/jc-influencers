@@ -115,15 +115,38 @@ export default async function CampaignDetailPage({
    * dejaría los márgenes de la agencia viajando al navegador de cualquiera.
    */
   const puedeVerPlata = can(ctx, 'budget.view', clientId)
-  const plan = tab === 'pagos' && puedeVerPlata ? await getPlan(ctx, campaignId) : null
 
-  const resultados = tab === 'resultados' ? await resumirResultados(ctx, campaignId) : null
+  /*
+   * Las migraciones de este proyecto se aplican a mano, a propósito. Entre que
+   * sale el código y alguien corre el SQL hay minutos en los que estas tablas
+   * no existen todavía, y una pantalla nueva no puede tumbar una campaña
+   * entera por eso.
+   *
+   * El `try` va ACÁ y no adentro del repositorio: un componente de servidor que
+   * lanza termina en la frontera de error igual, sin importar qué tipo de error
+   * sea. Convertir una excepción en otra no cambia nada; hay que no lanzar.
+   */
+  const plan =
+    tab === 'pagos' && puedeVerPlata
+      ? await getPlan(ctx, campaignId).catch((error: unknown) => {
+          console.error('[campaña] no se pudo leer el plan de pagos', { campaignId, error })
+          return null
+        })
+      : null
+
+  const resultados =
+    tab === 'resultados'
+      ? await resumirResultados(ctx, campaignId).catch((error: unknown) => {
+          console.error('[campaña] no se pudieron leer los resultados', { campaignId, error })
+          return null
+        })
+      : null
   /*
    * Sólo los confirmados: una publicación de alguien que quedó en screening no
    * existe, y ofrecerlo en el desplegable invita a cargar una entrega falsa.
    */
   const confirmados =
-    tab === 'resultados'
+    tab === 'resultados' && resultados
       ? await scoped(ctx, (tx) =>
           tx.candidacy.findMany({
             where: {
@@ -301,6 +324,13 @@ export default async function CampaignDetailPage({
           />
         ) : null}
 
+        {tab === 'resultados' && !resultados ? (
+          <InfoNote>
+            La sección de Resultados todavía no está habilitada en esta base: falta correr la migración. Avisale al
+            equipo.
+          </InfoNote>
+        ) : null}
+
         {tab === 'resultados' && resultados ? (
           <ReportingPanel
             resumen={resultados}
@@ -314,7 +344,11 @@ export default async function CampaignDetailPage({
           plan ? (
             <PagosPanel plan={plan} campaignId={campaign.id} puedeEditar={can(ctx, 'budget.manage', clientId)} />
           ) : (
-            <InfoNote>No tenés permiso para ver los números de esta campaña.</InfoNote>
+            <InfoNote>
+              {puedeVerPlata
+                ? 'La sección de Pagos todavía no está habilitada en esta base: falta correr la migración. Avisale al equipo.'
+                : 'No tenés permiso para ver los números de esta campaña.'}
+            </InfoNote>
           )
         ) : null}
 
