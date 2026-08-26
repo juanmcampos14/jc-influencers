@@ -11,6 +11,7 @@ import { aiProvider, AiUnavailableError, PROMPT_VERSION } from '@/lib/ports/ai'
 import { sanitizeMuralSvg } from '@/lib/domain/mural'
 import { buildBriefContext, buildCampaignState, buildProfileContext } from './ai-context'
 import { contextoDeResultados, resumirResultados } from './reporting'
+import { contextoDeObjetivos, getObjetivos } from './objetivos'
 import { actorOf, scoped } from './base'
 
 const AI_TIMEOUT_MS = 180_000
@@ -325,7 +326,18 @@ export async function writeCampaignReport(
    * decir en ese caso.
    */
   const resumen = await resumirResultados(ctx, campaignId)
-  const estadoConResultados = `${state}\n\n# Resultados medidos\n${contextoDeResultados(resumen)}`
+  /*
+   * Los objetivos entran al reporte porque son la única forma de que la IA
+   * pueda decir si algo estuvo BIEN. Sin ellos podía contar qué pasó -- 12.400
+   * visualizaciones -- y no si eso era mucho o poco para esta campaña.
+   */
+  const objetivos = await getObjetivos(ctx, campaignId).catch(() => null)
+  const estadoConResultados = [
+    state,
+    '\n# Resultados medidos',
+    contextoDeResultados(resumen),
+    objetivos ? `\n# Objetivos\n${contextoDeObjetivos(objetivos)}` : '',
+  ].join('\n')
 
   return runInsight(
     ctx,
@@ -339,6 +351,7 @@ export async function writeCampaignReport(
         publicacionesCargadas: resumen.publicaciones.total,
         clicsMedidos: resumen.clics.total,
         huecos: resumen.huecos.length,
+        objetivos: objetivos?.objetivos.length ?? 0,
       },
       inputsDigest: digest([brief, estadoConResultados, audience, PROMPT_VERSION]),
     },

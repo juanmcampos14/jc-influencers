@@ -382,6 +382,14 @@ Sobre los resultados medidos, si el material los trae:
   las cargó una persona: cuando la fuente sea una captura, aclarálo.
 - No calcules conversiones ni retorno si no te los dieron. No los hay.
 
+Sobre los objetivos, si el material los trae:
+- Son la única base para decir si algo estuvo BIEN. Sin ellos contás qué pasó y nada más:
+  "12.400 visualizaciones" no es bueno ni malo hasta que exista un número prometido.
+- Un objetivo SIN DATO no es un incumplimiento: es una métrica que nadie cargó. Decilo así.
+- Si la campaña sigue abierta, lo que va por debajo del objetivo está EN CAMINO. Llamarle
+  fracaso a una campaña que arrancó hace una semana es maltratar al equipo con un número
+  que todavía no significa nada.
+
 No inventes números: si un dato no está, decilo.`,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'high' },

@@ -12,6 +12,8 @@ import { PagosPanel } from './pagos-panel'
 import { ReportingPanel } from './reporting-panel'
 import { getPlan } from '@/lib/repos/pagos'
 import { resumirResultados } from '@/lib/repos/reporting'
+import { getObjetivos } from '@/lib/repos/objetivos'
+import { PanelDeObjetivos } from '@/components/objetivos/panel-objetivos'
 import { scoped } from '@/lib/repos/base'
 import { requireContext } from '@/lib/auth/current'
 import { can } from '@/lib/authz/context'
@@ -160,6 +162,19 @@ export default async function CampaignDetailPage({
           }),
         ).then((filas) => filas.map((fila) => ({ candidacyId: fila.id, nombre: fila.influencer.displayName })))
       : []
+
+  /*
+   * Los objetivos se definen en el Brief --que es el plan-- y se evalúan en
+   * Resultados --que es lo que pasó--. Es el mismo panel: separarlos en dos
+   * componentes haría que el número prometido y el medido puedan divergir.
+   */
+  const objetivos =
+    tab === 'brief' || tab === 'resultados'
+      ? await getObjetivos(ctx, campaignId).catch((error: unknown) => {
+          console.error('[campaña] no se pudieron leer los objetivos', { campaignId, error })
+          return null
+        })
+      : null
 
   const insights = tab === 'analisis' ? await listInsights(ctx, { campaignId }) : []
   const aiSpend = tab === 'analisis' ? await aiSpendThisMonth(ctx) : { spent: 0, limit: 0 }
@@ -331,6 +346,17 @@ export default async function CampaignDetailPage({
           </InfoNote>
         ) : null}
 
+        {tab === 'resultados' && objetivos ? (
+          <PanelDeObjetivos
+            objetivos={objetivos.objetivos}
+            veredicto={objetivos.veredicto}
+            campaignId={campaign.id}
+            cerrada={objetivos.cerrada}
+            puedeEditar={canEditBrief}
+            puedeTopeDePlata={can(ctx, 'budget.manage', clientId)}
+          />
+        ) : null}
+
         {tab === 'resultados' && resultados ? (
           <ReportingPanel
             resumen={resultados}
@@ -354,6 +380,19 @@ export default async function CampaignDetailPage({
 
         {tab === 'shortlist' && candidacies ? (
           <ShortlistPanel campaignId={campaign.id} items={candidacies.items} canManage={canManage} />
+        ) : null}
+
+        {tab === 'brief' && objetivos ? (
+          <div className="mb-4">
+            <PanelDeObjetivos
+              objetivos={objetivos.objetivos}
+              veredicto={objetivos.veredicto}
+              campaignId={campaign.id}
+              cerrada={objetivos.cerrada}
+              puedeEditar={canEditBrief}
+              puedeTopeDePlata={can(ctx, 'budget.manage', clientId)}
+            />
+          </div>
         ) : null}
 
         {tab === 'brief' ? (

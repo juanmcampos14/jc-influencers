@@ -271,6 +271,7 @@ model Campaign {
   finance      CampaignFinance?
   payments     Payment[]
   trackedLinks TrackedLink[]
+  goals        CampaignGoal[]
   comments     Comment[]
   importRuns   ImportRun[]
   aiInsights   AiInsight[]
@@ -1500,4 +1501,63 @@ model LinkClick {
   @@index([linkId, at])
   @@index([clientId])
   @@map("link_clicks")
+}
+
+// ── Objetivos: qué se prometió y si se cumplió ──────────────────────────────
+
+/// Qué se mide. Sólo entran métricas que el producto puede calcular hoy con
+/// datos reales. Una métrica que no se puede medir no es un objetivo: es un
+/// deseo, y un deseo con una barra de progreso al lado se lee como un hecho.
+enum GoalMetric {
+  /// Suma de seguidores del squad aprobado. Es una ESTIMACIÓN y se declara así.
+  ALCANCE_ESTIMADO
+  /// Suma del alcance real de las publicaciones, cargado a mano.
+  ALCANCE_REAL
+  /// Suma de visualizaciones de las publicaciones.
+  VISUALIZACIONES
+  /// Me gusta + comentarios + compartidos + guardados.
+  INTERACCIONES
+  /// Clics en los links medidos. Es lo único que medimos nosotros.
+  CLICS
+  /// Cantidad de publicaciones que salieron al aire.
+  PUBLICACIONES
+  /// Perfiles aprobados por el cliente.
+  PERFILES_APROBADOS
+  /// Inversión en talento. Se cumple NO pasándose.
+  INVERSION_EN_TALENTO
+}
+
+/// De qué lado del número está el éxito.
+enum GoalDirection {
+  /// Llegar o superar el objetivo.
+  AL_MENOS
+  /// No pasarse del objetivo. Para topes de presupuesto.
+  COMO_MUCHO
+}
+
+model CampaignGoal {
+  id         String @id @default(cuid())
+  campaignId String
+  clientId   String
+
+  metric    GoalMetric
+  direction GoalDirection @default(AL_MENOS)
+  target    Decimal       @db.Decimal(14, 2)
+  /// Por qué se eligió ese número. Lo que hace que dentro de seis meses se
+  /// pueda discutir el objetivo y no sólo el resultado.
+  rationale String?
+
+  /// Si el cliente lo ve en su portal. Un objetivo interno de la agencia
+  /// -- "no pasarnos de tanto de cachet" -- no es asunto suyo.
+  clientVisible Boolean @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  campaign Campaign @relation(fields: [campaignId, clientId], references: [id, clientId], onDelete: Cascade)
+
+  @@unique([campaignId, metric])
+  @@index([clientId, campaignId])
+  @@map("campaign_goals")
 }

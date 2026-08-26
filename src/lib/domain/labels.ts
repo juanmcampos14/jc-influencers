@@ -63,6 +63,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'budget.changed': 'Presupuesto modificado',
   'campaign.created': 'Campaña creada',
   'campaign.updated': 'Campaña modificada',
+  'campaign.goal.saved': 'Objetivo de campaña definido',
+  'campaign.goal.deleted': 'Objetivo de campaña quitado',
   'campaign.finance.updated': 'Términos económicos actualizados',
   'payment.created': 'Movimiento de plata registrado',
   'payment.updated': 'Movimiento de plata actualizado',

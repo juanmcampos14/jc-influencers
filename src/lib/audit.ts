@@ -93,6 +93,8 @@ export const AUDIT = {
   CLIENT_UPDATED: 'client.updated',
   CAMPAIGN_CREATED: 'campaign.created',
   CAMPAIGN_UPDATED: 'campaign.updated',
+  GOAL_SAVED: 'campaign.goal.saved',
+  GOAL_DELETED: 'campaign.goal.deleted',
   FINANCE_UPDATED: 'campaign.finance.updated',
   PAYMENT_CREATED: 'payment.created',
   PAYMENT_UPDATED: 'payment.updated',
