@@ -330,11 +330,21 @@ export function AppShell({
             aria-hidden="true"
             className="pointer-events-none fixed inset-y-0 right-0 z-0 hidden w-[min(52vw,760px)] select-none items-center justify-center overflow-hidden lg:flex"
           >
+            {/*
+              * El desvanecido no es un adorno: si el modelo pinta una placa de
+              * fondo de borde a borde, sin esto se ve el rectángulo recortado
+              * encima del fondo del cliente. La máscara lo disuelve pase lo que
+              * pase, sin depender de que el dibujo se porte bien.
+              */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={muralUrl}
               alt=""
               className="size-full max-h-[80vh] object-contain opacity-[0.07] dark:opacity-[0.10]"
+              style={{
+                maskImage: 'radial-gradient(closest-side, #000 55%, transparent 100%)',
+                WebkitMaskImage: 'radial-gradient(closest-side, #000 55%, transparent 100%)',
+              }}
             />
           </span>
         ) : null}

@@ -211,6 +211,9 @@ Cómo tiene que ser:
   cientos de nodos: se va a ver al 8% de opacidad, detrás de texto.
 - Sólo los colores de la paleta que te doy.
 - viewBox="0 0 512 512". Composición que aguante recortarse por los bordes.
+- SIN placa de fondo: nada de un rect que cubra todo el lienzo. El mural se apoya
+  sobre el fondo del cliente, y un rectángulo de borde a borde se ve como una caja
+  pegada encima. Que el lienzo quede transparente y sólo estén las formas.
 
 Reglas técnicas que no se negocian:
 - Etiquetas permitidas: svg, g, defs, path, circle, ellipse, rect, line, polyline, polygon,
