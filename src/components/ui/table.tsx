@@ -1,20 +1,6 @@
 import * as React from 'react'
 import { cn } from '@/lib/util/format'
 
-/**
- * Contenedor de tabla. Desplaza en HORIZONTAL y nada más.
- *
- * No le pongas una altura máxima. `overflow-x: auto` obliga al eje vertical a
- * valer `auto` también, así que un `max-h` acá crea un SEGUNDO scroll vertical
- * adentro del de la página: la tabla se corta, pero el documento sigue midiendo
- * lo que mide la tabla entera. Resultado: cientos de píxeles en blanco después
- * del final del contenido, la barra lateral se despega y la rueda del mouse
- * hace una cosa distinta según dónde esté el puntero.
- *
- * Medido en producción sobre una campaña de 75 perfiles: el cuerpo medía 1392px
- * y el documento 3590. Se pierde el encabezado fijo de la tabla, y está bien:
- * una sola barra de scroll vale más que un encabezado pegado.
- */
 export function TableWrap({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={cn('w-full overflow-x-auto', className)} {...props} />
 }
@@ -36,7 +22,7 @@ export function Th({ className, ...props }: React.ThHTMLAttributes<HTMLTableCell
     <th
       scope="col"
       className={cn(
-        'border-b border-ink-200 bg-surface-2/95 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-500 backdrop-blur',
+        'sticky top-0 z-10 border-b border-ink-200 bg-surface-2/95 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-500 backdrop-blur',
         className,
       )}
       {...props}

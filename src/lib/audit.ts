@@ -113,8 +113,6 @@ export const AUDIT = {
   BRAND_EXTRACTED: 'brand.extracted',
   BRAND_UPDATED: 'brand.updated',
   BRAND_RESET: 'brand.reset',
-  BRAND_MURAL_DRAWN: 'brand.mural.drawn',
-  BRAND_MURAL_REMOVED: 'brand.mural.removed',
   SCOUTING_PREVIEW: 'scouting.preview',
   SCOUTING_RUN: 'scouting.run',
   SCOUTING_IMPORTED: 'scouting.imported',

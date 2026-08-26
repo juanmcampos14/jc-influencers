@@ -11,17 +11,9 @@ import { ErrorState, InfoNote } from '@/components/ui/states'
 import { ConfirmButton } from '@/components/ui/confirm'
 import { buildThemeFromBrandColors, contrastBetween, type ThemeColors } from '@/lib/domain/color'
 import { resolveTheme } from '@/lib/domain/theme'
-import { formatDate } from '@/lib/util/format'
 import { dataUrlToFile } from '@/lib/util/data-url'
 import type { BrandDto } from '@/lib/repos/brand'
-import {
-  drawMuralAction,
-  extractBrandAction,
-  removeMuralAction,
-  resetBrandAction,
-  saveBrandAction,
-  type BrandProposal,
-} from '../../../actions/brand'
+import { extractBrandAction, resetBrandAction, saveBrandAction, type BrandProposal } from '../../../actions/brand'
 import { BrandPreview } from './brand-preview'
 
 type Source = 'WEBSITE' | 'INSTAGRAM' | 'UPLOAD' | 'MANUAL'
@@ -82,7 +74,6 @@ export function BrandStudio({
   const [removeLogo, setRemoveLogo] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [pending, startTransition] = React.useTransition()
-  const [dibujando, startMural] = React.useTransition()
 
   // El mismo cálculo que corre en el servidor: lo que se ve acá es lo que se guarda.
   const resolved = React.useMemo(
@@ -130,8 +121,6 @@ export function BrandStudio({
       formData.set('fontBody', fontBody)
       formData.set('colors', JSON.stringify(colors))
       formData.set('version', String(brand.version))
-      if (proposal?.siteTitle) formData.set('siteTitle', proposal.siteTitle)
-      if (proposal?.fontHints.length) formData.set('fontHints', proposal.fontHints.join(', '))
       if (removeLogo) formData.set('removeLogo', 'true')
       if (logoFile) {
         formData.set('logo', logoFile)
@@ -160,39 +149,6 @@ export function BrandStudio({
           : 'Borrador guardado. Todavía no lo ve el cliente.',
       )
       setProposal(null)
-      router.refresh()
-    })
-  }
-
-  function dibujarMural() {
-    startMural(async () => {
-      const result = await drawMuralAction({ clientId }).catch(() => null)
-      if (!result) {
-        toast.error('No se pudo dibujar el mural. Reintentá en un momento.')
-        return
-      }
-      if (!result.ok) {
-        toast.error(result.message)
-        return
-      }
-      if (result.data.status !== 'READY') {
-        // El intento quedó registrado con su motivo; no se finge que salió bien.
-        toast.error(result.data.motivo ?? 'El modelo no devolvió un dibujo utilizable.')
-        return
-      }
-      toast.success(result.data.concepto ?? 'Mural listo.')
-      router.refresh()
-    })
-  }
-
-  function quitarMural() {
-    startMural(async () => {
-      const result = await removeMuralAction({ clientId }).catch(() => null)
-      if (!result?.ok) {
-        toast.error(result && !result.ok ? result.message : 'No se pudo quitar el mural.')
-        return
-      }
-      toast.success('Se quitó el mural.')
       router.refresh()
     })
   }
@@ -533,61 +489,6 @@ export function BrandStudio({
                 <strong className="tabular-nums">{contrastBetween(resolved.colors.onPrimary, resolved.colors.primary).toFixed(2)}:1</strong>
               </span>
             </div>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>4 · Mural del espacio</CardTitle>
-            <p className="text-xs text-ink-500">
-              Un dibujo que la IA hace para esta marca y que se ve translúcido detrás del contenido del portal. Es
-              decoración: no dice nada, así que si no está no falta ningún dato.
-            </p>
-          </CardHeader>
-          <CardBody className="space-y-3">
-            {brand.mural ? (
-              <div className="flex flex-wrap items-start gap-4">
-                <span
-                  className="grid size-32 shrink-0 place-items-center overflow-hidden rounded-lg border border-ink-200"
-                  style={{ backgroundColor: resolved.colors.background }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(brand.mural.svg)))}`}
-                    alt={brand.mural.alt ?? 'Mural de la marca'}
-                    className="size-full object-contain"
-                  />
-                </span>
-                <div className="min-w-0 space-y-1">
-                  <p className="text-sm text-ink-800">{brand.mural.alt ?? 'Mural dibujado para esta marca.'}</p>
-                  <p className="text-xs text-ink-500">Dibujado el {formatDate(brand.mural.generatedAt)}.</p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-ink-500">Todavía no hay mural para esta marca.</p>
-            )}
-
-            <div className="flex flex-wrap items-center gap-3">
-              <Button variant="secondary" onClick={dibujarMural} disabled={dibujando || brand.status !== 'APPROVED'}>
-                {dibujando ? 'Dibujando…' : brand.mural ? 'Dibujar otro' : 'Dibujar el mural'}
-              </Button>
-              {brand.mural ? (
-                <Button variant="ghost" size="sm" onClick={quitarMural} disabled={dibujando}>
-                  Quitar el mural
-                </Button>
-              ) : null}
-            </div>
-
-            {brand.status !== 'APPROVED' ? (
-              <InfoNote>
-                El mural se dibuja con la paleta que ya está en vivo. Aplicá primero la identidad al espacio del
-                cliente.
-              </InfoNote>
-            ) : (
-              <p className="text-xs text-ink-500">
-                Cuesta una llamada al modelo y cuenta contra el tope mensual de gasto en IA.
-              </p>
-            )}
           </CardBody>
         </Card>
 

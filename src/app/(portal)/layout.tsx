@@ -17,7 +17,7 @@ export default async function PortalLayout({ children }: { children: React.React
   const theme = await getActiveTheme(ctx, ctx.activeClientId)
 
   return (
-    <ThemeScope theme={theme} className="zona-marca">
+    <ThemeScope theme={theme}>
       <AppShell
         nav={nav}
         clients={ctx.clients.map((client) => ({ id: client.id, name: client.name }))}
@@ -26,7 +26,6 @@ export default async function PortalLayout({ children }: { children: React.React
         roleLabel={activeClient?.role ? CLIENT_ROLE_LABELS[activeClient.role] : ctx.side === 'AGENCY' ? 'Agencia' : ''}
         sideLabel="Portal del cliente"
         accountHref="/portal/cuenta"
-        muralUrl={theme.muralUrl}
         brandName={activeClient?.name ?? null}
         logoUrl={theme.logoUrl}
         logoNeedsBackdrop={theme.logoUrl !== null && !theme.logoIsDark && theme.mode === 'LIGHT'}

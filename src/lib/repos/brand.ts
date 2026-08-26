@@ -6,7 +6,6 @@ import { NotFoundError, ValidationError } from '@/lib/authz/errors'
 import { AUDIT, recordAudit } from '@/lib/audit'
 import { normalizeHex, NEUTRAL_LIGHT, type ThemeColors } from '@/lib/domain/color'
 import { resolveTheme, sanitizeFontName, type ResolvedTheme } from '@/lib/domain/theme'
-import { muralDataUri, sanitizeMuralSvg } from '@/lib/domain/mural'
 import { fileStorage } from '@/lib/ports/storage'
 import { actorOf, assertUpdated, scoped } from './base'
 
@@ -26,7 +25,6 @@ export type BrandDto = {
   logoIsDark: boolean
   contrastReport: unknown
   version: number
-  mural: { svg: string; alt: string | null; generatedAt: string } | null
 }
 
 const DEFAULT_BRAND: Omit<BrandDto, 'clientId'> = {
@@ -44,7 +42,6 @@ const DEFAULT_BRAND: Omit<BrandDto, 'clientId'> = {
   logoIsDark: false,
   contrastReport: null,
   version: 1,
-  mural: null,
 }
 
 export async function getBrand(ctx: AuthContext, clientId: string): Promise<BrandDto> {
@@ -76,13 +73,6 @@ export async function getBrand(ctx: AuthContext, clientId: string): Promise<Bran
     logoIsDark: row.logoIsDark,
     contrastReport: row.contrastReport,
     version: row.version,
-    mural: row.muralSvg
-      ? {
-          svg: row.muralSvg,
-          alt: row.muralAlt,
-          generatedAt: (row.muralGeneratedAt ?? row.updatedAt).toISOString(),
-        }
-      : null,
   }
 }
 
@@ -96,24 +86,11 @@ export type ActiveTheme = ResolvedTheme & {
   /** true si el logo es de trazo oscuro; define sobre qué fondo mostrarlo. */
   logoIsDark: boolean
   clientId: string | null
-  /**
-   * Mural de fondo, ya saneado y listo para el `src` de un `<img>`. Es
-   * decoración: si no está, no falta nada.
-   */
-  muralUrl: string | null
-  muralAlt: string | null
 }
 
 export async function getActiveTheme(ctx: AuthContext, clientId: string | null): Promise<ActiveTheme> {
   if (!clientId || !ctx.clients.some((client) => client.id === clientId)) {
-    return {
-      ...resolveTheme({ colors: NEUTRAL_LIGHT, mode: 'LIGHT' }),
-      logoUrl: null,
-      logoIsDark: false,
-      clientId: null,
-      muralUrl: null,
-      muralAlt: null,
-    }
+    return { ...resolveTheme({ colors: NEUTRAL_LIGHT, mode: 'LIGHT' }), logoUrl: null, logoIsDark: false, clientId: null }
   }
 
   /*
@@ -130,14 +107,7 @@ export async function getActiveTheme(ctx: AuthContext, clientId: string | null):
     return null
   })
   if (!row || row.status !== 'APPROVED') {
-    return {
-      ...resolveTheme({ colors: NEUTRAL_LIGHT, mode: 'LIGHT' }),
-      logoUrl: null,
-      logoIsDark: false,
-      clientId,
-      muralUrl: null,
-      muralAlt: null,
-    }
+    return { ...resolveTheme({ colors: NEUTRAL_LIGHT, mode: 'LIGHT' }), logoUrl: null, logoIsDark: false, clientId }
   }
 
   const resolved = resolveTheme({
@@ -163,23 +133,6 @@ export async function getActiveTheme(ctx: AuthContext, clientId: string | null):
     clientId,
     logoIsDark: row.logoIsDark,
     logoUrl: row.logoStorageKey ? `/api/marca/${clientId}/logo?v=${row.version}` : null,
-    /*
-     * El mural se sanea otra vez al leerlo. Lo guardado ya pasó por el mismo
-     * filtro, pero una fila puede haber entrado por otro camino -- una
-     * migración, una carga a mano -- y esto se muestra en la pantalla de un
-     * cliente. Es barato y cierra la puerta.
-     */
-    muralUrl: row.muralSvg ? muralSeguro(row.muralSvg) : null,
-    muralAlt: row.muralAlt,
-  }
-}
-
-function muralSeguro(svg: string): string | null {
-  try {
-    return muralDataUri(sanitizeMuralSvg(svg))
-  } catch (error) {
-    console.error('[marca] el mural guardado no pasó la revisión; no se muestra', { error })
-    return null
   }
 }
 

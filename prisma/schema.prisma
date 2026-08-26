@@ -1092,14 +1092,6 @@ model ClientBrand {
   radius      Int       @default(12)
   mode        ThemeMode @default(LIGHT)
 
-  /// Ilustración de marca dibujada por IA, en SVG ya saneado. Se muestra
-  /// translúcida detrás del contenido del portal. Es decoración: nunca lleva
-  /// información, así que su ausencia no cambia lo que la pantalla dice.
-  muralSvg         String?
-  /// Qué se ve en el mural, para quien usa lector de pantalla.
-  muralAlt         String?
-  muralGeneratedAt DateTime?
-
   /// Ignora fondos y tipografías de marca y usa el tema neutro. Se activa solo
   /// cuando la paleta no alcanza el contraste mínimo.
   safeMode       Boolean @default(false)
@@ -1124,7 +1116,6 @@ enum AiInsightKind {
   CREATIVE_IDEAS
   CAMPAIGN_ANALYSIS
   CAMPAIGN_REPORT
-  BRAND_MURAL
 }
 
 enum AiJobStatus {

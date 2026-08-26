@@ -273,7 +273,7 @@ export function CandidacyTable({
           />
         ) : (
           <>
-            <TableWrap>
+            <TableWrap className="max-h-[70vh]">
               <Table>
                 <thead>
                   <tr>

@@ -62,7 +62,7 @@ export default async function AuditPage({
             <EmptyState title="Sin eventos" description="No hay eventos que coincidan con el filtro." />
           ) : (
             <>
-              <TableWrap>
+              <TableWrap className="max-h-[70vh]">
                 <Table>
                   <thead>
                     <tr>
