@@ -19,3 +19,4 @@ next-env.d.ts
 coverage
 .DS_Store
 .env*
+.vercel

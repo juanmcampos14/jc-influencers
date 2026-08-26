@@ -193,3 +193,26 @@
     line-height: 1;
   }
 }
+
+/*
+ * El encabezado del espacio de un cliente lleva su color.
+ *
+ * Va en CSS y no en el componente porque la decisión no es del encabezado: es
+ * del contexto. `.zona-marca` envuelve al portal; el panel de la agencia no la
+ * usa y ahí el encabezado se queda neutro.
+ *
+ * El par marca/texto-sobre-marca ya pasó por la comprobación de contraste WCAG
+ * del estudio de identidad, así que es legible por construcción.
+ */
+.zona-marca [data-encabezado] {
+  background: var(--jc-primary);
+  border-bottom-color: color-mix(in srgb, var(--jc-on-primary) 22%, transparent);
+}
+
+.zona-marca [data-encabezado] h1 {
+  color: var(--jc-on-primary);
+}
+
+.zona-marca [data-encabezado] p {
+  color: color-mix(in srgb, var(--jc-on-primary) 78%, transparent);
+}
