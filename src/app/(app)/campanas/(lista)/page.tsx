@@ -5,6 +5,8 @@ import { Card } from '@/components/ui/card'
 import { Pagination } from '@/components/ui/pagination'
 import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
+import { ThOrdenable } from '@/components/ui/ordenar'
+import { resolverOrden, type ColumnaOrdenable } from '@/lib/domain/orden'
 import { CampaignStatusBadge, CAMPAIGN_STATUS_LABELS } from '@/components/status-badge'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
@@ -13,11 +15,24 @@ import { listCampaigns } from '@/lib/repos/campaigns'
 import { formatDate, formatMoney } from '@/lib/util/format'
 import { CampaignFilters } from '../filters'
 import { NewCampaignDialog } from '../new-campaign-dialog'
+import { CasillaDeFila, SeleccionDeCampanas } from '../acciones-de-lote'
 
 export const metadata: Metadata = { title: 'Campañas' }
 export const dynamic = 'force-dynamic'
 
-type SearchParams = { q?: string; estado?: string; cliente?: string; pagina?: string }
+type SearchParams = { q?: string; estado?: string; cliente?: string; pagina?: string; orden?: string; dir?: string }
+
+type Clave = 'nombre' | 'cliente' | 'estado' | 'perfiles' | 'fechas'
+
+const COLUMNAS: ReadonlyArray<ColumnaOrdenable<Clave>> = [
+  { clave: 'estado' },
+  { clave: 'nombre' },
+  { clave: 'cliente' },
+  { clave: 'perfiles', porDefecto: 'desc' },
+  { clave: 'fechas', porDefecto: 'desc' },
+]
+
+const columna = (clave: Clave): ColumnaOrdenable<Clave> => COLUMNAS.find((c) => c.clave === clave)!
 
 const cerrada = (status: string): boolean => status === 'CLOSED' || status === 'CANCELLED'
 
@@ -25,6 +40,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   const params = await searchParams
   const ctx = await requireContext()
 
+  const orden = resolverOrden(COLUMNAS, params)
   const statusFilter = params.estado && params.estado in CAMPAIGN_STATUS_LABELS ? [params.estado] : null
   // El cliente del filtro se valida contra el alcance dentro del repositorio.
   const clientFilter = params.cliente && ctx.clients.some((c) => c.id === params.cliente) ? params.cliente : null
@@ -38,10 +54,14 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
       clientId: clientFilter,
     },
       { page: Number(params.pagina ?? 1) || 1, pageSize: 25 },
+      // Sin `orden` en la URL, el repositorio usa su orden natural: vivas
+      // primero. Pedirlo siempre lo pisaría con "por estado" de entrada.
+      params.orden ? orden : undefined,
     ),
   )
 
   const canCreate = ctx.clients.some((client) => can(ctx, 'campaign.create', client.id))
+  const canManage = campaigns.items.some((campaign) => can(ctx, 'campaign.update', campaign.clientId))
 
   return (
     <>
@@ -61,23 +81,42 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
             />
           ) : (
             <>
+              <SeleccionDeCampanas idsDeLaPagina={canManage ? campaigns.items.map((c) => c.id) : []}>
               <TableWrap>
                 <Table>
                   <thead>
                     <tr>
-                      <Th>Campaña</Th>
-                      <Th>Cliente</Th>
-                      <Th>Estado</Th>
-                      <Th className="text-right">Perfiles</Th>
+                      {canManage ? <Th className="w-10"><span className="sr-only">Elegir</span></Th> : null}
+                      <ThOrdenable columna={columna('nombre')} orden={orden} base="/campanas" params={params}>
+                        Campaña
+                      </ThOrdenable>
+                      <ThOrdenable columna={columna('cliente')} orden={orden} base="/campanas" params={params}>
+                        Cliente
+                      </ThOrdenable>
+                      <ThOrdenable columna={columna('estado')} orden={orden} base="/campanas" params={params}>
+                        Estado
+                      </ThOrdenable>
+                      <ThOrdenable columna={columna('perfiles')} orden={orden} base="/campanas" params={params} className="text-right" alineado="derecha">
+                        Perfiles
+                      </ThOrdenable>
                       <Th className="text-right">Aprobados</Th>
                       <Th className="text-right">Pendientes</Th>
-                      <Th>Fechas</Th>
+                      <ThOrdenable columna={columna('fechas')} orden={orden} base="/campanas" params={params}>
+                        Fechas
+                      </ThOrdenable>
+                      {/* El presupuesto no se puede ordenar: no todos lo ven, y
+                          el orden filtraría igual una columna oculta. */}
                       <Th className="text-right">Presupuesto</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {campaigns.items.map((campaign) => (
                       <Tr key={campaign.id}>
+                        {canManage ? (
+                          <Td>
+                            <CasillaDeFila id={campaign.id} nombre={campaign.name} />
+                          </Td>
+                        ) : null}
                         <Td>
                           <Link href={`/campanas/${campaign.id}`} className="font-medium underline-offset-4 hover:underline">
                             {campaign.name}
@@ -113,6 +152,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                   </tbody>
                 </Table>
               </TableWrap>
+              </SeleccionDeCampanas>
               <Pagination
                 base="/campanas"
                 params={params as Record<string, string | undefined>}

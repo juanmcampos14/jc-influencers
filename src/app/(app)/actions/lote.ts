@@ -1,0 +1,72 @@
+"use server"
+
+import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
+import { defineAction } from '@/lib/actions/define'
+import {
+  archivarClientes,
+  borrarInfluencers,
+  cambiarEstadoDeInfluencers,
+  cerrarCampanas,
+} from '@/lib/repos/lote'
+import { dismissDuplicate } from '@/lib/repos/influencers'
+
+const ids = z.array(z.string().min(1).max(60)).min(1).max(200)
+
+export const archivarClientesAction = defineAction(
+  z.object({ ids, destino: z.enum(['ARCHIVED', 'ACTIVE']) }),
+  async (input, ctx) => {
+    const resultado = await archivarClientes(ctx, input.ids, input.destino)
+    revalidatePath('/clientes')
+    revalidatePath('/panel')
+    return resultado
+  },
+)
+
+export const cerrarCampanasAction = defineAction(
+  z.object({ ids, destino: z.enum(['CLOSED', 'CANCELLED']) }),
+  async (input, ctx) => {
+    const resultado = await cerrarCampanas(ctx, input.ids, input.destino)
+    revalidatePath('/campanas')
+    revalidatePath('/panel')
+    revalidatePath('/portal')
+    return resultado
+  },
+)
+
+export const estadoDeInfluencersAction = defineAction(
+  z.object({ ids, destino: z.enum(['ARCHIVED', 'ACTIVE', 'BACKLOG', 'BLOCKED']) }),
+  async (input, ctx) => {
+    const resultado = await cambiarEstadoDeInfluencers(ctx, input.ids, input.destino)
+    revalidatePath('/influencers')
+    return resultado
+  },
+)
+
+export const borrarInfluencersAction = defineAction(z.object({ ids }), async (input, ctx) => {
+  const resultado = await borrarInfluencers(ctx, input.ids)
+  revalidatePath('/influencers')
+  return resultado
+})
+
+/**
+ * Descarta varios duplicados de una vez.
+ *
+ * Descartar no borra a nadie: marca que ese par ya se miró y no es el mismo.
+ * Por eso puede ir en lote, mientras que fusionar --que sí une dos fichas-- se
+ * hace de a uno y mirando cada una.
+ */
+export const descartarDuplicadosAction = defineAction(z.object({ ids }), async (input, ctx) => {
+  const omitidos: Array<{ nombre: string; motivo: string }> = []
+  let hechos = 0
+  for (const id of [...new Set(input.ids)]) {
+    try {
+      await dismissDuplicate(ctx, id)
+      hechos += 1
+    } catch (error) {
+      omitidos.push({ nombre: id, motivo: error instanceof Error ? error.message : 'No se pudo descartar.' })
+    }
+  }
+  revalidatePath('/influencers/duplicados')
+  return { hechos, omitidos }
+})

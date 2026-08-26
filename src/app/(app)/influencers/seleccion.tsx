@@ -3,66 +3,55 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, X } from 'lucide-react'
+import { Archive, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Checkbox, Select } from '@/components/ui/field'
+import { Select } from '@/components/ui/field'
+import { Seleccion, CasillaDeFila } from '@/components/ui/seleccion'
+import { BotonDeLote, useAccionDeLote } from '@/components/ui/acciones-de-lote'
 import { addToCampaignAction } from '../actions/candidacies'
+import { borrarInfluencersAction, estadoDeInfluencersAction } from '../actions/lote'
+
+export { CasillaDeFila }
 
 export type CampanaElegible = { id: string; name: string; clientName: string }
 
 /**
- * Selección de influencers y qué hacer con ellos.
+ * Qué se puede hacer con los influencers elegidos.
  *
  * La base era una lista para mirar: encontrabas a alguien que servía y no había
  * nada que hacer con eso. Había que anotarse el nombre, ir a la campaña y
  * buscarlo de nuevo.
  *
- * El estado vive acá arriba y no en cada fila para que la barra sepa cuántos
- * hay elegidos. Se limpia al cambiar de página: seleccionar cosas que ya no se
- * ven es la forma más fácil de hacer algo sin querer.
+ * Archivar y borrar no son lo mismo y la pantalla lo dice: archivar saca de la
+ * lista y se deshace; borrar sólo funciona con quien nunca participó de una
+ * campaña, porque si no dejaría campañas sin parte de su historia. Esa negativa
+ * llega como aviso con el nombre de cada uno, no como un fracaso mudo.
  */
-const Contexto = React.createContext<{
-  elegidos: Set<string>
-  alternar: (id: string) => void
-} | null>(null)
-
 export function SeleccionDeInfluencers({
   campanas,
   idsDeLaPagina,
+  puedeGestionar,
   children,
 }: {
   campanas: CampanaElegible[]
-  /** Lo que hay en pantalla ahora, para el "elegir todos". */
   idsDeLaPagina: string[]
+  puedeGestionar: boolean
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const [elegidos, setElegidos] = React.useState<Set<string>>(new Set())
   const [campana, setCampana] = React.useState<string>(campanas[0]?.id ?? '')
-  const [pendiente, startTransition] = React.useTransition()
+  const [agregando, startAgregar] = React.useTransition()
+  const { ejecutar, pendiente } = useAccionDeLote()
 
-  // Al cambiar de página la selección deja de tener sentido.
-  const firma = idsDeLaPagina.join(',')
-  React.useEffect(() => {
-    setElegidos(new Set())
-  }, [firma])
-
-  const alternar = React.useCallback((id: string) => {
-    setElegidos((actual) => {
-      const proximo = new Set(actual)
-      if (proximo.has(id)) proximo.delete(id)
-      else proximo.add(id)
-      return proximo
-    })
-  }, [])
-
-  const todosElegidos = idsDeLaPagina.length > 0 && idsDeLaPagina.every((id) => elegidos.has(id))
-
-  function agregar() {
+  function agregar(ids: string[], limpiar: () => void) {
     const elegida = campanas.find((c) => c.id === campana)
     if (!elegida) return
-    startTransition(async () => {
-      const resultado = await addToCampaignAction({ campaignId: campana, influencerIds: [...elegidos] })
+    startAgregar(async () => {
+      const resultado = await addToCampaignAction({ campaignId: campana, influencerIds: ids }).catch(() => null)
+      if (!resultado) {
+        toast.error('No se pudo agregar. Reintentá en un momento.')
+        return
+      }
       if (!resultado.ok) {
         toast.error(resultado.message)
         return
@@ -73,71 +62,98 @@ export function SeleccionDeInfluencers({
       const partes = [`${added} ${added === 1 ? 'influencer agregado' : 'influencers agregados'} a ${elegida.name}`]
       if (alreadyThere > 0) partes.push(`${alreadyThere} ya ${alreadyThere === 1 ? 'estaba' : 'estaban'}`)
       toast.success(`${partes.join(' · ')}.`)
-      setElegidos(new Set())
+      limpiar()
       router.refresh()
     })
   }
 
-  return (
-    <Contexto.Provider value={{ elegidos, alternar }}>
-      {campanas.length > 0 ? (
-        <div className="mb-3 flex items-center gap-2">
-          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink-600">
-            <Checkbox
-              checked={todosElegidos}
-              onChange={(event) => setElegidos(event.target.checked ? new Set(idsDeLaPagina) : new Set())}
-            />
-            Elegir los {idsDeLaPagina.length} de esta página
-          </label>
-        </div>
-      ) : null}
+  const ocupado = agregando || pendiente
 
+  return (
+    <Seleccion idsDeLaPagina={idsDeLaPagina} etiqueta="elegidos" acciones={(ids, limpiar) => (
+      <>
+        {campanas.length > 0 ? (
+          <>
+            <Select
+              aria-label="Campaña de destino"
+              value={campana}
+              onChange={(event) => setCampana(event.target.value)}
+              className="h-9 w-56"
+            >
+              {campanas.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} · {c.clientName}
+                </option>
+              ))}
+            </Select>
+            <Button size="sm" onClick={() => agregar(ids, limpiar)} disabled={ocupado || !campana}>
+              <Plus className="size-4" aria-hidden="true" />
+              {agregando ? 'Agregando…' : 'Agregar a la campaña'}
+            </Button>
+          </>
+        ) : null}
+
+        {puedeGestionar ? (
+          <>
+            <BotonDeLote
+              pendiente={ocupado}
+              confirmacion={{
+                title: `Archivar ${ids.length === 1 ? 'el influencer' : `${ids.length} influencers`}`,
+                description:
+                  'Salen de la lista por defecto y siguen en la base con todo su historial. Se puede deshacer poniéndolos en activo otra vez.',
+                confirmLabel: 'Archivar',
+              }}
+              onConfirm={() =>
+                ejecutar(
+                  () => estadoDeInfluencersAction({ ids, destino: 'ARCHIVED' }),
+                  { singular: 'influencer archivado', plural: 'influencers archivados', verbo: 'archivó' },
+                  limpiar,
+                )
+              }
+            >
+              <Archive className="size-4" aria-hidden="true" />
+              Archivar
+            </BotonDeLote>
+
+            <BotonDeLote
+              variant="ghost"
+              pendiente={ocupado}
+              onConfirm={() =>
+                ejecutar(
+                  () => estadoDeInfluencersAction({ ids, destino: 'ACTIVE' }),
+                  { singular: 'influencer activado', plural: 'influencers activados', verbo: 'activó' },
+                  limpiar,
+                )
+              }
+            >
+              Marcar activos
+            </BotonDeLote>
+
+            <BotonDeLote
+              variant="danger"
+              pendiente={ocupado}
+              confirmacion={{
+                title: `Borrar ${ids.length === 1 ? 'el influencer' : `${ids.length} influencers`}`,
+                description:
+                  'Esto no se deshace. Quien haya participado de alguna campaña no se va a borrar: borrarlo dejaría esas campañas sin parte de su historia, y te vamos a decir cuáles quedaron afuera. Si es un duplicado, fusionalo; si ya no trabajás con él, archivalo.',
+                confirmLabel: 'Borrar igual',
+              }}
+              onConfirm={() =>
+                ejecutar(
+                  () => borrarInfluencersAction({ ids }),
+                  { singular: 'influencer borrado', plural: 'influencers borrados', verbo: 'borró' },
+                  limpiar,
+                )
+              }
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              Borrar
+            </BotonDeLote>
+          </>
+        ) : null}
+      </>
+    )}>
       {children}
-
-      {elegidos.size > 0 && campanas.length > 0 ? (
-        /*
-         * Barra flotante: con doscientas filas, un botón arriba de todo obliga
-         * a volver al principio después de elegir.
-         */
-        <div className="sticky bottom-4 z-30 mx-auto mt-4 flex w-fit max-w-full flex-wrap items-center gap-3 rounded-xl border border-ink-300 bg-surface px-4 py-3 shadow-lg">
-          <span className="text-sm font-medium text-ink-900">
-            {elegidos.size} {elegidos.size === 1 ? 'elegido' : 'elegidos'}
-          </span>
-          <Select
-            aria-label="Campaña de destino"
-            value={campana}
-            onChange={(event) => setCampana(event.target.value)}
-            className="h-9 w-56"
-          >
-            {campanas.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} · {c.clientName}
-              </option>
-            ))}
-          </Select>
-          <Button size="sm" onClick={agregar} disabled={pendiente || !campana}>
-            <Plus className="size-4" aria-hidden="true" />
-            {pendiente ? 'Agregando…' : 'Agregar a la campaña'}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setElegidos(new Set())} disabled={pendiente}>
-            <X className="size-4" aria-hidden="true" />
-            Quitar selección
-          </Button>
-        </div>
-      ) : null}
-    </Contexto.Provider>
-  )
-}
-
-/** Casilla de una fila. Sin selección activa no se renderiza nada. */
-export function CasillaDeFila({ id, nombre }: { id: string; nombre: string }) {
-  const contexto = React.useContext(Contexto)
-  if (!contexto) return null
-  return (
-    <Checkbox
-      aria-label={`Elegir ${nombre}`}
-      checked={contexto.elegidos.has(id)}
-      onChange={() => contexto.alternar(id)}
-    />
+    </Seleccion>
   )
 }

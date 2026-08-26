@@ -33,10 +33,41 @@ export type InfluencerFilters = {
   statuses?: InfluencerStatus[] | null
 }
 
+/**
+ * Claves por las que se puede ordenar la base.
+ *
+ * "Seguidores" NO está todavía, y no es un descuido: el número que muestra la
+ * lista es el del perfil principal, que vive en otra tabla. Ordenar sólo las
+ * treinta filas de la página entre sí y titularlo "por seguidores" sería
+ * mentir -- la página 2 arrancaría de nuevo desde arriba. Sale bien cuando la
+ * cifra esté denormalizada en el influencer, no antes.
+ */
+export type OrdenDeInfluencers = {
+  clave: 'nombre' | 'pais' | 'estado' | 'actualizado'
+  direccion: 'asc' | 'desc'
+}
+
+function ordenPrisma(orden?: OrdenDeInfluencers) {
+  if (!orden) return [{ displayName: 'asc' as const }]
+  const dir = orden.direccion
+  switch (orden.clave) {
+    case 'pais':
+      // Sin país no es "antes que Argentina": va al final en los dos sentidos.
+      return [{ country: { sort: dir, nulls: 'last' as const } }, { displayName: 'asc' as const }]
+    case 'estado':
+      return [{ status: dir }, { displayName: 'asc' as const }]
+    case 'actualizado':
+      return [{ updatedAt: dir }]
+    default:
+      return [{ displayName: dir }]
+  }
+}
+
 export async function searchInfluencers(
   ctx: AuthContext,
   filters: InfluencerFilters = {},
   pageInput?: { page?: number; pageSize?: number },
+  orden?: OrdenDeInfluencers,
 ): Promise<Paginated<InfluencerDto>> {
   assertAgency(ctx)
   assertCan(ctx, 'influencer.view', null)
@@ -77,7 +108,7 @@ export async function searchInfluencers(
   const perms = fieldPermissionsFor(ctx, null)
   return scoped(ctx, async (tx) => {
     const [rows, total] = await Promise.all([
-      tx.influencer.findMany({ where, orderBy: { displayName: 'asc' }, ...skipTake(pagination), include: INCLUDE }),
+      tx.influencer.findMany({ where, orderBy: ordenPrisma(orden), ...skipTake(pagination), include: INCLUDE }),
       tx.influencer.count({ where }),
     ])
     return paginate(rows.map((row) => toInfluencerDto(row, perms)), total, pagination)

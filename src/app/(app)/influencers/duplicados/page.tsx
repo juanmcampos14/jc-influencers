@@ -9,6 +9,7 @@ import { can } from '@/lib/authz/context'
 import { listOpenDuplicates } from '@/lib/repos/influencers'
 import { formatDate } from '@/lib/util/format'
 import { ResolverDuplicado, type LadoDelPar } from './resolver'
+import { CasillaDeFila, SeleccionDeDuplicados } from './seleccion'
 
 export const metadata: Metadata = { title: 'Posibles duplicados' }
 export const dynamic = 'force-dynamic'
@@ -46,14 +47,21 @@ export default async function DuplicatesPage({ searchParams }: { searchParams: P
         }
       />
       <div className="px-5 py-6 sm:px-8">
-        <Card>
+        <Card className={canManage ? 'px-5 pt-4' : undefined}>
           {page.items.length === 0 ? (
             <EmptyState title="No hay duplicados pendientes" description="Todo lo detectado ya fue resuelto." />
           ) : (
+            <SeleccionDeDuplicados idsDeLaPagina={canManage ? page.items.map((d) => d.id) : []}>
             <ul className="divide-y divide-ink-100">
               {page.items.map((duplicate) => (
                 <li key={duplicate.id} className="px-5 py-4">
                   <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-ink-500">
+                    {canManage ? (
+                      <CasillaDeFila
+                        id={duplicate.id}
+                        nombre={`el par ${duplicate.a.displayName} y ${duplicate.b.displayName}`}
+                      />
+                    ) : null}
                     <span className="font-semibold tabular-nums text-ink-800">{duplicate.score}% de parecido</span>
                     <span aria-hidden="true">·</span>
                     <span>{duplicate.reason}</span>
@@ -69,6 +77,7 @@ export default async function DuplicatesPage({ searchParams }: { searchParams: P
                 </li>
               ))}
             </ul>
+            </SeleccionDeDuplicados>
           )}
         </Card>
       </div>

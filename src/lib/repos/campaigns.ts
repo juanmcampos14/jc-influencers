@@ -8,6 +8,35 @@ import { slugify } from '@/lib/domain/normalize'
 import { fieldPermissionsFor, toCampaignDto, type CampaignDto } from '@/lib/domain/dto'
 import { actorOf, assertUpdated, normalizePagination, paginate, scoped, skipTake, type Paginated } from './base'
 
+/**
+ * Sin orden explícito, las campañas vivas van primero: el enum está declarado
+ * en orden de avance y termina en CLOSED y CANCELLED, así que ordenar por
+ * estado deja las cerradas al final sin necesidad de un CASE.
+ *
+ * Antes ordenaba sólo por última modificación, y como importar toca las
+ * históricas, las cerradas tapaban a las tres que estaban en curso.
+ */
+function ordenPrisma(orden?: OrdenDeCampanas) {
+  if (!orden) return [{ status: 'asc' as const }, { updatedAt: 'desc' as const }]
+  const dir = orden.direccion
+  switch (orden.clave) {
+    case 'nombre':
+      return [{ name: dir }]
+    case 'cliente':
+      return [{ client: { name: dir } }, { name: 'asc' as const }]
+    case 'estado':
+      return [{ status: dir }, { updatedAt: 'desc' as const }]
+    case 'perfiles':
+      return [{ candidacies: { _count: dir } }]
+    case 'fechas':
+      // Una campaña sin fecha de inicio no es "la más vieja": va al final en
+      // los dos sentidos, para no inventarle una posición en el calendario.
+      return [{ startDate: { sort: dir, nulls: 'last' as const } }]
+    default:
+      return [{ status: 'asc' as const }, { updatedAt: 'desc' as const }]
+  }
+}
+
 export type CampaignFilters = {
   clientId?: string | null
   status?: CampaignStatus[] | null
@@ -21,10 +50,20 @@ export type CampaignListItem = CampaignDto & {
   pendingApprovalCount: number
 }
 
+/**
+ * Claves por las que se puede ordenar la lista.
+ *
+ * El presupuesto NO está, y es a propósito: no todos ven ese campo, y ordenar
+ * por una columna oculta la filtra igual -- se pide el orden y se deduce el
+ * valor mirando dónde cae cada fila.
+ */
+export type OrdenDeCampanas = { clave: 'nombre' | 'cliente' | 'estado' | 'perfiles' | 'fechas'; direccion: 'asc' | 'desc' }
+
 export async function listCampaigns(
   ctx: AuthContext,
   filters: CampaignFilters = {},
   pageInput?: { page?: number; pageSize?: number },
+  orden?: OrdenDeCampanas,
 ): Promise<Paginated<CampaignListItem>> {
   // Un clientId recibido del navegador se valida contra el alcance antes de usarse.
   if (filters.clientId) assertClientInScope(ctx, filters.clientId)
@@ -44,15 +83,7 @@ export async function listCampaigns(
     const [rows, total] = await Promise.all([
       tx.campaign.findMany({
         where,
-        /*
-         * Las campañas vivas van primero. El enum está declarado en orden de
-         * avance y termina en CLOSED y CANCELLED, así que ordenar por estado
-         * deja las cerradas al final sin necesidad de un CASE.
-         *
-         * Antes ordenaba sólo por última modificación, y como importar toca las
-         * históricas, las cerradas tapaban a las tres que estaban en curso.
-         */
-        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+        orderBy: ordenPrisma(orden),
         ...skipTake(pagination),
         include: {
           client: { select: { name: true } },

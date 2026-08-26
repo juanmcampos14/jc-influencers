@@ -6,24 +6,68 @@ import { Stat, StatStrip } from '@/components/ui/stat'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
+import { ThOrdenable } from '@/components/ui/ordenar'
+import { resolverOrden, type ColumnaOrdenable } from '@/lib/domain/orden'
+import { hrefCon } from '@/lib/util/query'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
 import { can } from '@/lib/authz/context'
 import { listClients, pendientesPorCliente } from '@/lib/repos/clients'
 import { NewClientDialog } from '../new-client-dialog'
+import { CasillaDeFila, SeleccionDeClientes } from '../acciones-de-lote'
 
 export const metadata: Metadata = { title: 'Clientes' }
 export const dynamic = 'force-dynamic'
 
-export default async function ClientsPage() {
+type Clave = 'nombre' | 'activas' | 'pendientes' | 'accesos'
+
+const COLUMNAS: ReadonlyArray<ColumnaOrdenable<Clave>> = [
+  { clave: 'nombre' },
+  { clave: 'activas', porDefecto: 'desc' },
+  { clave: 'pendientes', porDefecto: 'desc' },
+  { clave: 'accesos', porDefecto: 'desc' },
+]
+
+export default async function ClientsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const params = await searchParams
   const ctx = await requireContext()
   const [clients, pendientes] = await loadPage(() =>
     Promise.all([listClients(ctx), pendientesPorCliente(ctx)]),
   )
-  // `listClients` trae todos los clientes sin paginar, así que sumar es honesto.
-  const campanasActivas = clients.reduce((suma, client) => suma + client.activeCampaignCount, 0)
-  const totalPendientes = [...pendientes.values()].reduce((suma, n) => suma + n, 0)
   const canManage = ctx.allClients && can(ctx, 'client.manage', null)
+
+  /*
+   * Los archivados se esconden por defecto pero NO se descuentan en silencio:
+   * si hay alguno, la pantalla dice cuántos y ofrece verlos. Un filtro que no
+   * se anuncia hace que "5 clientes" signifique cosas distintas según quién
+   * mire.
+   */
+  const verArchivados = params.estado === 'archivados'
+  const archivados = clients.filter((client) => client.status === 'ARCHIVED')
+  const visibles = verArchivados ? archivados : clients.filter((client) => client.status !== 'ARCHIVED')
+
+  const orden = resolverOrden(COLUMNAS, params)
+  const signo = orden.direccion === 'asc' ? 1 : -1
+  const ordenados = [...visibles].sort((a, b) => {
+    switch (orden.clave) {
+      case 'activas':
+        return signo * (a.activeCampaignCount - b.activeCampaignCount)
+      case 'pendientes':
+        return signo * ((pendientes.get(a.id) ?? 0) - (pendientes.get(b.id) ?? 0))
+      case 'accesos':
+        return signo * (a.userCount - b.userCount)
+      default:
+        return signo * a.name.localeCompare(b.name, 'es')
+    }
+  })
+
+  // Las cifras miran lo que se está viendo, y el encabezado dice cuál es.
+  const campanasActivas = visibles.reduce((suma, client) => suma + client.activeCampaignCount, 0)
+  const totalPendientes = visibles.reduce((suma, client) => suma + (pendientes.get(client.id) ?? 0), 0)
 
   return (
     <>
@@ -34,7 +78,7 @@ export default async function ClientsPage() {
       />
       <div className="space-y-4 px-5 py-6 sm:px-8">
         <StatStrip>
-          <Stat label="Clientes" value={clients.length} />
+          <Stat label={verArchivados ? 'Clientes archivados' : 'Clientes activos'} value={visibles.length} />
           <Stat label="Campañas activas" value={campanasActivas} />
           <Stat
             label="Esperando decisión"
@@ -46,11 +90,25 @@ export default async function ClientsPage() {
             * "Accesos" y no "Usuarios": son membresías, y una persona que
             * trabaja en dos clientes cuenta dos veces.
             */}
-          <Stat label="Accesos de cliente" value={clients.reduce((s, c) => s + c.userCount, 0)} />
+          <Stat label="Accesos de cliente" value={visibles.reduce((s, c) => s + c.userCount, 0)} />
         </StatStrip>
 
+        {archivados.length > 0 ? (
+          <p className="text-xs text-ink-500">
+            {verArchivados ? (
+              <Link href={hrefCon('/clientes', params, { estado: null })} className="underline underline-offset-4">
+                Volver a los clientes activos
+              </Link>
+            ) : (
+              <Link href={hrefCon('/clientes', params, { estado: 'archivados' })} className="underline underline-offset-4">
+                Ver {archivados.length} {archivados.length === 1 ? 'cliente archivado' : 'clientes archivados'}
+              </Link>
+            )}
+          </p>
+        ) : null}
+
         <Card>
-          {clients.length === 0 ? (
+          {ordenados.length === 0 ? (
             <EmptyState
               action={canManage ? <NewClientDialog /> : null}
               title={canManage ? 'Todavía no hay clientes' : 'Todavía no tenés clientes asignados'}
@@ -61,24 +119,39 @@ export default async function ClientsPage() {
               }
             />
           ) : (
+            <SeleccionDeClientes idsDeLaPagina={canManage ? ordenados.map((client) => client.id) : []}>
             <TableWrap>
               <Table>
                 <thead>
                   <tr>
-                    <Th>Cliente</Th>
+                    {canManage ? <Th className="w-10"><span className="sr-only">Elegir</span></Th> : null}
+                    <ThOrdenable columna={COLUMNAS[0]!} orden={orden} base="/clientes" params={params}>
+                      Cliente
+                    </ThOrdenable>
                     <Th>País y mercados</Th>
                     {/* "2 / 7" bajo un encabezado que decía sólo "Campañas" no
                         dejaba saber si el primero eran las activas o el total. */}
-                    <Th className="text-right">Campañas activas / total</Th>
-                    <Th className="text-right">Esperando decisión</Th>
-                    <Th className="text-right">Accesos</Th>
+                    <ThOrdenable columna={COLUMNAS[1]!} orden={orden} base="/clientes" params={params} className="text-right" alineado="derecha">
+                      Campañas activas / total
+                    </ThOrdenable>
+                    <ThOrdenable columna={COLUMNAS[2]!} orden={orden} base="/clientes" params={params} className="text-right" alineado="derecha">
+                      Esperando decisión
+                    </ThOrdenable>
+                    <ThOrdenable columna={COLUMNAS[3]!} orden={orden} base="/clientes" params={params} className="text-right" alineado="derecha">
+                      Accesos
+                    </ThOrdenable>
                     <Th>Identidad visual</Th>
                     <Th>Permisos</Th>
                   </tr>
                 </thead>
                 <tbody>
-                  {clients.map((client) => (
+                  {ordenados.map((client) => (
                     <Tr key={client.id}>
+                      {canManage ? (
+                        <Td>
+                          <CasillaDeFila id={client.id} nombre={client.name} />
+                        </Td>
+                      ) : null}
                       <Td>
                         <span className="flex items-center gap-2.5">
                           {/*
@@ -97,6 +170,7 @@ export default async function ClientsPage() {
                           >
                             {client.name}
                           </Link>
+                          {client.status === 'ARCHIVED' ? <Badge tone="slate">Archivado</Badge> : null}
                         </span>
                         {/* El slug es un identificador técnico: se ve en el
                             detalle, no hace falta repetirlo en la lista. */}
@@ -162,6 +236,7 @@ export default async function ClientsPage() {
                 </tbody>
               </Table>
             </TableWrap>
+            </SeleccionDeClientes>
           )}
         </Card>
       </div>

@@ -9,6 +9,8 @@ import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { columnaFija, Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
+import { ThOrdenable } from '@/components/ui/ordenar'
+import { resolverOrden, type ColumnaOrdenable } from '@/lib/domain/orden'
 import { ExternalLink, InfluencerStatusBadge } from '@/components/status-badge'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
@@ -34,11 +36,26 @@ type SearchParams = {
   er?: string
   estado?: string
   pagina?: string
+  orden?: string
+  dir?: string
 }
+
+type Clave = 'nombre' | 'pais' | 'estado' | 'actualizado'
+
+const COLUMNAS: ReadonlyArray<ColumnaOrdenable<Clave>> = [
+  { clave: 'nombre' },
+  { clave: 'pais' },
+  { clave: 'estado' },
+  { clave: 'actualizado', porDefecto: 'desc' },
+]
+
+const columna = (clave: Clave): ColumnaOrdenable<Clave> => COLUMNAS.find((c) => c.clave === clave)!
 
 export default async function InfluencersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const ctx = await requireContext()
+
+  const orden = resolverOrden(COLUMNAS, params)
 
   // Un usuario sin acceso a la base global recibe 404, no una pantalla vacía.
   const { niches, countries, page, campanas, resumen } = await loadPage(async () => {
@@ -67,6 +84,7 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
         statuses: params.estado ? [params.estado as never] : null,
       },
       { page: Number(params.pagina ?? 1) || 1, pageSize: 30 },
+      orden,
     )
     // Campañas abiertas donde este usuario puede sumar gente. Sin esto la base
     // era una lista para mirar: encontrabas a alguien útil y no podías hacer
@@ -81,6 +99,7 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
   const campanasElegibles = campanas.items
     .filter((campana) => can(ctx, 'candidate.manage', campana.clientId))
     .map((campana) => ({ id: campana.id, name: campana.name, clientName: campana.clientName }))
+  const elegible = campanasElegibles.length > 0 || canManage
   const query = new URLSearchParams(Object.entries(params).filter(([, value]) => Boolean(value)) as [string, string][])
 
   return (
@@ -128,20 +147,31 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
           ) : (
             <SeleccionDeInfluencers
               campanas={campanasElegibles}
-              idsDeLaPagina={page.items.map((influencer) => influencer.id)}
+              puedeGestionar={canManage}
+              idsDeLaPagina={
+                campanasElegibles.length > 0 || canManage ? page.items.map((influencer) => influencer.id) : []
+              }
             >
               <TableWrap>
                 <Table>
                   <thead>
                     <tr>
-                      {campanasElegibles.length > 0 ? <Th className="w-10" aria-label="Elegir" /> : null}
-                      <Th className={columnaFija}>Creador</Th>
-                      <Th>País</Th>
+                      {elegible ? <Th className="w-10" aria-label="Elegir" /> : null}
+                      <ThOrdenable columna={columna('nombre')} orden={orden} base="/influencers" params={params} className={columnaFija}>
+                        Creador
+                      </ThOrdenable>
+                      <ThOrdenable columna={columna('pais')} orden={orden} base="/influencers" params={params}>
+                        País
+                      </ThOrdenable>
                       <Th>Nichos</Th>
                       <Th>Perfiles</Th>
+                      {/* Seguidores todavía no ordena: la cifra es la del perfil
+                          principal y vive en otra tabla. Ver `OrdenDeInfluencers`. */}
                       <Th className="text-right">Seguidores</Th>
                       <Th className="text-right">ER</Th>
-                      <Th>Estado</Th>
+                      <ThOrdenable columna={columna('estado')} orden={orden} base="/influencers" params={params}>
+                        Estado
+                      </ThOrdenable>
                     </tr>
                   </thead>
                   <tbody>
@@ -149,7 +179,7 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                       const main = influencer.profiles[0]
                       return (
                         <Tr key={influencer.id}>
-                          {campanasElegibles.length > 0 ? (
+                          {elegible ? (
                             <Td>
                               <CasillaDeFila id={influencer.id} nombre={influencer.displayName} />
                             </Td>
