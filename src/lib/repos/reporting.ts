@@ -1,8 +1,5 @@
 import 'server-only'
 import type { AuthContext } from '@/lib/authz/context'
-import { assertCan, assertClientInScope } from '@/lib/authz/context'
-import { NotFoundError } from '@/lib/authz/errors'
-import { scoped } from './base'
 import { listarEntregas, type EntregaDto } from './entregas'
 import { listarLinks, type LinkDto } from './links'
 
@@ -58,13 +55,11 @@ const medir = (valores: Array<number | null>): Medicion => {
 }
 
 export async function resumirResultados(ctx: AuthContext, campaignId: string): Promise<ResumenDeResultados> {
-  const campaign = await scoped(ctx, (tx) =>
-    tx.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true } }),
-  )
-  if (!campaign) throw new NotFoundError()
-  assertClientInScope(ctx, campaign.clientId)
-  assertCan(ctx, 'campaign.view', campaign.clientId)
-
+  /*
+   * Acá no se vuelve a comprobar el alcance: las DOS funciones que se llaman lo
+   * hacen, con las mismas aserciones y sobre la misma campaña. Hacerlo también
+   * acá era una transacción más --unos 900 ms-- por una garantía que ya estaba.
+   */
   const [entregas, links] = await Promise.all([listarEntregas(ctx, campaignId), listarLinks(ctx, campaignId)])
 
   const publicadas = entregas.filter((entrega) => entrega.status === 'PUBLISHED')

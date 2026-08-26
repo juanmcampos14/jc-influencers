@@ -35,18 +35,22 @@ export type ObjetivosDeCampana = ResumenDeObjetivos & {
 }
 
 export async function getObjetivos(ctx: AuthContext, campaignId: string): Promise<ObjetivosDeCampana> {
-  const campaign = await scoped(ctx, (tx) =>
-    tx.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true, status: true } }),
-  )
-  if (!campaign) throw new NotFoundError()
-  assertClientInScope(ctx, campaign.clientId)
-  assertCan(ctx, 'campaign.view', campaign.clientId)
+  // Campaña y objetivos en la misma transacción: ver la nota en `entregas.ts`.
+  const { campaign, filas } = await scoped(ctx, async (tx) => {
+    const fila = await tx.campaign.findUnique({
+      where: { id: campaignId },
+      select: { clientId: true, status: true },
+    })
+    if (!fila) throw new NotFoundError()
+    assertClientInScope(ctx, fila.clientId)
+    assertCan(ctx, 'campaign.view', fila.clientId)
+    return {
+      campaign: fila,
+      filas: await tx.campaignGoal.findMany({ where: { campaignId }, orderBy: { createdAt: 'asc' } }),
+    }
+  })
 
   const cerrada = campaign.status === 'CLOSED' || campaign.status === 'CANCELLED'
-
-  const filas = await scoped(ctx, (tx) =>
-    tx.campaignGoal.findMany({ where: { campaignId }, orderBy: { createdAt: 'asc' } }),
-  )
 
   /*
    * Se mide SÓLO lo que algún objetivo pide.

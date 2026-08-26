@@ -30,14 +30,13 @@ export type LinkDto = {
 const urlPublica = (slug: string): string => `${env().APP_URL.replace(/\/$/, '')}/r/${slug}`
 
 export async function listarLinks(ctx: AuthContext, campaignId: string): Promise<LinkDto[]> {
-  const campaign = await scoped(ctx, (tx) =>
-    tx.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true } }),
-  )
-  if (!campaign) throw new NotFoundError()
-  assertClientInScope(ctx, campaign.clientId)
-  assertCan(ctx, 'campaign.view', campaign.clientId)
-
+  // Alcance y consulta en la misma transacción: ver la nota en `entregas.ts`.
   return scoped(ctx, async (tx) => {
+    const campaign = await tx.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true } })
+    if (!campaign) throw new NotFoundError()
+    assertClientInScope(ctx, campaign.clientId)
+    assertCan(ctx, 'campaign.view', campaign.clientId)
+
     const links = await tx.trackedLink.findMany({
       where: { campaignId },
       orderBy: [{ archived: 'asc' }, { createdAt: 'desc' }],

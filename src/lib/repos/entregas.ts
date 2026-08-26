@@ -45,14 +45,21 @@ export type EntregaDto = {
 const CUENTA = ['views', 'likes', 'comments', 'shares', 'saves', 'reach'] as const
 
 export async function listarEntregas(ctx: AuthContext, campaignId: string): Promise<EntregaDto[]> {
-  const campaign = await scoped(ctx, (tx) =>
-    tx.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true } }),
-  )
-  if (!campaign) throw new NotFoundError()
-  assertClientInScope(ctx, campaign.clientId)
-  assertCan(ctx, 'campaign.view', campaign.clientId)
-
+  /*
+   * La comprobación de alcance y la consulta van en la MISMA transacción.
+   *
+   * Cada `scoped()` abre una transacción y fija el contexto de seguridad, y eso
+   * son cuatro idas y vueltas a la base. Medido en producción: unos 900 ms por
+   * llamada, que es latencia de red y no tiempo de consulta. Partir esto en dos
+   * duplicaba el costo sin agregar ninguna garantía: las mismas
+   * comprobaciones corren igual, sólo que una vez.
+   */
   return scoped(ctx, async (tx) => {
+    const campaign = await tx.campaign.findUnique({ where: { id: campaignId }, select: { clientId: true } })
+    if (!campaign) throw new NotFoundError()
+    assertClientInScope(ctx, campaign.clientId)
+    assertCan(ctx, 'campaign.view', campaign.clientId)
+
     const filas = await tx.deliverable.findMany({
       where: { candidacy: { campaignId } },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
