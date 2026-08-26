@@ -268,6 +268,9 @@ model Campaign {
   candidacies Candidacy[]
   links       CampaignLink[]
   documents   CampaignDocument[]
+  finance      CampaignFinance?
+  payments     Payment[]
+  trackedLinks TrackedLink[]
   comments     Comment[]
   importRuns   ImportRun[]
   aiInsights   AiInsight[]
@@ -761,6 +764,8 @@ model Candidacy {
   comments     Comment[]
   sources      SourceReference[]
   aiInsights   AiInsight[]
+  payments     Payment[]
+  trackedLinks TrackedLink[]
   importRun    ImportRun?            @relation(fields: [importRunId], references: [id], onDelete: SetNull)
 
   @@unique([campaignId, influencerId])
@@ -810,6 +815,16 @@ enum DeliverableStatus {
   CANCELLED
 }
 
+/// Quién dice que estas métricas son ciertas.
+enum MetricsSource {
+  /// Alguien de la agencia las copió a mano de la app.
+  MANUAL
+  /// Captura de pantalla que mandó el influencer.
+  SCREENSHOT
+  /// Las trajo un proveedor de datos.
+  PROVIDER
+}
+
 model Deliverable {
   id          String            @id @default(cuid())
   candidacyId String
@@ -821,6 +836,20 @@ model Deliverable {
   dueDate     DateTime?
   publishedAt DateTime?
   url         String?
+
+  /// Métricas de la publicación. Todas opcionales a propósito: null significa
+  /// "nadie lo cargó", que es distinto de cero. Un reporte que trata el hueco
+  /// como un cero informa una caída que nunca pasó.
+  views      Int?
+  likes      Int?
+  comments   Int?
+  shares     Int?
+  saves      Int?
+  reach      Int?
+  /// De dónde salieron los números y cuándo. Sin esto no se pueden defender.
+  metricsSource MetricsSource?
+  measuredAt    DateTime?
+
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -1307,4 +1336,168 @@ model StoredBlob {
 
   @@index([clientId])
   @@map("stored_blobs")
+}
+
+// ── Plata: qué se acordó, qué se pagó y qué falta ───────────────────────────
+
+/// Cómo cobra la agencia por esta campaña.
+enum AgencyFeeMode {
+  /// Un porcentaje de lo que se invierte en talento.
+  PERCENT
+  /// Un monto fijo, sin importar cuánto se gaste en talento.
+  FIXED
+  /// La agencia no cobra fee acá (retainer, canje, prueba).
+  NONE
+}
+
+/// Hacia dónde va la plata.
+enum PaymentDirection {
+  /// El cliente le paga a la agencia.
+  AGENCY_IN
+  /// La agencia le paga al influencer.
+  TALENT_OUT
+  /// Cualquier otro gasto de la campaña (producción, pauta, envíos).
+  EXPENSE_OUT
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+/// Los términos económicos de una campaña. Uno por campaña.
+model CampaignFinance {
+  id         String @id @default(cuid())
+  campaignId String @unique
+  clientId   String
+
+  feeMode    AgencyFeeMode @default(PERCENT)
+  /// Porcentaje sobre la inversión en talento. Sólo se usa con feeMode PERCENT.
+  feePercent Decimal?      @db.Decimal(6, 3)
+  /// Monto fijo. Sólo se usa con feeMode FIXED.
+  feeFixed   Decimal?      @db.Decimal(14, 2)
+
+  /// Costos que no son cachet: producción, envíos, edición.
+  productionCost Decimal? @db.Decimal(14, 2)
+  /// Pauta paga sobre el contenido.
+  adSpend        Decimal? @db.Decimal(14, 2)
+
+  /// Condiciones de pago acordadas con el cliente, en texto libre.
+  terms String?
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  version   Int      @default(1)
+
+  campaign Campaign @relation(fields: [campaignId, clientId], references: [id, clientId], onDelete: Cascade)
+
+  @@unique([campaignId, clientId])
+  @@index([clientId])
+  @@map("campaign_finances")
+}
+
+/// Un movimiento de plata. Prometido o hecho, pero siempre uno concreto.
+model Payment {
+  id          String  @id @default(cuid())
+  clientId    String
+  campaignId  String
+  /// Cuando el movimiento es hacia un influencer concreto.
+  candidacyId String?
+
+  direction PaymentDirection
+  status    PaymentStatus    @default(PENDING)
+
+  amount   Decimal @db.Decimal(14, 2)
+  currency String  @default("USD")
+
+  concept String
+  dueDate DateTime?
+  paidAt  DateTime?
+  method  String?
+  /// Número de factura, recibo o transferencia.
+  reference String?
+  notes     String?
+
+  /// La factura adjunta, guardada en `stored_blobs`.
+  documentKey  String?
+  documentName String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  version     Int      @default(1)
+
+  campaign  Campaign   @relation(fields: [campaignId, clientId], references: [id, clientId], onDelete: Cascade)
+  /*
+   * Restrict y no SetNull: si hay plata anotada contra un influencer, sacarlo
+   * de la campaña tiene que fallar hasta que alguien decida qué pasa con ese
+   * movimiento. Un pago huérfano es un pago que nadie reclama.
+   */
+  candidacy Candidacy? @relation(fields: [candidacyId, clientId], references: [id, clientId], onDelete: Restrict)
+
+  @@index([clientId, campaignId, direction])
+  @@index([clientId, campaignId, status])
+  @@index([candidacyId])
+  @@map("payments")
+}
+
+// ── Links medidos: la única fuente de clics que es nuestra ──────────────────
+
+/// Un link con UTMs que pasa por nosotros antes de llegar al destino.
+model TrackedLink {
+  id          String @id @default(cuid())
+  clientId    String
+  campaignId  String
+  candidacyId String?
+
+  /// Lo que va en la URL corta. Corto, sin ambigüedad, sin caracteres raros.
+  slug        String @unique
+  /// A dónde se manda a la persona, ya con los UTMs pegados.
+  destination String
+
+  utmSource   String
+  utmMedium   String
+  utmCampaign String
+  utmContent  String?
+  utmTerm     String?
+
+  label    String?
+  archived Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  campaign  Campaign   @relation(fields: [campaignId, clientId], references: [id, clientId], onDelete: Cascade)
+  /* Los clics ya medidos son historia: no se van con la candidatura. */
+  candidacy Candidacy? @relation(fields: [candidacyId, clientId], references: [id, clientId], onDelete: Restrict)
+  clicks    LinkClick[]
+
+  @@index([clientId, campaignId])
+  @@index([candidacyId])
+  @@map("tracked_links")
+}
+
+/// Un clic. Se guarda lo mínimo para contar y para no contar dos veces al mismo.
+model LinkClick {
+  id     String @id @default(cuid())
+  linkId String
+  clientId String
+
+  at        DateTime @default(now())
+  /// Hash del visitante (IP + user agent + sal diaria). NUNCA la IP en claro.
+  visitorHash String
+  /// De dónde venía, si el navegador lo dijo. Sólo el host.
+  referrerHost String?
+  country      String?
+  /// Si el patrón del user agent parecía un bot. Los bots se cuentan aparte.
+  bot Boolean @default(false)
+
+  link TrackedLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([linkId, at])
+  @@index([clientId])
+  @@map("link_clicks")
 }

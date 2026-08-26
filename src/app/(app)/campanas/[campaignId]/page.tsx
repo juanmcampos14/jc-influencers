@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { InfoNote } from '@/components/ui/states'
 import { EstadoDeCampana } from './estado-campana'
 import { PestanasDeCampana } from './tabs'
+import { PagosPanel } from './pagos-panel'
+import { getPlan } from '@/lib/repos/pagos'
 import { requireContext } from '@/lib/auth/current'
 import { can } from '@/lib/authz/context'
 import { NotFoundError } from '@/lib/authz/errors'
@@ -35,6 +37,7 @@ const TABS = [
   { key: 'funnel', label: 'Funnel' },
   { key: 'shortlist', label: 'Shortlist' },
   { key: 'brief', label: 'Brief' },
+  { key: 'pagos', label: 'Pagos' },
   { key: 'analisis', label: 'Análisis IA' },
   { key: 'actividad', label: 'Actividad' },
 ] as const
@@ -101,6 +104,14 @@ export default async function CampaignDetailPage({
   const porCluster = tab === 'brief' ? await perfilesPorCluster(ctx, campaignId) : {}
 
   const comments = tab === 'actividad' ? await listComments(ctx, { campaignId }) : []
+
+  /*
+   * La pestaña de Pagos sólo se consulta si se está mirando Y si esta persona
+   * puede ver presupuestos. Traer el plan igual y esconderlo en la interfaz
+   * dejaría los márgenes de la agencia viajando al navegador de cualquiera.
+   */
+  const puedeVerPlata = can(ctx, 'budget.view', clientId)
+  const plan = tab === 'pagos' && puedeVerPlata ? await getPlan(ctx, campaignId) : null
 
   const insights = tab === 'analisis' ? await listInsights(ctx, { campaignId }) : []
   const aiSpend = tab === 'analisis' ? await aiSpendThisMonth(ctx) : { spent: 0, limit: 0 }
@@ -194,7 +205,7 @@ export default async function CampaignDetailPage({
 
       <PestanasDeCampana
         activa={tab}
-        tabs={TABS.map((entry) => ({
+        tabs={TABS.filter((entry) => entry.key !== 'pagos' || puedeVerPlata).map((entry) => ({
           key: entry.key,
           label: entry.label,
           href: hrefCon(`/campanas/${campaign.id}`, query, {
@@ -254,12 +265,24 @@ export default async function CampaignDetailPage({
           />
         ) : null}
 
-        {tab === 'funnel' && candidacies ? <FunnelBoard
+        {tab === 'funnel' && candidacies ? (
+          <FunnelBoard
             items={candidacies.items}
             byStatus={summary.byStatus}
             mostrando={candidacies.items.length}
             total={summary.total}
-          /> : null}
+            campaignId={campaign.id}
+            puedeMover={canManage}
+          />
+        ) : null}
+
+        {tab === 'pagos' ? (
+          plan ? (
+            <PagosPanel plan={plan} campaignId={campaign.id} puedeEditar={can(ctx, 'budget.manage', clientId)} />
+          ) : (
+            <InfoNote>No tenés permiso para ver los números de esta campaña.</InfoNote>
+          )
+        ) : null}
 
         {tab === 'shortlist' && candidacies ? (
           <ShortlistPanel campaignId={campaign.id} items={candidacies.items} canManage={canManage} />
