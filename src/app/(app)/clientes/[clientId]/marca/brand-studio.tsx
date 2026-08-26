@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox, Field, Input, Select } from '@/components/ui/field'
 import { ErrorState, InfoNote } from '@/components/ui/states'
 import { ConfirmButton } from '@/components/ui/confirm'
+import { cn } from '@/lib/util/format'
 import { buildThemeFromBrandColors, contrastBetween, type ThemeColors } from '@/lib/domain/color'
 import { resolveTheme } from '@/lib/domain/theme'
 import { formatDate } from '@/lib/util/format'
@@ -80,6 +81,14 @@ export function BrandStudio({
     brand.hasLogo ? `/api/marca/${clientId}/logo?v=${brand.version}` : null,
   )
   const [removeLogo, setRemoveLogo] = React.useState(false)
+  /*
+   * El fondo elegido viaja como URL, no como imagen: la miniatura alcanza para
+   * decidir y el servidor la vuelve a bajar al aplicar.
+   */
+  const [fondoUrl, setFondoUrl] = React.useState<string | null>(null)
+  const [fondoVista, setFondoVista] = React.useState<string | null>(brand.fondo?.url ?? null)
+  const [fondoOpacidad, setFondoOpacidad] = React.useState(brand.fondo?.opacidad ?? 8)
+  const [quitarFondo, setQuitarFondo] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [pending, startTransition] = React.useTransition()
   const [dibujando, startMural] = React.useTransition()
@@ -108,6 +117,13 @@ export function BrandStudio({
       setColors(data.theme)
       setSource(data.source)
       if (data.logoDataUrl) setLogoPreview(data.logoDataUrl)
+      // Se propone el primero, que es el que la marca eligió para presentarse.
+      const primero = data.fondos[0]
+      if (primero) {
+        setFondoUrl(primero.url)
+        setFondoVista(primero.miniatura)
+        setQuitarFondo(false)
+      }
       if (data.fontHints[0]) setFontBody(data.fontHints[0])
       if (data.fontHints[1] ?? data.fontHints[0]) setFontHeading(data.fontHints[1] ?? data.fontHints[0] ?? '')
       setRemoveLogo(false)
@@ -130,6 +146,9 @@ export function BrandStudio({
       formData.set('fontBody', fontBody)
       formData.set('colors', JSON.stringify(colors))
       formData.set('version', String(brand.version))
+      formData.set('fondoOpacidad', String(fondoOpacidad))
+      if (quitarFondo) formData.set('quitarFondo', 'true')
+      else if (fondoUrl) formData.set('fondoUrl', fondoUrl)
       if (proposal?.siteTitle) formData.set('siteTitle', proposal.siteTitle)
       if (proposal?.fontHints.length) formData.set('fontHints', proposal.fontHints.join(', '))
       if (removeLogo) formData.set('removeLogo', 'true')
@@ -154,11 +173,13 @@ export function BrandStudio({
         toast.error(result.message)
         return
       }
-      toast.success(
-        status === 'APPROVED'
-          ? `Listo. ${clientName} ya ve su espacio con esta identidad.`
-          : 'Borrador guardado. Todavía no lo ve el cliente.',
-      )
+      if (result.data.aviso) toast.warning(result.data.aviso)
+      else
+        toast.success(
+          status === 'APPROVED'
+            ? `Listo. ${clientName} ya ve su espacio con esta identidad.`
+            : 'Borrador guardado. Todavía no lo ve el cliente.',
+        )
       setProposal(null)
       router.refresh()
     })
@@ -477,9 +498,96 @@ export function BrandStudio({
           </CardBody>
         </Card>
 
+        {(proposal?.fondos.length ?? 0) > 0 || fondoVista ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>3 · Fondo del espacio</CardTitle>
+              <p className="text-xs text-ink-500">
+                Una imagen del sitio del cliente detrás de sus campañas. Se repinta con el color de la marca y se
+                atenúa, así que aporta identidad sin pelearle al texto. Mirala en la previsualización de la derecha
+                antes de aplicar.
+              </p>
+            </CardHeader>
+            <CardBody className="space-y-4">
+              {(proposal?.fondos.length ?? 0) > 0 ? (
+                <div>
+                  <p className="mb-1.5 text-xs text-ink-500">
+                    Encontradas en el sitio. La primera es la que la marca eligió para presentarse.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {proposal?.fondos.map((candidata) => {
+                      const elegida = !quitarFondo && fondoUrl === candidata.url
+                      return (
+                        <button
+                          key={candidata.url}
+                          type="button"
+                          onClick={() => {
+                            setFondoUrl(candidata.url)
+                            setFondoVista(candidata.miniatura)
+                            setQuitarFondo(false)
+                          }}
+                          aria-pressed={elegida}
+                          className={cn(
+                            'overflow-hidden rounded-lg border-2 transition-colors',
+                            elegida ? 'border-brand-500' : 'border-ink-200 hover:border-ink-400',
+                          )}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={candidata.miniatura} alt="" className="h-20 w-36 object-cover" />
+                          <span className="block px-1.5 py-1 text-[11px] text-ink-500">
+                            {candidata.ancho}×{candidata.alto}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              <Field
+                label={`Intensidad (${fondoOpacidad}%)`}
+                htmlFor="fondoOpacidad"
+                hint="Una foto oscura sobre modo claro y una clara sobre modo oscuro no toleran lo mismo. Se ajusta mirando."
+              >
+                <input
+                  id="fondoOpacidad"
+                  type="range"
+                  min={4}
+                  max={30}
+                  value={fondoOpacidad}
+                  onChange={(event) => setFondoOpacidad(Number(event.target.value))}
+                  className="mt-2 w-full accent-[var(--jc-primary)]"
+                  disabled={quitarFondo}
+                />
+              </Field>
+
+              {fondoVista && !quitarFondo ? (
+                <Button variant="ghost" size="sm" onClick={() => setQuitarFondo(true)}>
+                  Sin fondo
+                </Button>
+              ) : brand.fondo || proposal?.fondos.length ? (
+                <p className="text-xs text-ink-500">
+                  Sin fondo.{' '}
+                  <button
+                    type="button"
+                    className="underline underline-offset-4"
+                    onClick={() => setQuitarFondo(false)}
+                  >
+                    Volver a poner el elegido
+                  </button>
+                </p>
+              ) : null}
+
+              {brand.fondo?.sourceUrl && !proposal ? (
+                <p className="text-[11px] text-ink-400">Salió de {brand.fondo.sourceUrl}</p>
+              ) : null}
+            </CardBody>
+          </Card>
+        ) : null}
+
         <Card>
           <CardHeader>
-            <CardTitle>3 · Legibilidad</CardTitle>
+            <CardTitle>4 · Legibilidad</CardTitle>
             <p className="text-xs text-ink-500">
               Se mide el contraste real de cada par según WCAG 2.1. Lo que no llega, se corrige solo.
             </p>
@@ -538,7 +646,7 @@ export function BrandStudio({
 
         <Card>
           <CardHeader>
-            <CardTitle>4 · Mural del espacio</CardTitle>
+            <CardTitle>5 · Mural del espacio</CardTitle>
             <p className="text-xs text-ink-500">
               Un dibujo que la IA hace para esta marca y que se ve translúcido detrás del contenido del portal. Es
               decoración: no dice nada, así que si no está no falta ningún dato.
@@ -623,6 +731,9 @@ export function BrandStudio({
           clientName={clientName}
           logoUrl={removeLogo ? null : logoPreview}
           logoIsDark={proposal?.logoIsDark ?? brand.logoIsDark}
+          fondoUrl={quitarFondo ? null : fondoVista}
+          muralUrl={brand.mural ? `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(brand.mural.svg)))}` : null}
+          fondoOpacidad={fondoOpacidad}
         />
       </div>
     </div>

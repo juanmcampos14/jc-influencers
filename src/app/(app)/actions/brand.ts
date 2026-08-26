@@ -8,7 +8,13 @@ import { requireContext } from '@/lib/auth/current'
 import { assertCan, assertClientInScope } from '@/lib/authz/context'
 import { ValidationError } from '@/lib/authz/errors'
 import { AUDIT, recordAudit } from '@/lib/audit'
-import { extractFromInstagram, extractFromUpload, extractFromWebsite } from '@/lib/ports/brand-extractor'
+import {
+  descargarFondo,
+  extractFromInstagram,
+  extractFromUpload,
+  extractFromWebsite,
+  miniaturaDeFondo,
+} from '@/lib/ports/brand-extractor'
 import { scoutingProvider } from '@/lib/ports/scouting'
 import { resolveTheme } from '@/lib/domain/theme'
 import { assertUploadAllowed } from '@/lib/ports/storage'
@@ -39,6 +45,14 @@ export type BrandProposal = {
   theme: z.infer<typeof colorsSchema>
   logoDataUrl: string | null
   logoIsDark: boolean
+  /**
+   * Imágenes del sitio que pueden servir de fondo.
+   *
+   * Viajan como miniatura, no enteras: al elegir se manda la URL y el servidor
+   * la vuelve a bajar. Mandar tres imágenes de cuatro megas para una decisión
+   * de un clic sería tirar doce megas.
+   */
+  fondos: Array<{ url: string; miniatura: string; ancho: number; alto: number; esOscura: boolean }>
   warnings: string[]
   contrastIssues: Array<{ pair: string; ratio: number; minimum: number; fixed: boolean }>
 }
@@ -103,6 +117,15 @@ export async function extractBrandAction(formData: FormData): Promise<ActionResu
       theme: resolved.colors,
       logoDataUrl,
       logoIsDark: extraction.logo?.isDark ?? false,
+      fondos: await Promise.all(
+        extraction.backdrops.map(async (fondo) => ({
+          url: fondo.url,
+          miniatura: await miniaturaDeFondo(fondo.data),
+          ancho: fondo.width,
+          alto: fondo.height,
+          esOscura: fondo.isDark,
+        })),
+      ),
       warnings: [
         ...extraction.warnings,
         ...(extraction.logo?.data && !logoDataUrl ? ['El logo es muy pesado para previsualizarlo acá.'] : []),
@@ -115,7 +138,9 @@ export async function extractBrandAction(formData: FormData): Promise<ActionResu
 }
 
 /** Guarda la identidad visual. `status: APPROVED` es lo que la pone en vivo. */
-export async function saveBrandAction(formData: FormData): Promise<ActionResult<{ status: string }>> {
+export async function saveBrandAction(
+  formData: FormData,
+): Promise<ActionResult<{ status: string; aviso: string | null }>> {
   try {
     const ctx = await requireContext()
     const clientId = String(formData.get('clientId') ?? '')
@@ -139,6 +164,10 @@ export async function saveBrandAction(formData: FormData): Promise<ActionResult<
          */
         siteTitle: z.string().max(300).nullish(),
         fontHints: z.string().max(400).nullish(),
+        /* El fondo viaja como URL: el servidor lo vuelve a bajar. */
+        fondoUrl: z.string().max(1000).nullish(),
+        quitarFondo: z.coerce.boolean().optional(),
+        fondoOpacidad: z.coerce.number().int().min(4).max(30).nullish(),
       })
       .parse({
         source: formData.get('source'),
@@ -153,6 +182,9 @@ export async function saveBrandAction(formData: FormData): Promise<ActionResult<
         colors: JSON.parse(String(formData.get('colors') ?? '{}')) as unknown,
         siteTitle: String(formData.get('siteTitle') ?? '') || null,
         fontHints: String(formData.get('fontHints') ?? '') || null,
+        fondoUrl: String(formData.get('fondoUrl') ?? '') || null,
+        quitarFondo: formData.get('quitarFondo') === 'true',
+        fondoOpacidad: formData.get('fondoOpacidad') ? Number(formData.get('fondoOpacidad')) : null,
       })
 
     const file = formData.get('logo')
@@ -167,6 +199,18 @@ export async function saveBrandAction(formData: FormData): Promise<ActionResult<
       }
     }
 
+    /*
+     * Si la descarga del fondo falla, se guarda TODO lo demás igual y se avisa.
+     * Perder la paleta recién ajustada porque una imagen no bajó sería castigar
+     * al usuario por algo del sitio del cliente.
+     */
+    let fondo: { data: Buffer; contentType: string; sourceUrl: string } | null = null
+    let avisoDelFondo: string | null = null
+    if (parsed.fondoUrl && !parsed.quitarFondo) {
+      fondo = await descargarFondo(parsed.fondoUrl).catch(() => null)
+      if (!fondo) avisoDelFondo = 'No se pudo bajar la imagen de fondo. Se guardó el resto.'
+    }
+
     const result = await saveBrand(ctx, clientId, {
       source: parsed.source,
       sourceUrl: parsed.sourceUrl ?? null,
@@ -179,6 +223,9 @@ export async function saveBrandAction(formData: FormData): Promise<ActionResult<
       status: parsed.status,
       logo,
       removeLogo: formData.get('removeLogo') === 'true',
+      fondo,
+      removeFondo: parsed.quitarFondo === true,
+      fondoOpacidad: parsed.fondoOpacidad ?? null,
       extractedAt: parsed.source === 'MANUAL' ? null : new Date(),
       version: parsed.version,
       rawExtraction:
@@ -190,7 +237,7 @@ export async function saveBrandAction(formData: FormData): Promise<ActionResult<
     revalidatePath(`/clientes/${clientId}`)
     revalidatePath(`/clientes/${clientId}/marca`)
     revalidatePath('/portal')
-    return ok({ status: result.status })
+    return ok({ status: result.status, aviso: avisoDelFondo })
   } catch (error) {
     return fail(error)
   }

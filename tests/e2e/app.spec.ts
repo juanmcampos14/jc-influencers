@@ -174,6 +174,9 @@ test.describe('Portal del cliente', () => {
     await page.getByRole('link', { name: /Lanzamiento tarjeta global/ }).click()
     await page.getByRole('link', { name: /Uno por uno/ }).click()
 
+    // Se espera la tarjeta antes de tocar: sin esto el test dependía de que la
+    // vista ya hubiera vuelto del servidor, y a veces no.
+    await expect(page.getByText(/esperando tu decisión/)).toBeVisible()
     await page.getByRole('button', { name: 'Descartar' }).first().click()
     // El botón de confirmar arranca deshabilitado: sin motivo no hay envío que
     // pueda fallar del otro lado.

@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from 'react'
 import type { ResolvedTheme } from '@/lib/domain/theme'
+import { FondoDeMarca } from '@/components/fondo-de-marca'
 
 /**
  * Vista previa del portal del cliente con la identidad aplicada.
@@ -15,11 +16,18 @@ export function BrandPreview({
   clientName,
   logoUrl,
   logoIsDark,
+  fondoUrl,
+  muralUrl,
+  fondoOpacidad,
 }: {
   theme: ResolvedTheme
   clientName: string
   logoUrl: string | null
   logoIsDark: boolean
+  /** Imagen del sitio elegida, o la que ya está guardada. */
+  fondoUrl?: string | null
+  muralUrl?: string | null
+  fondoOpacidad?: number
 }) {
   // Misma regla que en el portal: un logo de trazo claro necesita fondo.
   const needsBackdrop = logoUrl !== null && !logoIsDark && theme.mode === 'LIGHT'
@@ -39,8 +47,20 @@ export function BrandPreview({
             fontFamily: 'var(--jc-font-body)',
           } as CSSProperties
         }
-        className="overflow-hidden rounded-b-xl p-4"
+        className="relative overflow-hidden rounded-b-xl p-4"
       >
+        {/*
+          * El MISMO componente que usa el portal, no una imitación. Si el
+          * tratamiento de color cambia, cambia en los dos lados a la vez: una
+          * previsualización que se desincroniza es peor que no tenerla, porque
+          * se aprueba mirando algo que el cliente no va a ver.
+          */}
+        <FondoDeMarca
+          imagenUrl={fondoUrl ?? null}
+          muralUrl={muralUrl ?? null}
+          opacidad={fondoOpacidad ?? 8}
+        />
+        <div className="relative z-10">
         {/* Barra lateral */}
         <div className="flex gap-3">
           <aside
@@ -177,6 +197,7 @@ export function BrandPreview({
               </p>
             </div>
           </main>
+        </div>
         </div>
       </div>
     </div>

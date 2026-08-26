@@ -1122,9 +1122,20 @@ model ClientBrand {
   radius      Int       @default(12)
   mode        ThemeMode @default(LIGHT)
 
-  /// Ilustración de marca dibujada por IA, en SVG ya saneado. Se muestra
-  /// translúcida detrás del contenido del portal. Es decoración: nunca lleva
-  /// información, así que su ausencia no cambia lo que la pantalla dice.
+  /// Imagen real de la marca, sacada de su sitio: la foto de producto o la
+  /// escena que usan en su portada. Se muestra tratada y translúcida detrás del
+  /// contenido del portal, y GANA sobre el mural dibujado: una imagen propia
+  /// reconoce a la marca mejor que cualquier ilustración inventada.
+  backdropStorageKey  String?
+  backdropContentType String?
+  /// De dónde se sacó. Sin esto nadie puede explicar por qué está esa imagen.
+  backdropSourceUrl   String?
+  /// Cuánto se atenúa, de 4 a 30. Lo ajusta la agencia mirando la previsualización.
+  backdropOpacity     Int?
+
+  /// Ilustración de marca dibujada por IA, en SVG ya saneado. Se usa cuando NO
+  /// hay imagen del sitio. Es decoración: nunca lleva información, así que su
+  /// ausencia no cambia lo que la pantalla dice.
   muralSvg         String?
   /// Qué se ve en el mural, para quien usa lector de pantalla.
   muralAlt         String?

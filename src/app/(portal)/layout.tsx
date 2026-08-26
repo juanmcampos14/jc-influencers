@@ -34,6 +34,8 @@ export default async function PortalLayout({ children }: { children: React.React
         sideLabel="Portal del cliente"
         accountHref="/portal/cuenta"
         muralUrl={theme.muralUrl}
+        fondoUrl={theme.fondoUrl}
+        fondoOpacidad={theme.fondoOpacidad}
         brandName={activeClient?.name ?? null}
         logoUrl={theme.logoUrl}
         logoNeedsBackdrop={theme.logoUrl !== null && !theme.logoIsDark && theme.mode === 'LIGHT'}

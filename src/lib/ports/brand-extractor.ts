@@ -26,6 +26,11 @@ export type BrandExtraction = {
   siteTitle: string | null
   colors: BrandColorFinding[]
   logo: { url: string | null; data: Buffer | null; contentType: string | null; isDark: boolean } | null
+  /**
+   * Imágenes grandes del sitio: la foto de producto o la escena de la portada.
+   * Es lo que hace que el espacio se vea DE esa marca y no sólo con sus colores.
+   */
+  backdrops: Array<{ url: string; data: Buffer; contentType: string; width: number; height: number; isDark: boolean }>
   fontHints: string[]
   theme: ThemeColors
   warnings: string[]
@@ -239,6 +244,147 @@ async function downloadLogo(candidates: string[]): Promise<BrandExtraction['logo
 }
 
 /** Extrae la identidad visual de un sitio web. */
+/**
+ * Candidatos a imagen de fondo, del más probable al menos.
+ *
+ * Lo que se busca es la imagen que la marca eligió para presentarse: en Kast
+ * son las tarjetas, en una marca de ropa es la campaña de temporada. Casi
+ * siempre está en `og:image` --que es justamente la que eligieron para que se
+ * vea cuando comparten el link-- o en el primer tramo del HTML.
+ *
+ * Se descartan logos e íconos: ya tienen su lugar y como fondo no dicen nada.
+ */
+function findBackdropCandidates(html: string, baseUrl: URL): string[] {
+  const encontrados: Array<{ url: string; puntos: number }> = []
+  const agregar = (valor: string | null, puntos: number) => {
+    if (!valor) return
+    try {
+      const url = new URL(valor, baseUrl)
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return
+      const texto = url.toString()
+      if (/\.svg($|\?)/i.test(texto)) return // los SVG del sitio son logos
+      if (/logo|favicon|icon|avatar|sprite|badge|placeholder/i.test(texto)) return
+      if (encontrados.some((otro) => otro.url === texto)) return
+      encontrados.push({ url: texto, puntos })
+    } catch {
+      // Una URL rota en el HTML no es un error nuestro: se ignora.
+    }
+  }
+
+  // La que la marca eligió para representarse cuando comparten el link.
+  agregar(metaContent(html, /^og:image$/i), 100)
+  agregar(metaContent(html, /^twitter:image$/i), 90)
+
+  /*
+   * La portada es el primer tramo del HTML: ahí está la imagen principal.
+   *
+   * Un tercio a secas no sirve: en una página corta ese tercio no llega ni al
+   * primer `<img>`, y en una larguísima un tercio son cien mil caracteres de
+   * secciones que no son la portada. Se toma el mayor entre un tercio y veinte
+   * mil caracteres, que cubre las dos formas.
+   */
+  const portada = html.slice(0, Math.max(20_000, Math.floor(html.length / 3)))
+  for (const tag of portada.match(/<img\b[^>]*>/gi) ?? []) {
+    const srcset = attribute(tag, 'srcset')
+    if (srcset) {
+      // De un srcset interesa la más grande: es la que tiene detalle.
+      const mayor = srcset
+        .split(',')
+        .map((parte) => parte.trim().split(/\s+/))
+        .map(([url, medida]) => ({ url, ancho: Number((medida ?? '').replace(/\D/g, '')) || 0 }))
+        .sort((a, b) => b.ancho - a.ancho)[0]
+      agregar(mayor?.url ?? null, 60)
+    }
+    agregar(attribute(tag, 'src'), 50)
+  }
+
+  for (const match of portada.matchAll(/background-image\s*:\s*url\((['"]?)([^'")]+)\1\)/gi)) {
+    agregar(match[2] ?? null, 40)
+  }
+
+  return encontrados.sort((a, b) => b.puntos - a.puntos).map((entrada) => entrada.url).slice(0, 8)
+}
+
+const MAX_BACKDROP_BYTES = 4 * 1024 * 1024
+
+/**
+ * Baja los candidatos y se queda con los que sirven de fondo.
+ *
+ * El filtro es por forma, no por nombre: tiene que ser grande y ancha. Una
+ * imagen chica se ve pixelada al ocupar media pantalla, y una muy alta y
+ * angosta --un banner lateral, un retrato-- deja franjas vacías.
+ */
+async function downloadBackdrops(
+  candidatos: string[],
+): Promise<BrandExtraction['backdrops']> {
+  const elegidas: BrandExtraction['backdrops'] = []
+
+  for (const url of candidatos) {
+    if (elegidas.length >= 3) break
+    try {
+      const respuesta = await safeFetch(url, { maxBytes: MAX_BACKDROP_BYTES, accept: 'image/*' })
+      if (respuesta.status !== 200 || respuesta.body.byteLength === 0) continue
+
+      const meta = await sharp(respuesta.body, { failOn: 'none' }).metadata()
+      const width = meta.width ?? 0
+      const height = meta.height ?? 0
+      if (width < 600 || height < 300) continue
+      if (height > width * 1.4) continue
+
+      const { isDark } = await colorsFromImage(respuesta.body)
+      elegidas.push({
+        url: respuesta.finalUrl,
+        data: respuesta.body,
+        contentType: respuesta.contentType ?? 'image/jpeg',
+        width,
+        height,
+        isDark,
+      })
+    } catch {
+      // Un candidato que no se puede leer simplemente no entra.
+    }
+  }
+
+  return elegidas
+}
+
+/**
+ * Baja UNA imagen elegida, por su URL.
+ *
+ * Existe porque los candidatos no viajan enteros al navegador: al elegir se
+ * manda la URL y el servidor la vuelve a bajar. Mandar tres imágenes de cuatro
+ * megas para que la persona elija una sería tirar doce megas por una decisión
+ * de un clic.
+ *
+ * Pasa por `safeFetch` igual que todo lo demás: una URL que llega del navegador
+ * no se busca sin comprobar a dónde apunta.
+ */
+export async function descargarFondo(
+  url: string,
+): Promise<{ data: Buffer; contentType: string; sourceUrl: string } | null> {
+  const destino = parsePublicUrl(url)
+  const respuesta = await safeFetch(destino.toString(), { maxBytes: MAX_BACKDROP_BYTES, accept: 'image/*' })
+  if (respuesta.status !== 200 || respuesta.body.byteLength === 0) return null
+
+  const meta = await sharp(respuesta.body, { failOn: 'none' }).metadata()
+  if ((meta.width ?? 0) < 600) return null
+
+  return {
+    data: respuesta.body,
+    contentType: respuesta.contentType ?? 'image/jpeg',
+    sourceUrl: respuesta.finalUrl,
+  }
+}
+
+/** Miniatura para elegir en la pantalla, liviana de mandar. */
+export async function miniaturaDeFondo(data: Buffer): Promise<string> {
+  const jpeg = await sharp(data, { failOn: 'none' })
+    .resize(480, 270, { fit: 'cover', position: 'attention' })
+    .jpeg({ quality: 70 })
+    .toBuffer()
+  return `data:image/jpeg;base64,${jpeg.toString('base64')}`
+}
+
 export async function extractFromWebsite(input: string, mode: 'LIGHT' | 'DARK' = 'LIGHT'): Promise<BrandExtraction> {
   const url = parsePublicUrl(input)
   const warnings: string[] = []
@@ -255,6 +401,11 @@ export async function extractFromWebsite(input: string, mode: 'LIGHT' | 'DARK' =
   const logo = await downloadLogo(findLogoCandidates(html, baseUrl))
   if (!logo) warnings.push('No se encontró un logo utilizable en el sitio. Se puede subir a mano.')
 
+  const backdrops = await downloadBackdrops(findBackdropCandidates(html, baseUrl))
+  if (backdrops.length === 0) {
+    warnings.push('No se encontró una imagen del sitio que sirva de fondo. Se puede dibujar un mural con IA.')
+  }
+
   const logoColors = logo?.data ? (await colorsFromImage(logo.data)).colors : []
   // El logo manda sobre los colores sueltos del CSS: identifica mejor a la marca.
   const colors = [...logoColors, ...markupColors].filter(
@@ -270,6 +421,7 @@ export async function extractFromWebsite(input: string, mode: 'LIGHT' | 'DARK' =
     siteTitle: titleMatch?.[1] ? decodeEntities(titleMatch[1]).trim() : null,
     colors: colors.slice(0, 8),
     logo,
+    backdrops,
     fontHints: fontsFromMarkup(html),
     theme: buildThemeFromBrandColors(colors.map((color) => color.hex), mode),
     warnings,
@@ -292,6 +444,7 @@ export async function extractFromUpload(
     siteTitle: null,
     colors,
     logo: { url: null, data: storable.data, contentType: storable.contentType, isDark },
+    backdrops: [],
     fontHints: [],
     theme: buildThemeFromBrandColors(colors.map((color) => color.hex), mode),
     warnings: colors.length === 0 ? ['No se pudo deducir ningún color del archivo. Se usa la paleta neutra.'] : [],
@@ -317,6 +470,7 @@ export async function extractFromInstagram(
       siteTitle: profile.displayName,
       colors: [],
       logo: null,
+      backdrops: [],
       fontHints: [],
       theme: buildThemeFromBrandColors([], mode),
       warnings: [
@@ -340,8 +494,12 @@ export async function extractFromInstagram(
       contentType: storable.contentType,
       isDark,
     },
+    backdrops: [],
     fontHints: [],
     theme: buildThemeFromBrandColors(colors.map((color) => color.hex), mode),
     warnings: ['La foto de perfil de Instagram suele estar recortada en círculo: revisá el logo antes de aprobarlo.'],
   }
 }
+
+/** Expuesto sólo para los tests. */
+export const __testing = { findBackdropCandidates }

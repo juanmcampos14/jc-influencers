@@ -24,6 +24,8 @@ export type BrandDto = {
   status: 'DRAFT' | 'APPROVED'
   hasLogo: boolean
   logoIsDark: boolean
+  /** Imagen del sitio que se usa de fondo, si hay una elegida. */
+  fondo: { url: string; sourceUrl: string | null; opacidad: number } | null
   contrastReport: unknown
   version: number
   mural: { svg: string; alt: string | null; generatedAt: string } | null
@@ -42,6 +44,7 @@ const DEFAULT_BRAND: Omit<BrandDto, 'clientId'> = {
   status: 'DRAFT',
   hasLogo: false,
   logoIsDark: false,
+  fondo: null,
   contrastReport: null,
   version: 1,
   mural: null,
@@ -74,6 +77,13 @@ export async function getBrand(ctx: AuthContext, clientId: string): Promise<Bran
     status: row.status,
     hasLogo: Boolean(row.logoStorageKey),
     logoIsDark: row.logoIsDark,
+    fondo: row.backdropStorageKey
+      ? {
+          url: `/api/marca/${clientId}/fondo?v=${row.version}`,
+          sourceUrl: row.backdropSourceUrl,
+          opacidad: row.backdropOpacity ?? OPACIDAD_POR_DEFECTO,
+        }
+      : null,
     contrastReport: row.contrastReport,
     version: row.version,
     mural: row.muralSvg
@@ -102,7 +112,23 @@ export type ActiveTheme = ResolvedTheme & {
    */
   muralUrl: string | null
   muralAlt: string | null
+  /**
+   * Imagen del sitio del cliente, tratada y translúcida detrás del contenido.
+   * Gana sobre el mural: una imagen propia reconoce a la marca mejor que
+   * cualquier ilustración inventada.
+   */
+  fondoUrl: string | null
+  fondoOpacidad: number
 }
+
+/**
+ * Cuánto se atenúa el fondo por defecto.
+ *
+ * Ocho por ciento: se reconoce la escena y no compite con el texto que va
+ * encima. La agencia lo ajusta mirando la previsualización, porque una foto
+ * oscura sobre modo claro y una clara sobre modo oscuro no toleran lo mismo.
+ */
+export const OPACIDAD_POR_DEFECTO = 8
 
 export async function getActiveTheme(ctx: AuthContext, clientId: string | null): Promise<ActiveTheme> {
   if (!clientId || !ctx.clients.some((client) => client.id === clientId)) {
@@ -113,6 +139,8 @@ export async function getActiveTheme(ctx: AuthContext, clientId: string | null):
       clientId: null,
       muralUrl: null,
       muralAlt: null,
+      fondoUrl: null,
+      fondoOpacidad: OPACIDAD_POR_DEFECTO,
     }
   }
 
@@ -137,6 +165,8 @@ export async function getActiveTheme(ctx: AuthContext, clientId: string | null):
       clientId,
       muralUrl: null,
       muralAlt: null,
+      fondoUrl: null,
+      fondoOpacidad: OPACIDAD_POR_DEFECTO,
     }
   }
 
@@ -171,6 +201,8 @@ export async function getActiveTheme(ctx: AuthContext, clientId: string | null):
      */
     muralUrl: row.muralSvg ? muralSeguro(row.muralSvg) : null,
     muralAlt: row.muralAlt,
+    fondoUrl: row.backdropStorageKey ? `/api/marca/${clientId}/fondo?v=${row.version}` : null,
+    fondoOpacidad: row.backdropOpacity ?? OPACIDAD_POR_DEFECTO,
   }
 }
 
@@ -195,6 +227,10 @@ export type BrandWriteInput = {
   status: 'DRAFT' | 'APPROVED'
   logo?: { data: Buffer; contentType: string; isDark: boolean } | null
   removeLogo?: boolean
+  /** Imagen de fondo elegida en el estudio. */
+  fondo?: { data: Buffer; contentType: string; sourceUrl: string | null } | null
+  removeFondo?: boolean
+  fondoOpacidad?: number | null
   rawExtraction?: unknown
   extractedAt?: Date | null
   version?: number
@@ -256,6 +292,23 @@ export async function saveBrand(ctx: AuthContext, clientId: string, input: Brand
     )
   }
 
+  let fondoStorageKey: string | null | undefined
+  let fondoContentType: string | null | undefined
+  if (input.removeFondo) {
+    fondoStorageKey = null
+    fondoContentType = null
+  } else if (input.fondo) {
+    const guardado = await fileStorage().put({
+      data: input.fondo.data,
+      filename: 'fondo',
+      contentType: input.fondo.contentType,
+      clientId,
+      prefix: 'fondos',
+    })
+    fondoStorageKey = guardado.key
+    fondoContentType = input.fondo.contentType
+  }
+
   let logoStorageKey: string | null | undefined
   let logoContentType: string | null | undefined
   if (input.removeLogo) {
@@ -282,6 +335,16 @@ export async function saveBrand(ctx: AuthContext, clientId: string, input: Brand
       extractedAt: input.extractedAt ?? before?.extractedAt ?? null,
       rawExtraction: (input.rawExtraction ?? before?.rawExtraction ?? undefined) as never,
       ...(logoStorageKey !== undefined ? { logoStorageKey, logoContentType } : {}),
+      ...(fondoStorageKey !== undefined
+        ? {
+            backdropStorageKey: fondoStorageKey,
+            backdropContentType: fondoContentType,
+            backdropSourceUrl: input.fondo?.sourceUrl ?? null,
+          }
+        : {}),
+      ...(input.fondoOpacidad !== undefined && input.fondoOpacidad !== null
+        ? { backdropOpacity: Math.min(30, Math.max(4, Math.round(input.fondoOpacidad))) }
+        : {}),
       ...(input.logo ? { logoIsDark: input.logo.isDark } : {}),
       primary: colors.primary,
       onPrimary: colors.onPrimary,
@@ -312,6 +375,13 @@ export async function saveBrand(ctx: AuthContext, clientId: string, input: Brand
         await tx.clientBrand.update({ where: { clientId }, data: { ...data, version: { increment: 1 } } })
       }
       // El logo viejo deja de referenciarse: se borra para no acumular archivos huérfanos.
+      if (
+        fondoStorageKey !== undefined &&
+        before.backdropStorageKey &&
+        before.backdropStorageKey !== fondoStorageKey
+      ) {
+        await fileStorage().remove(before.backdropStorageKey, { clientId }).catch(() => undefined)
+      }
       if (logoStorageKey !== undefined && before.logoStorageKey && before.logoStorageKey !== logoStorageKey) {
         await fileStorage().remove(before.logoStorageKey, { clientId }).catch(() => undefined)
       }
@@ -352,6 +422,19 @@ export async function resetBrand(ctx: AuthContext, clientId: string): Promise<vo
 }
 
 /** Devuelve el logo para servirlo. Sólo a quien tenga el cliente en alcance. */
+/** El fondo de un cliente, para servirlo por HTTP. */
+export async function readFondo(
+  ctx: AuthContext,
+  clientId: string,
+): Promise<{ data: Buffer; contentType: string } | null> {
+  assertClientInScope(ctx, clientId)
+  const row = await scoped(ctx, (tx) => tx.clientBrand.findUnique({ where: { clientId } }))
+  if (!row?.backdropStorageKey) return null
+  const data = await fileStorage().get(row.backdropStorageKey, { clientId }).catch(() => null)
+  if (!data) throw new NotFoundError()
+  return { data, contentType: row.backdropContentType ?? 'image/jpeg' }
+}
+
 export async function readLogo(
   ctx: AuthContext,
   clientId: string,
