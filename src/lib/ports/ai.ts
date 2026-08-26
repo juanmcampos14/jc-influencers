@@ -371,6 +371,17 @@ ${
     : 'El destinatario es el equipo interno de la agencia. Podés ser franco sobre lo que no está funcionando.'
 }
 Usá encabezados de nivel 2 y 3, listas cortas y tablas sólo si aportan.
+
+Sobre los resultados medidos, si el material los trae:
+- Cada total viene con sobre cuántas publicaciones se calculó. Repetí ese denominador
+  cuando cites el número; "12.400 visualizaciones" a secas, cuando cinco publicaciones
+  no cargaron nada, es un número que alguien va a defender sin saber que está roto.
+- "SIN DATO" significa que nadie lo cargó. NO es cero, no es una caída y no se estima.
+  Si falta algo importante, decilo como lo que es: una tarea pendiente de carga.
+- Los clics de los links medidos son nuestros y son un hecho. Las métricas de las redes
+  las cargó una persona: cuando la fuente sea una captura, aclarálo.
+- No calcules conversiones ni retorno si no te los dieron. No los hay.
+
 No inventes números: si un dato no está, decilo.`,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'high' },

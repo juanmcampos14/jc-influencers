@@ -9,7 +9,10 @@ import { InfoNote } from '@/components/ui/states'
 import { EstadoDeCampana } from './estado-campana'
 import { PestanasDeCampana } from './tabs'
 import { PagosPanel } from './pagos-panel'
+import { ReportingPanel } from './reporting-panel'
 import { getPlan } from '@/lib/repos/pagos'
+import { resumirResultados } from '@/lib/repos/reporting'
+import { scoped } from '@/lib/repos/base'
 import { requireContext } from '@/lib/auth/current'
 import { can } from '@/lib/authz/context'
 import { NotFoundError } from '@/lib/authz/errors'
@@ -37,6 +40,7 @@ const TABS = [
   { key: 'funnel', label: 'Funnel' },
   { key: 'shortlist', label: 'Shortlist' },
   { key: 'brief', label: 'Brief' },
+  { key: 'resultados', label: 'Resultados' },
   { key: 'pagos', label: 'Pagos' },
   { key: 'analisis', label: 'Análisis IA' },
   { key: 'actividad', label: 'Actividad' },
@@ -112,6 +116,27 @@ export default async function CampaignDetailPage({
    */
   const puedeVerPlata = can(ctx, 'budget.view', clientId)
   const plan = tab === 'pagos' && puedeVerPlata ? await getPlan(ctx, campaignId) : null
+
+  const resultados = tab === 'resultados' ? await resumirResultados(ctx, campaignId) : null
+  /*
+   * Sólo los confirmados: una publicación de alguien que quedó en screening no
+   * existe, y ofrecerlo en el desplegable invita a cargar una entrega falsa.
+   */
+  const confirmados =
+    tab === 'resultados'
+      ? await scoped(ctx, (tx) =>
+          tx.candidacy.findMany({
+            where: {
+              campaignId,
+              statusKey: {
+                in: ['CONFIRMADO', 'CONTENIDO_EN_PRODUCCION', 'CONTENIDO_PARA_APROBACION', 'PUBLICADO', 'FINALIZADO'],
+              },
+            },
+            select: { id: true, influencer: { select: { displayName: true } } },
+            orderBy: { influencer: { displayName: 'asc' } },
+          }),
+        ).then((filas) => filas.map((fila) => ({ candidacyId: fila.id, nombre: fila.influencer.displayName })))
+      : []
 
   const insights = tab === 'analisis' ? await listInsights(ctx, { campaignId }) : []
   const aiSpend = tab === 'analisis' ? await aiSpendThisMonth(ctx) : { spent: 0, limit: 0 }
@@ -273,6 +298,15 @@ export default async function CampaignDetailPage({
             total={summary.total}
             campaignId={campaign.id}
             puedeMover={canManage}
+          />
+        ) : null}
+
+        {tab === 'resultados' && resultados ? (
+          <ReportingPanel
+            resumen={resultados}
+            campaignId={campaign.id}
+            talento={confirmados}
+            puedeEditar={canManage}
           />
         ) : null}
 

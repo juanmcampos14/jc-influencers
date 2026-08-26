@@ -10,6 +10,7 @@ import { withSystemScope } from '@/lib/db/scope'
 import { aiProvider, AiUnavailableError, PROMPT_VERSION } from '@/lib/ports/ai'
 import { sanitizeMuralSvg } from '@/lib/domain/mural'
 import { buildBriefContext, buildCampaignState, buildProfileContext } from './ai-context'
+import { contextoDeResultados, resumirResultados } from './reporting'
 import { actorOf, scoped } from './base'
 
 const AI_TIMEOUT_MS = 180_000
@@ -314,16 +315,34 @@ export async function writeCampaignReport(
     AI_TIMEOUT_MS,
   )
 
+  /*
+   * Los resultados medidos entran al mismo reporte, con sus huecos declarados.
+   * Antes el reporte sólo sabía a quién se eligió y en qué etapa estaba: podía
+   * contar cómo venía la campaña, no qué pasó cuando salió al aire.
+   *
+   * Se agrega al final y no reemplaza nada: sin entregas cargadas, el bloque
+   * dice que no hay nada medido, que es exactamente lo que el reporte tiene que
+   * decir en ese caso.
+   */
+  const resumen = await resumirResultados(ctx, campaignId)
+  const estadoConResultados = `${state}\n\n# Resultados medidos\n${contextoDeResultados(resumen)}`
+
   return runInsight(
     ctx,
     {
       clientId: campaign.clientId,
       campaignId,
       kind: 'CAMPAIGN_REPORT',
-      inputsSummary: { campania: campaign.name, destinatario: audience },
-      inputsDigest: digest([brief, state, audience, PROMPT_VERSION]),
+      inputsSummary: {
+        campania: campaign.name,
+        destinatario: audience,
+        publicacionesCargadas: resumen.publicaciones.total,
+        clicsMedidos: resumen.clics.total,
+        huecos: resumen.huecos.length,
+      },
+      inputsDigest: digest([brief, estadoConResultados, audience, PROMPT_VERSION]),
     },
-    () => aiProvider().writeCampaignReport({ brief, state, audience }),
+    () => aiProvider().writeCampaignReport({ brief, state: estadoConResultados, audience }),
   )
 }
 
