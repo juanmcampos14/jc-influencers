@@ -8,6 +8,7 @@ import { AUDIT, recordAudit } from '@/lib/audit'
 import { env } from '@/lib/env'
 import { withSystemScope } from '@/lib/db/scope'
 import { aiProvider, AiUnavailableError, PROMPT_VERSION } from '@/lib/ports/ai'
+import { sanitizeMuralSvg } from '@/lib/domain/mural'
 import { buildBriefContext, buildCampaignState, buildProfileContext } from './ai-context'
 import { actorOf, scoped } from './base'
 
@@ -377,4 +378,120 @@ export async function shareInsight(ctx: AuthContext, insightId: string, visible:
       after: { clientVisible: visible },
     })
   })
+}
+
+/**
+ * Dibuja el mural de fondo del espacio de un cliente.
+ *
+ * El dibujo lo hace un modelo y se muestra en la pantalla de otra persona, así
+ * que entre una cosa y la otra pasa por `sanitizeMuralSvg`. Si de ahí no sale
+ * nada dibujable, el intento queda en FAILED con el motivo y la marca se queda
+ * como estaba: nunca se guarda un SVG a medio revisar.
+ */
+export async function drawBrandMural(ctx: AuthContext, clientId: string): Promise<InsightDto> {
+  assertClientInScope(ctx, clientId)
+  assertCan(ctx, 'ai.run', clientId)
+
+  const client = await scoped(ctx, (tx) => tx.client.findUnique({ where: { id: clientId }, select: { name: true } }))
+  if (!client) throw new NotFoundError()
+
+  const brand = await scoped(ctx, (tx) => tx.clientBrand.findUnique({ where: { clientId } }))
+  if (!brand) {
+    throw new ValidationError('Primero definí la identidad visual: el mural se dibuja con la paleta de la marca.')
+  }
+
+  const contexto = buildMuralContext(client.name, brand.sourceUrl, brand.rawExtraction)
+  const input = {
+    marca: client.name,
+    contexto,
+    paleta: {
+      primary: brand.primary,
+      accent: brand.accent,
+      surface: brand.surface,
+      text: brand.text,
+      muted: brand.muted,
+    },
+    modo: brand.mode,
+  }
+
+  const insight = await runInsight(
+    ctx,
+    {
+      clientId,
+      kind: 'BRAND_MURAL',
+      inputsSummary: { marca: client.name, sitio: brand.sourceUrl, caracteresDeContexto: contexto.length },
+      inputsDigest: digest([contexto, brand.primary, brand.accent, brand.mode, PROMPT_VERSION]),
+    },
+    async () => {
+      const result = await aiProvider().drawBrandMural(input)
+      // Se sanea ACÁ adentro: si el SVG no pasa, el intento se registra como
+      // fallido igual que un error del proveedor, con el motivo a la vista.
+      const svg = sanitizeMuralSvg(result.output.svg)
+      return { output: { ...result.output, svg }, usage: result.usage }
+    },
+    (output) => output.concepto,
+  )
+
+  if (insight.status !== 'READY') return insight
+
+  const output = insight.output as { svg: string; alt: string } | null
+  if (!output?.svg) return insight
+
+  await scoped(ctx, async (tx) => {
+    await tx.clientBrand.update({
+      where: { clientId },
+      data: { muralSvg: output.svg, muralAlt: output.alt, muralGeneratedAt: new Date() },
+    })
+    await recordAudit(tx, actorOf(ctx), {
+      action: AUDIT.BRAND_MURAL_DRAWN,
+      entityType: 'ClientBrand',
+      entityId: clientId,
+      clientId,
+      metadata: { insightId: insight.id, bytes: output.svg.length },
+    })
+  })
+
+  return insight
+}
+
+/** Saca el mural. La marca queda con su paleta y sin fondo ilustrado. */
+export async function removeBrandMural(ctx: AuthContext, clientId: string): Promise<void> {
+  assertClientInScope(ctx, clientId)
+  assertCan(ctx, 'brand.manage', clientId)
+  await scoped(ctx, async (tx) => {
+    await tx.clientBrand.updateMany({
+      where: { clientId },
+      data: { muralSvg: null, muralAlt: null, muralGeneratedAt: null },
+    })
+    await recordAudit(tx, actorOf(ctx), {
+      action: AUDIT.BRAND_MURAL_REMOVED,
+      entityType: 'ClientBrand',
+      entityId: clientId,
+      clientId,
+    })
+  })
+}
+
+/**
+ * Lo que sabemos de la marca, en texto plano para el ilustrador.
+ *
+ * Sale de lo que ya se extrajo del sitio -- no se scrapea de nuevo -- y si no
+ * hay nada, se dice que no hay nada: el prompt le pide dibujar igual, no
+ * completar el hueco con una fantasía sobre el negocio del cliente.
+ */
+function buildMuralContext(name: string, sourceUrl: string | null, raw: unknown): string {
+  const partes: string[] = [`Nombre: ${name}`]
+  if (sourceUrl) partes.push(`Sitio: ${sourceUrl}`)
+
+  const datos = (raw ?? {}) as Record<string, unknown>
+  const titulo = typeof datos.siteTitle === 'string' ? datos.siteTitle : null
+  const tipografias = typeof datos.fontHints === 'string' ? datos.fontHints : null
+
+  if (titulo) partes.push(`Cómo se presenta el sitio: ${titulo}`)
+  if (tipografias) partes.push(`Tipografías de la marca: ${tipografias}`)
+
+  if (!titulo && !tipografias) {
+    partes.push('No tenemos material del sitio: sólo el nombre y la paleta.')
+  }
+  return partes.join('\n')
 }

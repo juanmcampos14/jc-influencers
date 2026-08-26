@@ -85,6 +85,17 @@ class FakeAiProvider implements AiProvider {
   private usage() {
     return { inputTokens: 100, outputTokens: 50, costUsd: 0.002, model: this.model }
   }
+  async drawBrandMural() {
+    this.calls += 1
+    return {
+      output: {
+        concepto: 'Una silueta simple.',
+        alt: 'Silueta simple sobre un fondo plano.',
+        svg: '<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><circle cx="256" cy="256" r="180"/></svg>',
+      },
+      usage: this.usage(),
+    }
+  }
   async analyzeProfileFit() {
     this.calls += 1
     return {

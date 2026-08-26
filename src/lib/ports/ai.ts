@@ -55,6 +55,21 @@ export const creativeIdeasSchema = z.object({
   queEvitar: z.array(z.string().max(300)).max(6).describe('Qué NO hacer, según los criterios de exclusión del brief.'),
 })
 
+export const brandMuralSchema = z.object({
+  concepto: z
+    .string()
+    .max(400)
+    .describe('En una o dos frases: qué dibujaste y por qué representa a esta marca.'),
+  alt: z
+    .string()
+    .max(180)
+    .describe('Qué se ve en el dibujo, para quien usa lector de pantalla. Sin la palabra "imagen".'),
+  svg: z
+    .string()
+    .max(90_000)
+    .describe('El dibujo completo, empezando por <svg y terminando en </svg>. Sin explicaciones alrededor.'),
+})
+
 export const campaignAnalysisSchema = z.object({
   resumen: z.string().max(800).describe('Estado de la campaña en dos o tres frases.'),
   loQueVaBien: z.array(z.string().max(300)).max(6),
@@ -70,6 +85,8 @@ export type CampaignAnalysis = z.infer<typeof campaignAnalysisSchema>
 
 // ── Puerto ───────────────────────────────────────────────────────────────────
 
+export type BrandMural = z.infer<typeof brandMuralSchema>
+
 export type AiUsage = { inputTokens: number; outputTokens: number; costUsd: number; model: string }
 export type AiResult<T> = { output: T; usage: AiUsage }
 
@@ -81,6 +98,17 @@ export interface AiProvider {
   suggestCreatives(input: { brief: string; squad: string }): Promise<AiResult<CreativeIdeas>>
   analyzeCampaign(input: { brief: string; state: string }): Promise<AiResult<CampaignAnalysis>>
   writeCampaignReport(input: { brief: string; state: string; audience: 'AGENCIA' | 'CLIENTE' }): Promise<AiResult<string>>
+  drawBrandMural(input: BrandMuralInput): Promise<AiResult<BrandMural>>
+}
+
+export type BrandMuralInput = {
+  /** Nombre del cliente. */
+  marca: string
+  /** Lo que sacamos del sitio: título, descripción, palabras del rubro. */
+  contexto: string
+  /** Paleta ya aprobada, en hexadecimal. El dibujo tiene que vivir adentro de ella. */
+  paleta: { primary: string; accent: string; surface: string; text: string; muted: string }
+  modo: 'LIGHT' | 'DARK'
 }
 
 const NOT_CONFIGURED =
@@ -100,6 +128,9 @@ class UnconfiguredAiProvider implements AiProvider {
     throw new AiUnavailableError(NOT_CONFIGURED)
   }
   async writeCampaignReport(): Promise<never> {
+    throw new AiUnavailableError(NOT_CONFIGURED)
+  }
+  async drawBrandMural(): Promise<never> {
     throw new AiUnavailableError(NOT_CONFIGURED)
   }
 }
@@ -160,6 +191,36 @@ Reglas que no se negocian:
 - Cuando un dato viene marcado como "sin verificar" o "desactualizado", lo tratás como tal y lo aclarás.
 - Sos concreto: cada afirmación se apoya en algo del material.
 - No adules ni exageres. Si un perfil no encaja, lo decís.`
+
+/**
+ * El mural es decoración, y eso define todo lo demás: se muestra translúcido
+ * detrás del trabajo del cliente, así que no puede competir con el contenido ni
+ * afirmar nada. Un dibujo de fondo que dice un número es un número que nadie
+ * verificó.
+ */
+const MURAL_SYSTEM = `Sos ilustrador. Dibujás en SVG a mano, con la geometría escrita por vos.
+
+Te dan una marca y su paleta, y devolvés UN dibujo que funcione como mural de fondo
+del espacio de trabajo de ese cliente.
+
+Cómo tiene que ser:
+- Una sola idea visual grande, centrada, reconocible desde lejos. Si la marca tiene un
+  personaje, un objeto o un símbolo propio en lo que te pasaron, dibujá ESO. Si no, buscá
+  una metáfora del rubro; nunca un logo genérico ni engranajes ni bombitas de luz.
+- Formas amplias y limpias: siluetas, curvas, planos de color. Nada de tramas finas ni de
+  cientos de nodos: se va a ver al 8% de opacidad, detrás de texto.
+- Sólo los colores de la paleta que te doy.
+- viewBox="0 0 512 512". Composición que aguante recortarse por los bordes.
+
+Reglas técnicas que no se negocian:
+- Etiquetas permitidas: svg, g, defs, path, circle, ellipse, rect, line, polyline, polygon,
+  linearGradient, radialGradient, stop, clipPath, mask, use, symbol.
+- PROHIBIDO: script, style, text, tspan, image, foreignObject, animate, filter, href y
+  cualquier atributo que empiece con "on". Nada de referencias a archivos externos.
+- Sin letras ni palabras adentro del dibujo: no hay etiqueta de texto disponible.
+
+Si el material no alcanza para representar la marca, dibujá igual algo del rubro y decilo
+en "concepto". No pidas más datos.`
 
 class AnthropicProvider implements AiProvider {
   readonly name = 'anthropic'
@@ -334,6 +395,31 @@ ${input.state}`,
       .trim()
     if (!text) throw new AiUnavailableError('El modelo devolvió una respuesta vacía.')
     return { output: text, usage: this.usage(response) }
+  }
+
+  async drawBrandMural(input: BrandMuralInput): Promise<AiResult<BrandMural>> {
+    return this.structured(
+      brandMuralSchema,
+      'MuralDeMarca',
+      MURAL_SYSTEM,
+      `Dibujá el mural de fondo para el espacio de esta marca.
+
+## Marca
+${input.marca}
+
+## Lo que sabemos de ella
+${input.contexto}
+
+## Paleta aprobada (usá SÓLO estos colores)
+- Color de marca: ${input.paleta.primary}
+- Acento: ${input.paleta.accent}
+- Superficie: ${input.paleta.surface}
+- Texto: ${input.paleta.text}
+- Texto secundario: ${input.paleta.muted}
+
+El espacio se ve en modo ${input.modo === 'DARK' ? 'oscuro' : 'claro'}.`,
+      'high',
+    )
   }
 }
 

@@ -560,7 +560,7 @@ export function ScoutingConsole({
               Importar {selected.size > 0 ? `${selected.size} perfiles` : 'seleccionados'}
             </Button>
           </CardBody>
-          <TableWrap className="max-h-[60vh]">
+          <TableWrap>
             <Table>
               <thead>
                 <tr>

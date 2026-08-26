@@ -12,6 +12,8 @@ import { extractFromInstagram, extractFromUpload, extractFromWebsite } from '@/l
 import { scoutingProvider } from '@/lib/ports/scouting'
 import { resolveTheme } from '@/lib/domain/theme'
 import { assertUploadAllowed } from '@/lib/ports/storage'
+import { consumeRateLimit } from '@/lib/auth/rate-limit'
+import { drawBrandMural, removeBrandMural } from '@/lib/repos/ai'
 import { resetBrand, saveBrand } from '@/lib/repos/brand'
 import { actorOf, scoped } from '@/lib/repos/base'
 
@@ -130,6 +132,13 @@ export async function saveBrandAction(formData: FormData): Promise<ActionResult<
         fontBody: z.string().max(40).nullish(),
         version: z.coerce.number().int().min(1).optional(),
         colors: colorsSchema,
+        /*
+         * Lo que se encontró en el sitio se guarda con la marca. No es para
+         * mostrarlo: es el material con el que después se dibuja el mural, y
+         * tenerlo evita volver a scrapear el sitio del cliente por gusto.
+         */
+        siteTitle: z.string().max(300).nullish(),
+        fontHints: z.string().max(400).nullish(),
       })
       .parse({
         source: formData.get('source'),
@@ -142,6 +151,8 @@ export async function saveBrandAction(formData: FormData): Promise<ActionResult<
         fontBody: String(formData.get('fontBody') ?? '') || null,
         version: formData.get('version') ? Number(formData.get('version')) : undefined,
         colors: JSON.parse(String(formData.get('colors') ?? '{}')) as unknown,
+        siteTitle: String(formData.get('siteTitle') ?? '') || null,
+        fontHints: String(formData.get('fontHints') ?? '') || null,
       })
 
     const file = formData.get('logo')
@@ -170,6 +181,10 @@ export async function saveBrandAction(formData: FormData): Promise<ActionResult<
       removeLogo: formData.get('removeLogo') === 'true',
       extractedAt: parsed.source === 'MANUAL' ? null : new Date(),
       version: parsed.version,
+      rawExtraction:
+        parsed.siteTitle || parsed.fontHints
+          ? { siteTitle: parsed.siteTitle, fontHints: parsed.fontHints }
+          : undefined,
     })
 
     revalidatePath(`/clientes/${clientId}`)
@@ -180,6 +195,37 @@ export async function saveBrandAction(formData: FormData): Promise<ActionResult<
     return fail(error)
   }
 }
+
+/**
+ * Dibuja el mural del espacio del cliente. Es un pedido de IA, así que cuesta
+ * plata: sólo lo puede disparar la agencia, con el mismo tope mensual que el
+ * resto de los análisis.
+ */
+export const drawMuralAction = defineAction(
+  z.object({ clientId: z.string().min(1).max(60) }),
+  async (input, ctx) => {
+    await consumeRateLimit('aiRun', ctx.user.id)
+    const insight = await drawBrandMural(ctx, input.clientId)
+    revalidatePath(`/clientes/${input.clientId}/marca`)
+    revalidatePath('/portal')
+    return {
+      status: insight.status,
+      concepto: insight.outputText,
+      motivo: insight.errorMessage,
+      costoUsd: insight.costUsd,
+    }
+  },
+)
+
+export const removeMuralAction = defineAction(
+  z.object({ clientId: z.string().min(1).max(60) }),
+  async (input, ctx) => {
+    await removeBrandMural(ctx, input.clientId)
+    revalidatePath(`/clientes/${input.clientId}/marca`)
+    revalidatePath('/portal')
+    return { ok: true }
+  },
+)
 
 export const resetBrandAction = defineAction(
   z.object({ clientId: z.string().min(1).max(60) }),

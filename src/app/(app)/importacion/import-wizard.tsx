@@ -221,7 +221,7 @@ export function ImportWizard({
               <InfoNote className="mb-2">
                 No se fusionan automáticamente. Se importan por separado y quedan marcados para que una persona decida.
               </InfoNote>
-              <TableWrap className="max-h-64">
+              <TableWrap>
                 <Table>
                   <thead>
                     <tr>
@@ -254,7 +254,7 @@ export function ImportWizard({
                   ? ` · se listan ${summary.issues.length} de ${summary.counts.incompleteRows}`
                   : ` (${summary.issues.length})`}
               </summary>
-              <TableWrap className="mt-2 max-h-80">
+              <TableWrap className="mt-2">
                 <Table>
                   <thead>
                     <tr>

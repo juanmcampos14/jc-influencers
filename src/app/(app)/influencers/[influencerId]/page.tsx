@@ -245,7 +245,7 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
                   <p className="text-sm text-ink-500">Sin lecturas registradas.</p>
                 </CardBody>
               ) : (
-                <TableWrap className="max-h-96">
+                <TableWrap>
                   <Table>
                     <thead>
                       <tr>
