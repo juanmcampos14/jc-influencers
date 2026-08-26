@@ -41,25 +41,55 @@ export async function listarLinks(ctx: AuthContext, campaignId: string): Promise
     const links = await tx.trackedLink.findMany({
       where: { campaignId },
       orderBy: [{ archived: 'asc' }, { createdAt: 'desc' }],
-      include: {
-        candidacy: { select: { influencer: { select: { displayName: true } } } },
-        clicks: { select: { at: true, bot: true, visitorHash: true } },
-      },
+      include: { candidacy: { select: { influencer: { select: { displayName: true } } } } },
     })
+    if (links.length === 0) return []
+
+    const ids = links.map((link) => link.id)
+
+    /*
+     * Los clics se cuentan en la base, no en memoria.
+     *
+     * La primera versión traía TODAS las filas de clics para contarlas acá. Con
+     * cien clics no se nota; con cien mil es una pantalla que no carga -- y el
+     * éxito de una campaña es justamente lo que hace crecer esa tabla. El
+     * agrupado por (link, bot) da los totales, y el agrupado por
+     * (link, visitante) devuelve una fila por visitante distinto, que es lo que
+     * hace falta contar y es mucho más chico que el total de clics.
+     */
+    const [totales, porVisitante, ultimos] = await Promise.all([
+      tx.linkClick.groupBy({ by: ['linkId', 'bot'], where: { linkId: { in: ids } }, _count: { _all: true } }),
+      tx.linkClick.groupBy({
+        by: ['linkId', 'visitorHash'],
+        where: { linkId: { in: ids }, bot: false },
+      }),
+      tx.linkClick.groupBy({ by: ['linkId'], where: { linkId: { in: ids }, bot: false }, _max: { at: true } }),
+    ])
+
+    const humanosPorLink = new Map<string, number>()
+    const botsPorLink = new Map<string, number>()
+    for (const fila of totales) {
+      const destino = fila.bot ? botsPorLink : humanosPorLink
+      destino.set(fila.linkId, (destino.get(fila.linkId) ?? 0) + fila._count._all)
+    }
+
+    /*
+     * "Personas" no es "visitantes únicos para siempre": el hash cambia todos
+     * los días a propósito, así que lo que se cuenta son visitantes distintos
+     * por día. Es menos preciso y es la única forma honesta de contarlo sin
+     * seguir a nadie en el tiempo.
+     */
+    const personasPorLink = new Map<string, number>()
+    for (const fila of porVisitante) {
+      personasPorLink.set(fila.linkId, (personasPorLink.get(fila.linkId) ?? 0) + 1)
+    }
+
+    const ultimoPorLink = new Map<string, Date | null>()
+    for (const fila of ultimos) ultimoPorLink.set(fila.linkId, fila._max.at)
 
     return links.map((link) => {
-      const humanos = link.clicks.filter((clic) => !clic.bot)
-      /*
-       * "Personas" no es "visitantes únicos para siempre": el hash cambia todos
-       * los días a propósito, así que lo que se cuenta son visitantes distintos
-       * por día. Es menos preciso y es la única forma honesta de contarlo sin
-       * seguir a nadie en el tiempo.
-       */
-      const distintos = new Set(humanos.map((clic) => clic.visitorHash))
-      const ultimo = humanos.reduce<Date | null>(
-        (max, clic) => (max === null || clic.at > max ? clic.at : max),
-        null,
-      )
+      const humanos = humanosPorLink.get(link.id) ?? 0
+      const ultimo = ultimoPorLink.get(link.id) ?? null
 
       return {
         id: link.id,
@@ -77,9 +107,9 @@ export async function listarLinks(ctx: AuthContext, campaignId: string): Promise
         candidacyId: link.candidacyId,
         quien: link.candidacy?.influencer.displayName ?? null,
         archived: link.archived,
-        clics: humanos.length,
-        personas: distintos.size,
-        bots: link.clicks.length - humanos.length,
+        clics: humanos,
+        personas: personasPorLink.get(link.id) ?? 0,
+        bots: botsPorLink.get(link.id) ?? 0,
         ultimoClic: ultimo?.toISOString() ?? null,
         createdAt: link.createdAt.toISOString(),
       }

@@ -9,6 +9,7 @@ import {
   evaluarObjetivos,
   METRICA_LABEL,
   type Mediciones,
+  type Metrica,
   type Objetivo,
   type ResumenDeObjetivos,
 } from '@/lib/domain/objetivos'
@@ -43,10 +44,21 @@ export async function getObjetivos(ctx: AuthContext, campaignId: string): Promis
 
   const cerrada = campaign.status === 'CLOSED' || campaign.status === 'CANCELLED'
 
-  const [filas, mediciones] = await Promise.all([
-    scoped(ctx, (tx) => tx.campaignGoal.findMany({ where: { campaignId }, orderBy: { createdAt: 'asc' } })),
-    medir(ctx, campaignId, campaign.clientId),
-  ])
+  const filas = await scoped(ctx, (tx) =>
+    tx.campaignGoal.findMany({ where: { campaignId }, orderBy: { createdAt: 'asc' } }),
+  )
+
+  /*
+   * Se mide SÓLO lo que algún objetivo pide.
+   *
+   * La primera versión traía el resumen entero de resultados --todas las
+   * entregas y todos los clics-- para evaluar cualquier objetivo, y esto se
+   * llama desde la pestaña de Brief. Medido en producción: la pantalla tardaba
+   * 17 segundos en repintarse después de guardar. Sin objetivos definidos no
+   * hay nada que medir y el costo tiene que ser cero.
+   */
+  const pedidas = new Set<Metrica>(filas.map((fila) => fila.metric))
+  const mediciones = await medir(ctx, campaignId, campaign.clientId, pedidas)
 
   /*
    * El filtro por lado va acá y no en la pantalla: un objetivo interno no puede
@@ -78,20 +90,50 @@ export async function getObjetivos(ctx: AuthContext, campaignId: string): Promis
  * Cada `null` es deliberado: significa que nadie cargó ese dato. Ninguna de
  * estas ramas devuelve cero por las dudas.
  */
-async function medir(ctx: AuthContext, campaignId: string, clientId: string): Promise<Mediciones> {
-  const resumen = await resumirResultados(ctx, campaignId)
+async function medir(
+  ctx: AuthContext,
+  campaignId: string,
+  clientId: string,
+  pedidas: Set<Metrica>,
+): Promise<Mediciones> {
+  const VACIO: Mediciones = {
+    ALCANCE_ESTIMADO: null,
+    ALCANCE_REAL: null,
+    VISUALIZACIONES: null,
+    INTERACCIONES: null,
+    CLICS: null,
+    PUBLICACIONES: null,
+    PERFILES_APROBADOS: null,
+    INVERSION_EN_TALENTO: null,
+  }
+  if (pedidas.size === 0) return VACIO
 
-  const aprobados = await scoped(ctx, (tx) =>
-    tx.candidacy.findMany({
-      where: { campaignId, clientApproval: 'APPROVED' },
-      select: {
-        budgetNegotiated: true,
-        cacheAmount: true,
-        statusKey: true,
-        influencer: { select: { profiles: { select: { followers: true, isPrimary: true } } } },
-      },
-    }),
-  )
+  // Lo que sale de las publicaciones y los links: caro, y sólo si hace falta.
+  const DE_RESULTADOS: Metrica[] = [
+    'ALCANCE_REAL',
+    'VISUALIZACIONES',
+    'INTERACCIONES',
+    'CLICS',
+    'PUBLICACIONES',
+  ]
+  const necesitaResultados = DE_RESULTADOS.some((metrica) => pedidas.has(metrica))
+  const resumen = necesitaResultados ? await resumirResultados(ctx, campaignId) : null
+
+  const DE_CANDIDATURAS: Metrica[] = ['ALCANCE_ESTIMADO', 'PERFILES_APROBADOS', 'INVERSION_EN_TALENTO']
+  const necesitaCandidaturas = DE_CANDIDATURAS.some((metrica) => pedidas.has(metrica))
+  const aprobados = necesitaCandidaturas
+    ? await scoped(ctx, (tx) =>
+        tx.candidacy.findMany({
+          where: { campaignId, clientApproval: 'APPROVED' },
+          select: {
+            budgetNegotiated: true,
+            cacheAmount: true,
+            statusKey: true,
+            influencer: { select: { profiles: { select: { followers: true, isPrimary: true } } } },
+          },
+        }),
+      )
+    : []
 
   /*
    * Alcance estimado: seguidores del perfil principal de cada aprobado. Si
@@ -122,16 +164,28 @@ async function medir(ctx: AuthContext, campaignId: string, clientId: string): Pr
   const puedeVerPlata = can(ctx, 'budget.view', clientId)
 
   return {
-    ALCANCE_ESTIMADO: seguidores.length === 0 ? null : seguidores.reduce((suma, valor) => suma + valor, 0),
-    ALCANCE_REAL: resumen.reach.con === 0 ? null : resumen.reach.total,
-    VISUALIZACIONES: resumen.views.con === 0 ? null : resumen.views.total,
-    INTERACCIONES: resumen.interacciones.con === 0 ? null : resumen.interacciones.total,
-    CLICS: resumen.clics.links === 0 ? null : resumen.clics.total,
-    PUBLICACIONES: resumen.publicaciones.publicadas,
-    PERFILES_APROBADOS: aprobados.length,
+    ...VACIO,
+    ...(pedidas.has('ALCANCE_ESTIMADO')
+      ? { ALCANCE_ESTIMADO: seguidores.length === 0 ? null : seguidores.reduce((suma, valor) => suma + valor, 0) }
+      : {}),
+    ...(resumen
+      ? {
+          ALCANCE_REAL: resumen.reach.con === 0 ? null : resumen.reach.total,
+          VISUALIZACIONES: resumen.views.con === 0 ? null : resumen.views.total,
+          INTERACCIONES: resumen.interacciones.con === 0 ? null : resumen.interacciones.total,
+          CLICS: resumen.clics.links === 0 ? null : resumen.clics.total,
+          PUBLICACIONES: resumen.publicaciones.publicadas,
+        }
+      : {}),
+    ...(pedidas.has('PERFILES_APROBADOS') ? { PERFILES_APROBADOS: aprobados.length } : {}),
     // Sin permiso de presupuestos el número no se calcula, ni siquiera para
     // descartarlo después: no sale de la base.
-    INVERSION_EN_TALENTO: !puedeVerPlata || cachets.length === 0 ? null : cachets.reduce((s, v) => s + v, 0),
+    ...(pedidas.has('INVERSION_EN_TALENTO')
+      ? {
+          INVERSION_EN_TALENTO:
+            !puedeVerPlata || cachets.length === 0 ? null : cachets.reduce((s, v) => s + v, 0),
+        }
+      : {}),
   }
 }
 
