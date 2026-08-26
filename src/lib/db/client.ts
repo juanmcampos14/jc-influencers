@@ -9,9 +9,8 @@ import { sslFor } from './ssl'
  * Se conecta con el rol de aplicación (`jc_app`), que NO tiene BYPASSRLS: las
  * políticas de Row-Level Security se aplican de verdad.
  *
- * En Vercel cada instancia serverless es efímera y puede haber muchas a la vez,
- * así que el pool local es chico y se apoya en el pooler de Supabase. El pooler
- * en modo transacción es compatible con `SET LOCAL`, que es lo que usa
+ * En Vercel el pool local es chico y se apoya en el pooler de Supabase. El
+ * pooler en modo transacción es compatible con `SET LOCAL`, que es lo que usa
  * `withScope` para fijar el alcance: la transacción entera vive en una sola
  * conexión del servidor.
  */
@@ -25,8 +24,16 @@ function create(): PrismaClient {
 
   const pool = new Pool({
     connectionString,
-    // Con pooler externo no tiene sentido acumular conexiones acá.
-    max: isServerless ? 1 : 10,
+    /*
+     * Con Fluid Compute una misma instancia atiende VARIOS pedidos a la vez.
+     * Con una sola conexión, esos pedidos hacían cola entre ellos: dos personas
+     * usando la app al mismo tiempo se esperaban mutuamente, y cada `scoped()`
+     * ocupa la conexión durante toda su transacción.
+     *
+     * Cinco es chico a propósito: el pooler de Supabase es quien acumula
+     * conexiones de verdad, y pasarse acá multiplica por cada instancia viva.
+     */
+    max: isServerless ? 5 : 10,
     idleTimeoutMillis: isServerless ? 10_000 : 30_000,
     connectionTimeoutMillis: 10_000,
     // Supabase firma con su propia CA: se verifica contra ella, no se saltea.
