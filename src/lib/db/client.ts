@@ -34,7 +34,14 @@ function create(): PrismaClient {
      * conexiones de verdad, y pasarse acá multiplica por cada instancia viva.
      */
     max: isServerless ? 5 : 10,
-    idleTimeoutMillis: isServerless ? 10_000 : 30_000,
+    /*
+     * Diez segundos era demasiado poco. La conexión moría entre una pantalla y
+     * la siguiente, y cada pedido volvía a pagar el saludo TLS contra el pooler
+     * --que está en otra región--: unas cuatro idas y vueltas antes de la
+     * primera consulta. Con Fluid Compute la instancia sobrevive entre pedidos,
+     * así que la conexión también puede.
+     */
+    idleTimeoutMillis: isServerless ? 120_000 : 30_000,
     connectionTimeoutMillis: 10_000,
     // Supabase firma con su propia CA: se verifica contra ella, no se saltea.
     ssl: sslFor(connectionString),

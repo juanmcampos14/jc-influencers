@@ -83,10 +83,18 @@ type BuildOptions = {
  */
 export async function buildAuthContext(token: string | null, options: BuildOptions = {}): Promise<AuthContext | null> {
   if (!token) return null
-  const session = await loadSessionByToken(token)
-  if (!session) return null
+  /*
+   * Sesión y usuario en la MISMA transacción.
+   *
+   * Eran dos, y esto corre en todas las páginas: medido en producción, cada
+   * transacción cuesta unos 190 ms de red. Ninguna comprobación cambia -- la
+   * sesión se resuelve igual y el usuario se lee igual -- sólo que no se paga
+   * dos veces el mismo viaje.
+   */
+  const resuelto = await withSystemScope(async (tx) => {
+    const session = await loadSessionByToken(token, new Date(), tx)
+    if (!session) return null
 
-  const data = await withSystemScope(async (tx) => {
     const user = await tx.user.findUnique({
       where: { id: session.userId },
       include: {
@@ -96,17 +104,19 @@ export async function buildAuthContext(token: string | null, options: BuildOptio
       },
     })
     if (!user) return null
-    if (user.status !== 'ACTIVE') return { disabled: true as const, user }
+    if (user.status !== 'ACTIVE') return { session, disabled: true as const, user }
 
     const agencyRole = user.agencyMembership?.role ?? null
     const allClients = agencyRole === 'PLATFORM_SUPERADMIN' || agencyRole === 'AGENCY_ADMIN'
     const allClientRows = allClients
       ? await tx.client.findMany({ where: { status: 'ACTIVE' }, orderBy: { name: 'asc' } })
       : []
-    return { disabled: false as const, user, agencyRole, allClients, allClientRows }
+    return { session, disabled: false as const, user, agencyRole, allClients, allClientRows }
   })
 
-  if (!data) return null
+  if (!resuelto) return null
+  const { session } = resuelto
+  const data = resuelto
   if (data.disabled) {
     // Un usuario desactivado pierde el acceso en el acto, aunque tenga cookie válida.
     await revokeSession(session.sessionId, 'user_disabled')

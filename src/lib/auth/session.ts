@@ -71,18 +71,30 @@ export type LoadedSession = {
 }
 
 /** Busca la sesión por su token. Devuelve null si no existe, venció o fue revocada. */
-export async function loadSessionByToken(token: string, now: Date = new Date()): Promise<LoadedSession | null> {
-  const record = await withSystemScope((tx) =>
-    tx.session.findUnique({ where: { tokenHash: hashToken(token) } }),
-  )
+/**
+ * Resuelve la sesión desde el token.
+ *
+ * Acepta una transacción existente para poder compartirla con quien arma el
+ * contexto: cada transacción cuesta varias idas y vueltas a la base, y esto
+ * corre en TODAS las páginas.
+ */
+export async function loadSessionByToken(
+  token: string,
+  now: Date = new Date(),
+  existente?: Tx,
+): Promise<LoadedSession | null> {
+  const correr = <T>(fn: (tx: Tx) => Promise<T>): Promise<T> =>
+    existente ? fn(existente) : withSystemScope(fn)
+
+  const record = await correr((tx) => tx.session.findUnique({ where: { tokenHash: hashToken(token) } }))
   if (!record) return null
   if (record.revokedAt) return null
   if (record.expiresAt.getTime() <= now.getTime()) return null
 
   if (now.getTime() - record.lastSeenAt.getTime() > SLIDING_REFRESH_MS) {
-    await withSystemScope((tx) =>
-      tx.session.update({ where: { id: record.id }, data: { lastSeenAt: now } }),
-    ).catch(() => undefined)
+    await correr((tx) => tx.session.update({ where: { id: record.id }, data: { lastSeenAt: now } })).catch(
+      () => undefined,
+    )
   }
 
   return {
