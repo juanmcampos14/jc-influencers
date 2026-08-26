@@ -40,6 +40,20 @@ export type AuthContext = {
   ip: string | null
   userAgent: string | null
   correlationId: string
+  /**
+   * Vista previa: alguien de la agencia mirando el espacio de un cliente CON
+   * LOS OJOS DEL CLIENTE.
+   *
+   * No es una capa de interfaz. El contexto entero se transforma --lado,
+   * capacidades, alcance-- así que las consultas filtran igual que para el
+   * cliente y los datos que él no ve directamente no salen de la base.
+   *
+   * Es de SÓLO LECTURA, y no por prudencia: todo el registro de "quién aprobó y
+   * cuándo" depende de que una decisión del cliente sea del cliente. Si desde
+   * acá se pudiera aprobar, esa firma dejaría de valer el día que haya que
+   * mostrarla.
+   */
+  preview: { clientId: string; nombreDelCliente: string } | null
 }
 
 function toCapabilitySet(base: readonly Capability[], extras: readonly string[], side: 'AGENCY' | 'CLIENT'): Set<Capability> {
@@ -55,7 +69,13 @@ function toCapabilitySet(base: readonly Capability[], extras: readonly string[],
   return set
 }
 
-type BuildOptions = { ip?: string | null; userAgent?: string | null; correlationId?: string }
+type BuildOptions = {
+  ip?: string | null
+  userAgent?: string | null
+  correlationId?: string
+  /** Cliente que se quiere mirar con los ojos del cliente. Ver `preview`. */
+  previewClientId?: string | null
+}
 
 /**
  * Construye el contexto de autorización a partir del token de sesión.
@@ -94,14 +114,20 @@ export async function buildAuthContext(token: string | null, options: BuildOptio
   }
 
   const { user, agencyRole, allClients, allClientRows } = data
-  const side: 'AGENCY' | 'CLIENT' = agencyRole ? 'AGENCY' : 'CLIENT'
 
-  const agencyCapabilities: ReadonlySet<Capability> = agencyRole
+  /*
+   * La vista previa sólo la puede pedir alguien de la agencia, y sólo sobre un
+   * cliente que ya tiene en su alcance. Se comprueba contra la base: de la
+   * cookie no se confía nada más que QUÉ cliente se quiere mirar.
+   */
+  const previewPedido = agencyRole ? (options.previewClientId ?? null) : null
+
+  const capacidadesDeAgencia: ReadonlySet<Capability> = agencyRole
     ? toCapabilitySet(AGENCY_ROLE_CAPABILITIES[agencyRole] ?? [], user.agencyMembership?.extraCapabilities ?? [], 'AGENCY')
     : new Set<Capability>()
 
   const clients: ClientAccess[] = []
-  if (side === 'AGENCY') {
+  if (agencyRole) {
     const rows = allClients ? allClientRows : user.agencyClientAssignments.map((a) => a.client)
     for (const client of rows) {
       clients.push({
@@ -109,7 +135,7 @@ export async function buildAuthContext(token: string | null, options: BuildOptio
         slug: client.slug,
         name: client.name,
         role: null,
-        capabilities: agencyCapabilities,
+        capabilities: capacidadesDeAgencia,
         allowClientUserInvites: client.allowClientUserInvites,
         allowClientExports: client.allowClientExports,
         defaultCurrency: client.defaultCurrency,
@@ -141,6 +167,33 @@ export async function buildAuthContext(token: string | null, options: BuildOptio
     }
   }
 
+  /*
+   * En vista previa se reemplaza todo el alcance por el del cliente elegido,
+   * con las capacidades de un LECTOR. Un lector ve exactamente los mismos datos
+   * que un administrador del cliente -- cambian los botones, no la información
+   * -- y no puede escribir nada en nombre de nadie.
+   */
+  let preview: AuthContext['preview'] = null
+  const elegido = previewPedido ? clients.find((cliente) => cliente.id === previewPedido) : undefined
+  if (elegido) {
+    preview = { clientId: elegido.id, nombreDelCliente: elegido.name }
+    const caps = toCapabilitySet(CLIENT_ROLE_CAPABILITIES.CLIENT_VIEWER ?? [], [], 'CLIENT')
+    if (!elegido.allowClientExports) caps.delete('export.create')
+    clients.length = 0
+    clients.push({ ...elegido, role: 'CLIENT_VIEWER', capabilities: caps })
+  }
+
+  /*
+   * Recién ACÁ se decide el lado, y sale de si la vista previa se activó de
+   * verdad -- no de si alguien la pidió. Con una cookie apuntando a un cliente
+   * fuera de alcance, el contexto degradaba a cliente sin clientes: fallaba
+   * cerrado, pero dejaba a una persona de la agencia sin entender por qué no
+   * veía nada. Lo encontró un test.
+   */
+  const enVistaPrevia = preview !== null
+  const side: 'AGENCY' | 'CLIENT' = agencyRole && !enVistaPrevia ? 'AGENCY' : 'CLIENT'
+  const agencyCapabilities: ReadonlySet<Capability> = enVistaPrevia ? new Set<Capability>() : capacidadesDeAgencia
+
   const accessibleIds = clients.map((c) => c.id)
   /*
    * Espacio de trabajo activo.
@@ -161,7 +214,8 @@ export async function buildAuthContext(token: string | null, options: BuildOptio
     userId: user.id,
     scope: side === 'AGENCY' ? 'agency' : 'client',
     clientIds: accessibleIds,
-    allClients,
+    // En vista previa el alcance de base también se acota al cliente mirado.
+    allClients: allClients && !enVistaPrevia,
   }
 
   return {
@@ -169,15 +223,18 @@ export async function buildAuthContext(token: string | null, options: BuildOptio
     csrfToken: deriveCsrfToken(session.token),
     user: { id: user.id, email: user.email, name: user.name, timezone: user.timezone, locale: user.locale },
     side,
-    agencyRole,
+    // En vista previa no hay rol de agencia: `side` se calcula a partir de esto
+    // en varios lugares, y dejarlo puesto haría que el contexto se contradiga.
+    agencyRole: enVistaPrevia ? null : agencyRole,
     agencyCapabilities,
     clients,
     allClients,
-    activeClientId,
+    activeClientId: preview?.clientId ?? activeClientId,
     db,
     ip: options.ip ?? null,
     userAgent: options.userAgent ?? null,
     correlationId: options.correlationId ?? crypto.randomUUID(),
+    preview,
   }
 }
 

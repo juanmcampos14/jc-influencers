@@ -27,6 +27,31 @@ async function assertSameOrigin(): Promise<void> {
 
 type Handler<TInput, TOutput> = (input: TInput, ctx: AuthContext) => Promise<TOutput>
 
+type Opciones = {
+  /**
+   * Si la acción puede correr durante una vista previa del cliente.
+   *
+   * Casi ninguna puede. La vista previa existe para MIRAR lo que ve el cliente,
+   * y todo el registro de "quién aprobó y cuándo" depende de que una decisión
+   * suya sea suya. La única excepción razonable es salir de la vista previa.
+   */
+  permitidoEnVistaPrevia?: boolean
+}
+
+/**
+ * El candado de la vista previa.
+ *
+ * Va acá, en el único lugar por donde pasan todas las acciones autenticadas, y
+ * no en cada pantalla: esconder botones no alcanza -- una acción de servidor se
+ * puede invocar sin pasar por la interfaz.
+ */
+function assertNoEsVistaPrevia(ctx: AuthContext, opciones: Opciones): void {
+  if (!ctx.preview || opciones.permitidoEnVistaPrevia) return
+  throw new ForbiddenError(
+    'Estás mirando el espacio como lo ve el cliente, y eso es sólo lectura. Salí de la vista previa para hacer cambios.',
+  )
+}
+
 /**
  * Server action autenticada con contrato tipado.
  * Valida entrada con Zod, resuelve el contexto desde la sesión y traduce errores.
@@ -34,11 +59,13 @@ type Handler<TInput, TOutput> = (input: TInput, ctx: AuthContext) => Promise<TOu
 export function defineAction<TSchema extends z.ZodTypeAny, TOutput>(
   schema: TSchema,
   handler: Handler<z.infer<TSchema>, TOutput>,
+  opciones: Opciones = {},
 ): (raw: unknown) => Promise<ActionResult<TOutput>> {
   return async (raw: unknown) => {
     try {
       await assertSameOrigin()
       const ctx = await requireContext()
+      assertNoEsVistaPrevia(ctx, opciones)
       const input = schema.parse(raw) as z.infer<TSchema>
       return ok(await handler(input, ctx))
     } catch (error) {

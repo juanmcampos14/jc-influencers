@@ -7,7 +7,12 @@ import { can } from '@/lib/authz/context'
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getAuthContext()
   if (!ctx) redirect('/login')
-  // El panel interno es sólo para la agencia. Un usuario de cliente va al portal.
+  /*
+   * El panel interno es sólo para la agencia. Un usuario de cliente va al
+   * portal -- y en vista previa el contexto ES de cliente, así que quien esté
+   * mirando con los ojos del cliente también termina ahí. Es exactamente lo
+   * que tiene que pasar: la vista previa no es media vista previa.
+   */
   if (ctx.side !== 'AGENCY') redirect('/portal')
 
   const clientId = ctx.activeClientId

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { AppShell, type NavItem } from '@/components/app-shell'
 import { ThemeScope } from '@/components/theme-scope'
+import { BarraDeVistaPrevia } from '@/components/barra-vista-previa'
 import { getAuthContext } from '@/lib/auth/current'
 import { CLIENT_ROLE_LABELS } from '@/lib/authz/capabilities'
 import { getActiveTheme } from '@/lib/repos/brand'
@@ -18,6 +19,12 @@ export default async function PortalLayout({ children }: { children: React.React
 
   return (
     <ThemeScope theme={theme} className="zona-marca">
+      {/*
+        * Dentro del ThemeScope a propósito: la barra tiene que verse sobre el
+        * espacio del cliente, con su tema puesto, porque eso es lo que se está
+        * mirando.
+        */}
+      {ctx.preview ? <BarraDeVistaPrevia nombreDelCliente={ctx.preview.nombreDelCliente} /> : null}
       <AppShell
         nav={nav}
         clients={ctx.clients.map((client) => ({ id: client.id, name: client.name }))}

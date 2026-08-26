@@ -108,11 +108,15 @@ export async function createUser(spec: UserSpec): Promise<{ id: string; email: s
 }
 
 /** Contexto de autorización real: crea una sesión y la resuelve como en producción. */
-export async function contextFor(userId: string): Promise<AuthContext> {
+export async function contextFor(userId: string, previewClientId?: string): Promise<AuthContext> {
   const session = await withSystemScope((tx) =>
     createSession(tx, userId, { ip: '127.0.0.1', userAgent: 'vitest' }),
   )
-  const ctx = await buildAuthContext(session.token, { ip: '127.0.0.1', userAgent: 'vitest' })
+  const ctx = await buildAuthContext(session.token, {
+    ip: '127.0.0.1',
+    userAgent: 'vitest',
+    previewClientId: previewClientId ?? null,
+  })
   if (!ctx) throw new Error('No se pudo construir el contexto de test')
   return ctx
 }

@@ -86,6 +86,25 @@ export async function resetRateLimits(): Promise<void> {
  * aprueba deja sin pendientes al siguiente. Cada test del portal arranca desde
  * su propio punto de partida en vez de depender del orden.
  */
+/**
+ * Borra las preferencias de vista.
+ *
+ * La preferencia se guarda a propósito y sobrevive entre tests, así que sin
+ * esto un test que cambia de vista le rompe el default al siguiente. Es la
+ * función funcionando, no un efecto raro.
+ */
+export async function resetVistasGuardadas(): Promise<void> {
+  const url = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL
+  if (!url) return
+  const client = new PgClient({ connectionString: url })
+  await client.connect()
+  try {
+    await client.query(`DELETE FROM saved_views WHERE resource = 'campaign_view'`)
+  } finally {
+    await client.end()
+  }
+}
+
 export async function resetAprobaciones(campaignName: string): Promise<void> {
   const url = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL
   if (!url) return

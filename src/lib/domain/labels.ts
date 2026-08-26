@@ -80,6 +80,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'candidacy.visibility': 'Visibilidad para el cliente cambiada',
   'client.created': 'Cliente creado',
   'client.updated': 'Cliente modificado',
+  'client.preview.entered': 'Entró a ver el espacio como el cliente',
+  'client.preview.left': 'Salió de la vista del cliente',
   'comment.created': 'Comentario',
   'export.created': 'Exportación generada',
   'import.cancelled': 'Importación cancelada',

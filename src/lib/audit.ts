@@ -91,6 +91,8 @@ export const AUDIT = {
   MEMBERSHIP_REMOVED: 'membership.removed',
   CLIENT_CREATED: 'client.created',
   CLIENT_UPDATED: 'client.updated',
+  CLIENT_PREVIEW_ENTERED: 'client.preview.entered',
+  CLIENT_PREVIEW_LEFT: 'client.preview.left',
   CAMPAIGN_CREATED: 'campaign.created',
   CAMPAIGN_UPDATED: 'campaign.updated',
   GOAL_SAVED: 'campaign.goal.saved',

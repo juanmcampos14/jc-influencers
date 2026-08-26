@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { buildAuthContext, requireAuth, type AuthContext } from '@/lib/authz/context'
 import { readSessionCookie } from './session'
 
@@ -9,13 +9,22 @@ function firstIp(value: string | null): string | null {
   return first ? first.trim() : null
 }
 
+/**
+ * Cookie de la vista previa del cliente.
+ *
+ * Sólo dice QUÉ cliente se quiere mirar. Que esa persona pueda hacerlo se
+ * comprueba contra la base al armar el contexto: la cookie no otorga nada.
+ */
+export const PREVIEW_COOKIE = 'jc_preview'
+
 /** Contexto de la request actual. Cacheado por render para no repetir consultas. */
 export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
-  const [token, headerList] = await Promise.all([readSessionCookie(), headers()])
+  const [token, headerList, cookieStore] = await Promise.all([readSessionCookie(), headers(), cookies()])
   return buildAuthContext(token, {
     ip: firstIp(headerList.get('x-forwarded-for')) ?? headerList.get('x-real-ip'),
     userAgent: headerList.get('user-agent'),
     correlationId: headerList.get('x-correlation-id') ?? undefined,
+    previewClientId: cookieStore.get(PREVIEW_COOKIE)?.value ?? null,
   })
 })
 

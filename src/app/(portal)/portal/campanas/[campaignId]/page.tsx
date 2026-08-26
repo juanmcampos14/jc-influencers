@@ -16,7 +16,12 @@ import { ActivityPanel } from '@/app/(app)/campanas/[campaignId]/activity-panel'
 import { InsightView } from '@/components/insight-view'
 import { listInsights } from '@/lib/repos/ai'
 import { Pagination } from '@/components/ui/pagination'
-import { ProposalList } from './proposal-list'
+import { Bandeja } from './bandeja'
+import { Conjunto } from './conjunto'
+import { SelectorDeVista } from '@/components/selector-vista'
+import { PanelDeObjetivos } from '@/components/objetivos/panel-objetivos'
+import { getObjetivos } from '@/lib/repos/objetivos'
+import { getVistaPreferida, resolverVista } from '@/lib/repos/view-prefs'
 
 export const metadata: Metadata = { title: 'Campaña' }
 export const dynamic = 'force-dynamic'
@@ -26,10 +31,10 @@ export default async function PortalCampaignPage({
   searchParams,
 }: {
   params: Promise<{ campaignId: string }>
-  searchParams: Promise<{ filtro?: string; pagina?: string }>
+  searchParams: Promise<{ vista?: string; n?: string; foco?: string; pagina?: string }>
 }) {
   const { campaignId } = await params
-  const { filtro, pagina } = await searchParams
+  const { vista: vistaPedida, foco, pagina } = await searchParams
   const ctx = await requireContext()
 
   let campaign
@@ -49,34 +54,47 @@ export default async function PortalCampaignPage({
    */
   const summary = await candidacySummary(ctx, campaignId)
   const esperando = (summary.byApproval.PENDING ?? 0) + (summary.byApproval.NEEDS_REVIEW ?? 0)
-  const filtroActivo = filtro ?? (esperando > 0 ? 'pendientes' : '')
+  const aprobados = summary.byApproval.APPROVED ?? 0
 
-  const [candidacies, brief, comments, insights] = await Promise.all([
+  /*
+   * Qué vista mostrar: lo que pide la URL, si no la preferencia guardada, si no
+   * el tamaño de la cola. Sin `redirect()`: se resuelve en el servidor y se
+   * renderiza, y los enlaces del switch siempre llevan `?vista=` explícito para
+   * que la URL que el cliente comparte diga qué está mirando.
+   */
+  const preferida = await getVistaPreferida(ctx, campaign.clientId).catch(() => null)
+  const vista = resolverVista({ pedida: vistaPedida, preferida, esperando })
+
+  const [candidacies, brief, comments, insights, objetivos] = await Promise.all([
     listCandidacies(
       ctx,
       campaignId,
       {
-        clientApproval: filtroActivo === 'pendientes' ? ['PENDING', 'NEEDS_REVIEW'] : null,
-        onlyShortlist: filtroActivo === 'shortlist',
+        // La bandeja es la cola: sólo lo que espera decisión. El conjunto es el
+        // equipo: todo, para poder ver de dónde sale cada elegido.
+        clientApproval: vista === 'bandeja' ? ['PENDING', 'NEEDS_REVIEW'] : null,
       },
       { page: Number(pagina ?? 1) || 1, pageSize: 60 },
     ),
     getBrief(ctx, campaignId),
     listComments(ctx, { campaignId }),
     can(ctx, 'ai.view', campaign.clientId) ? listInsights(ctx, { campaignId }) : Promise.resolve([]),
+    getObjetivos(ctx, campaignId).catch(() => null),
   ])
 
   const canApprove = can(ctx, 'candidate.approve', campaign.clientId)
   const canComment = can(ctx, 'feedback.create', campaign.clientId)
   const canExport = can(ctx, 'export.create', campaign.clientId)
 
-  const FILTERS = [
-    { key: 'pendientes', label: `Esperan tu decisión (${esperando})` },
-    { key: '', label: `Todos (${summary.total})` },
-    { key: 'shortlist', label: `Shortlist (${summary.shortlist})` },
-  ]
-
   const decididos = summary.total - esperando
+
+  /*
+   * El objetivo de alcance sale de los objetivos de la campaña. Si no hay, el
+   * panel no dibuja esa barra: sin denominador, una barra es decoración que se
+   * lee como un dato.
+   */
+  const objetivoDeAlcance =
+    objetivos?.objetivos.find((objetivo) => objetivo.metric === 'ALCANCE_ESTIMADO')?.target ?? null
 
   return (
     <>
@@ -146,10 +164,30 @@ export default async function PortalCampaignPage({
           </Card>
         ) : null}
 
-        <nav aria-label="Filtros de perfiles">
-          {summary.total > 0 ? (
-            /* Cuánto falta. Sale de los mismos conteos que los filtros. */
-            <div className="mb-3">
+        {objetivos && objetivos.objetivos.length > 0 ? (
+          <PanelDeObjetivos
+            objetivos={objetivos.objetivos}
+            veredicto={objetivos.veredicto}
+            campaignId={campaign.id}
+            cerrada={objetivos.cerrada}
+            puedeEditar={false}
+            compacto
+          />
+        ) : null}
+
+        {summary.total > 0 ? (
+          <div className="space-y-3">
+            <SelectorDeVista
+              activa={vista}
+              base={`/portal/campanas/${campaign.id}`}
+              clientId={campaign.clientId}
+              pendientes={esperando}
+              aprobados={aprobados}
+              total={summary.total}
+            />
+
+            {/* Cuánto falta. Sale de los mismos conteos que el switch. */}
+            <div>
               <div className="mb-1.5 flex items-center justify-between text-xs">
                 <span className="font-medium text-ink-700">
                   {esperando === 0
@@ -174,57 +212,44 @@ export default async function PortalCampaignPage({
                 />
               </div>
             </div>
-          ) : null}
+          </div>
+        ) : null}
 
-          <ul className="flex flex-wrap gap-2">
-            {FILTERS.map((entry) => {
-              const isActive = filtroActivo === entry.key
-              return (
-                <li key={entry.key || 'todos'}>
-                  <Link
-                    href={
-                      entry.key
-                        ? `/portal/campanas/${campaign.id}?filtro=${entry.key}`
-                        : `/portal/campanas/${campaign.id}`
-                    }
-                    aria-current={isActive ? 'page' : undefined}
-                    className={
-                      isActive
-                        ? 'inline-block rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-on-brand'
-                        : 'inline-block rounded-lg border border-ink-300 bg-surface px-3 py-1.5 text-sm text-ink-700 hover:bg-ink-100'
-                    }
-                  >
-                    {entry.label}
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        </nav>
+        {vista === 'bandeja' ? (
+          <Bandeja
+            campaignId={campaign.id}
+            items={candidacies.items}
+            canApprove={canApprove}
+            decididos={decididos}
+            total={summary.total}
+          />
+        ) : (
+          <Conjunto
+            campaignId={campaign.id}
+            items={candidacies.items}
+            clusters={(brief?.clusters ?? []).map((cluster) => ({
+              id: cluster.id,
+              label: cluster.label,
+              emoji: cluster.emoji,
+              targetPercent: cluster.targetPercent,
+            }))}
+            canApprove={canApprove}
+            foco={foco ?? null}
+            objetivoDeAlcance={objetivoDeAlcance}
+          />
+        )}
 
-        {/*
-          * Con paginación de verdad.
-          *
-          * Antes se pedían 200 y el repositorio recortaba a 100 sin decirlo:
-          * la lista mostraba 100 tarjetas debajo de una pestaña que decía
-          * "Todos (245)". El cliente scrolleaba hasta el final y concluía que
-          * ésos eran los 245. Aprobaba sobre una muestra creyendo que era todo.
-          */}
-        <ProposalList
-          campaignId={campaign.id}
-          items={candidacies.items}
-          canApprove={canApprove}
-          timezone={ctx.user.timezone}
-        />
-
+        {/* La bandeja avanza de a uno con `?n=`, así que sólo pagina el conjunto. */}
+        {vista === 'conjunto' ? (
         <Pagination
           base={`/portal/campanas/${campaign.id}`}
-          params={{ filtro: filtroActivo || undefined, pagina }}
+          params={{ vista, pagina }}
           page={candidacies.page}
           pageCount={candidacies.pageCount}
           total={candidacies.total}
           unidad="perfiles"
         />
+        ) : null}
 
         {insights.length > 0 ? (
           <section className="space-y-4">

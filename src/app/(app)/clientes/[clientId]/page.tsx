@@ -14,6 +14,7 @@ import { NotFoundError } from '@/lib/authz/errors'
 import { can } from '@/lib/authz/context'
 import { getClient } from '@/lib/repos/clients'
 import { listCampaigns } from '@/lib/repos/campaigns'
+import { VerComoElCliente } from './ver-como-el-cliente'
 import { listUsers } from '@/lib/repos/users'
 import { dashboard } from '@/lib/repos/dashboard'
 import { getBrand } from '@/lib/repos/brand'
@@ -59,14 +60,17 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
           </Link>
         }
         actions={
-          canManage ? (
-            <Button asChild variant={brand.status === 'APPROVED' ? 'secondary' : 'primary'} size="sm">
-              <Link href={`/clientes/${clientId}/marca`}>
-                <Palette className="size-4" aria-hidden="true" />
-                {brand.status === 'APPROVED' ? 'Identidad visual' : 'Darle su identidad visual'}
-              </Link>
-            </Button>
-          ) : null
+          <>
+            <VerComoElCliente clientId={clientId} nombre={client.name} />
+            {canManage ? (
+              <Button asChild variant={brand.status === 'APPROVED' ? 'secondary' : 'primary'} size="sm">
+                <Link href={`/clientes/${clientId}/marca`}>
+                  <Palette className="size-4" aria-hidden="true" />
+                  {brand.status === 'APPROVED' ? 'Identidad visual' : 'Darle su identidad visual'}
+                </Link>
+              </Button>
+            ) : null}
+          </>
         }
       />
       <div className="grid gap-6 px-5 py-6 sm:px-8 lg:grid-cols-3">
