@@ -24,6 +24,20 @@ export const previewScoutingAction = defineAction(
     keywords: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
     urls: z.array(z.string().trim().min(4).max(500)).max(200).optional(),
     limit: z.number().int().min(1).max(500),
+    /*
+     * Los filtros llegan del navegador, así que se acotan acá: un número
+     * absurdo o un texto larguísimo no tienen por qué llegar a la evaluación.
+     */
+    filtros: z
+      .object({
+        pais: z.string().trim().max(4).nullish(),
+        zona: z.string().trim().max(60).nullish(),
+        bioMenciona: z.string().trim().max(60).nullish(),
+        seguidoresDesde: z.number().min(0).max(1_000_000_000).nullish(),
+        seguidoresHasta: z.number().min(0).max(1_000_000_000).nullish(),
+        engagementMinimo: z.number().min(0).max(100).nullish(),
+      })
+      .nullish(),
   }),
   async (input, ctx) =>
     previewScouting(ctx, {
@@ -32,6 +46,7 @@ export const previewScoutingAction = defineAction(
       mode: input.mode,
       platform: input.platform,
       keywords: input.keywords,
+      filtros: input.filtros ?? null,
       urls: input.urls,
       limit: input.limit,
     }),

@@ -13,6 +13,8 @@ import { ConfirmButton } from '@/components/ui/confirm'
 import { ExternalLink } from '@/components/status-badge'
 import { platformLabel } from '@/lib/domain/labels'
 import { formatDateTime, formatFollowers, formatMoney, formatPercent } from '@/lib/util/format'
+import { SelectorDeRed, type Red } from '@/components/scouting/selector-de-red'
+import { FiltrosAvanzados } from '@/components/scouting/filtros-avanzados'
 import type { BudgetState, PreviewResult, ScoutingResultDto } from '@/lib/repos/scouting'
 import {
   cancelScoutingAction,
@@ -84,6 +86,8 @@ export function ScoutingConsole({
   const router = useRouter()
   const params = useSearchParams()
   const [preview, setPreview] = React.useState<PreviewResult | null>(null)
+  const [red, setRed] = React.useState<Red>('INSTAGRAM')
+  const [filtrosAbiertos, setFiltrosAbiertos] = React.useState(false)
   const [openRun, setOpenRun] = React.useState<string | null>(null)
   const [results, setResults] = React.useState<ScoutingResultDto[]>([])
   const [selected, setSelected] = React.useState<Set<string>>(new Set())
@@ -159,11 +163,31 @@ export function ScoutingConsole({
     const form = new FormData(event.currentTarget)
     setError(null)
     startTransition(async () => {
+      /* Vacío es "no filtrar", no "cero". Un 0 en seguidores filtraría todo. */
+      const numero = (clave: string): number | null => {
+        const texto = String(form.get(clave) ?? '').replace(/\./g, '').replace(',', '.').trim()
+        if (!texto) return null
+        const valor = Number(texto)
+        return Number.isFinite(valor) && valor >= 0 ? valor : null
+      }
+      const texto = (clave: string): string | null => String(form.get(clave) ?? '').trim() || null
+
       const result = await previewScoutingAction({
         clientId,
         campaignId: String(form.get('campaignId') ?? '') || null,
         mode,
         platform: String(form.get('platform') ?? 'INSTAGRAM') as never,
+        filtros:
+          mode === 'DISCOVER'
+            ? {
+                pais: texto('fPais'),
+                zona: texto('fZona'),
+                bioMenciona: texto('fBio'),
+                seguidoresDesde: numero('fDesde'),
+                seguidoresHasta: numero('fHasta'),
+                engagementMinimo: numero('fEngagement'),
+              }
+            : undefined,
         keywords:
           mode === 'DISCOVER'
             ? String(form.get('keywords') ?? '')
@@ -293,22 +317,43 @@ export function ScoutingConsole({
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Nueva búsqueda</CardTitle>
+            <CardTitle>¿A quién buscás?</CardTitle>
+            <p className="text-xs text-ink-500">
+              Un tema y una red. Todo lo que filtres se comprueba contra los datos que devuelve la red: si a un
+              creador le falta el dato, se marca, no se descarta.
+            </p>
           </CardHeader>
           <CardBody>
             <form onSubmit={runPreview} className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-3">
-                {clients.length > 1 ? (
-                  <Field label="Cliente" htmlFor="clientSelect">
-                    <Select id="clientSelect" value={clientId} onChange={(event) => switchClient(event.target.value)}>
-                      {clients.map((client) => (
-                        <option key={client.id} value={client.id}>
-                          {client.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                ) : null}
+              {mode === 'DISCOVER' ? (
+                <Field
+                  label="Tema o nicho"
+                  htmlFor="keywords"
+                  hint="Uno por línea. Salen del brief de la campaña."
+                  required
+                >
+                  <Textarea
+                    id="keywords"
+                    name="keywords"
+                    rows={3}
+                    placeholder={'finanzas personales\nstablecoins'}
+                    required
+                  />
+                </Field>
+              ) : (
+                <Field label="Perfiles a actualizar" htmlFor="urls" hint="Una URL por línea." required>
+                  <Textarea
+                    id="urls"
+                    name="urls"
+                    rows={4}
+                    placeholder={'https://www.instagram.com/perfil1\nhttps://www.instagram.com/perfil2'}
+                    required
+                  />
+                </Field>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SelectorDeRed valor={red} onChange={setRed} />
                 <Field label="Qué querés hacer" htmlFor="mode">
                   <Select
                     id="mode"
@@ -319,38 +364,30 @@ export function ScoutingConsole({
                     <option value="ENRICH">Actualizar métricas de perfiles</option>
                   </Select>
                 </Field>
-                <Field label="Plataforma" htmlFor="platform">
-                  <Select id="platform" name="platform" defaultValue="INSTAGRAM">
-                    <option value="INSTAGRAM">Instagram</option>
-                    <option value="TIKTOK">TikTok</option>
-                  </Select>
-                </Field>
               </div>
 
-              {mode === 'DISCOVER' ? (
-                <>
-                  <Field
-                    label="Palabras clave o hashtags"
-                    htmlFor="keywords"
-                    hint="Uno por línea. Salen del brief de la campaña."
-                    required
-                  >
-                    <Textarea id="keywords" name="keywords" rows={4} placeholder={'stablecoins\nfinanzas personales\nnomadismo digital'} required />
+              <div className="grid gap-4 sm:grid-cols-2">
+                {clients.length > 1 ? (
+                  <Field label="Para qué cliente" htmlFor="clientSelect">
+                    <Select id="clientSelect" value={clientId} onChange={(event) => switchClient(event.target.value)}>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.name}
+                        </option>
+                      ))}
+                    </Select>
                   </Field>
+                ) : null}
+                {mode === 'DISCOVER' ? (
                   <Field label="Cuántos perfiles como máximo" htmlFor="limit" hint="Cada perfil tiene costo.">
                     <Input id="limit" name="limit" type="number" min={1} max={500} defaultValue={30} />
                   </Field>
-                </>
-              ) : (
-                <Field
-                  label="Perfiles a actualizar"
-                  htmlFor="urls"
-                  hint="Una URL por línea."
-                  required
-                >
-                  <Textarea id="urls" name="urls" rows={5} placeholder={'https://www.instagram.com/perfil1\nhttps://www.instagram.com/perfil2'} required />
-                </Field>
-              )}
+                ) : null}
+              </div>
+
+              {mode === 'DISCOVER' ? (
+                <FiltrosAvanzados abierto={filtrosAbiertos} onToggle={() => setFiltrosAbiertos((v) => !v)} />
+              ) : null}
 
               <Field label="Agregar a una campaña (opcional)" htmlFor="campaignId">
                 <Select id="campaignId" name="campaignId" defaultValue={campaignId ?? ''}>
@@ -573,6 +610,24 @@ export function ScoutingConsole({
             <p className="text-xs text-ink-500">
               Elegí los que valgan la pena. Los que no importes no se guardan en la base de influencers.
             </p>
+            {(() => {
+              const cumplen = results.filter((r) => r.veredicto === 'CUMPLE').length
+              const sinDato = results.filter((r) => r.veredicto === 'SIN_DATO').length
+              const fuera = results.filter((r) => r.veredicto === 'NO_CUMPLE').length
+              if (cumplen === results.length) return null
+              /*
+               * El recuento por veredicto va arriba de la tabla: sin esto,
+               * alguien mira treinta filas y no sabe cuáles pasaron el filtro
+               * que acaba de pedir.
+               */
+              return (
+                <p className="mt-1.5 text-xs text-ink-600">
+                  <strong className="text-ink-900">{cumplen}</strong> cumplen lo que pediste
+                  {sinDato > 0 ? ` · ${sinDato} no se pudieron comprobar` : ''}
+                  {fuera > 0 ? ` · ${fuera} quedaron fuera` : ''}. Ninguno se descarta solo: los tenés todos acá.
+                </p>
+              )
+            })()}
           </CardHeader>
           <CardBody className="flex flex-wrap items-end gap-3 border-b border-ink-200">
             <Field label="Agregar a la campaña" htmlFor="targetCampaign" className="w-64">
@@ -610,6 +665,7 @@ export function ScoutingConsole({
                   <Th className="text-right">Seguidores</Th>
                   <Th className="text-right">ER</Th>
                   <Th>País</Th>
+                  <Th>Contra tus filtros</Th>
                   <Th>Estado</Th>
                 </tr>
               </thead>
@@ -641,6 +697,21 @@ export function ScoutingConsole({
                     <Td className="text-right tabular-nums">{formatFollowers(result.followers)}</Td>
                     <Td className="text-right tabular-nums">{formatPercent(result.engagementRate)}</Td>
                     <Td className="text-xs">{result.country ?? '—'}</Td>
+                    <Td className="text-xs">
+                      {result.veredicto === 'CUMPLE' ? (
+                        <Badge tone="emerald">Cumple</Badge>
+                      ) : result.veredicto === 'SIN_DATO' ? (
+                        <>
+                          <Badge tone="amber">Sin dato</Badge>
+                          <p className="mt-0.5 text-ink-500">{result.motivos.join(' · ')}</p>
+                        </>
+                      ) : (
+                        <>
+                          <Badge tone="slate">Fuera</Badge>
+                          <p className="mt-0.5 text-ink-500">{result.motivos.join(' · ')}</p>
+                        </>
+                      )}
+                    </Td>
                     <Td>
                       {result.imported ? (
                         <Badge tone="emerald">Importado</Badge>

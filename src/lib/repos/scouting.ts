@@ -1,6 +1,12 @@
 import 'server-only'
 import type { Platform, ScoutingMode } from '@/generated/prisma/enums'
 import type { AuthContext } from '@/lib/authz/context'
+import {
+  evaluarCreador,
+  hayFiltros,
+  type FiltrosDeScouting,
+  type Veredicto,
+} from '@/lib/domain/filtros-scouting'
 import { assertCan, assertClientInScope } from '@/lib/authz/context'
 import { NotFoundError, ValidationError } from '@/lib/authz/errors'
 import { AUDIT, recordAudit } from '@/lib/audit'
@@ -127,6 +133,8 @@ export async function setBudget(
 }
 
 export type PreviewInput = {
+  /** Filtros que se van a aplicar a los resultados. Ver `filtros-scouting.ts`. */
+  filtros?: FiltrosDeScouting | null
   clientId: string
   campaignId?: string | null
   mode: ScoutingMode
@@ -218,6 +226,9 @@ export async function previewScouting(ctx: AuthContext, input: PreviewInput): Pr
           keywords: input.keywords ?? [],
           urls: input.urls ?? [],
           limit: requested,
+          // Los filtros viajan con la corrida: así los resultados se pueden
+          // volver a evaluar después sin depender de la pantalla que los pidió.
+          filtros: input.filtros ?? null,
         } as never,
         status: 'PREVIEW',
         requestedRecords: requested,
@@ -448,6 +459,10 @@ export async function cancelScouting(ctx: AuthContext, runId: string): Promise<v
 }
 
 export type ScoutingResultDto = {
+  /** Cómo quedó contra los filtros pedidos. Ver `filtros-scouting.ts`. */
+  veredicto: Veredicto
+  /** Por qué no cumple, o qué dato faltó para comprobarlo. */
+  motivos: string[]
   id: string
   platform: Platform
   handle: string | null
@@ -472,7 +487,27 @@ export async function listScoutingResults(ctx: AuthContext, runId: string): Prom
   const rows = await scoped(ctx, (tx) =>
     tx.scoutingResult.findMany({ where: { runId }, orderBy: [{ followers: 'desc' }], take: 500 }),
   )
+  const query = run.query as { filtros?: FiltrosDeScouting | null }
+  const filtros = query.filtros ?? {}
+  const conFiltros = hayFiltros(filtros)
+
   return rows.map((row) => ({
+    /*
+     * Sin filtros pedidos, todo cumple: no hay contra qué comparar. Con
+     * filtros, al que le falta el dato se lo marca -- nunca se lo saca de la
+     * lista, porque "no lo dice" no es "no lo cumple".
+     */
+    ...(conFiltros
+      ? evaluarCreador(
+          {
+            followers: row.followers,
+            engagementRate: row.engagementRate === null ? null : Number(row.engagementRate),
+            country: row.country,
+            bio: row.bio,
+          },
+          filtros,
+        )
+      : { veredicto: 'CUMPLE' as const, motivos: [] }),
     id: row.id,
     platform: row.platform,
     handle: row.handle,

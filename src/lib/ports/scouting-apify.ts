@@ -1,5 +1,6 @@
 import 'server-only'
 import type { Platform } from '@/generated/prisma/enums'
+import { construirEntrada, type EsquemaDeActor } from './apify-esquema'
 import { parseProfileUrl } from '@/lib/domain/normalize'
 import {
   ScoutingUnavailableError,
@@ -236,6 +237,8 @@ export function apifyInput(
 export class ApifyScoutingProvider implements ScoutingProvider {
   readonly name = 'apify'
   readonly configured = true
+  /** Esquemas ya leídos, por actor. No cambian entre corridas. */
+  private readonly esquemas = new Map<string, EsquemaDeActor | null>()
 
   constructor(
     private readonly token: string,
@@ -306,9 +309,20 @@ export class ApifyScoutingProvider implements ScoutingProvider {
     const parametros = new URLSearchParams({ maxItems: String(tope) })
     if (techoUsd >= MINIMO_TECHO_USD) parametros.set('maxTotalChargeUsd', techoUsd.toFixed(4))
 
+    /*
+     * La entrada sale del esquema que declara el actor, no de su nombre.
+     *
+     * Los actores de la tienda no comparten nombres de campo: uno pide
+     * `hashtags` como lista y otro `query` como texto. Codificar un actor acá
+     * funciona hasta que alguien cambia de actor, y entonces la corrida falla
+     * DESPUÉS de cobrarse. Si el esquema no se puede leer, se cae a la entrada
+     * escrita a mano, que sirve para los actores conocidos.
+     */
+    const entrada = await this.entradaSegunEsquema(actor, plataforma, modo, params)
+
     const response = await this.pedir(
       `/actors/${encodeURIComponent(actor)}/runs?${parametros.toString()}`,
-      { method: 'POST', body: JSON.stringify(apifyInput(plataforma, modo, params)) },
+      { method: 'POST', body: JSON.stringify(entrada) },
     )
     if (!response.ok) {
       const detalle = (await response.text().catch(() => '')).slice(0, 300)
@@ -332,6 +346,43 @@ export class ApifyScoutingProvider implements ScoutingProvider {
 
   async startEnrich(params: EnrichParams): Promise<JobHandle> {
     return this.lanzar(params.platform, 'ENRICH', { urls: params.urls, limit: params.urls.length })
+  }
+
+  /**
+   * Lee el esquema del actor (una vez) y arma la entrada con sus nombres de
+   * campo. Ante cualquier duda vuelve a la entrada escrita a mano.
+   */
+  private async entradaSegunEsquema(
+    actor: string,
+    plataforma: Platform,
+    modo: 'DISCOVER' | 'ENRICH',
+    params: { keywords?: string[]; urls?: string[]; limit: number },
+  ): Promise<Record<string, unknown>> {
+    const aMano = apifyInput(plataforma, modo, params)
+    // Actualizar métricas va por URL o usuario, que ya es específico del actor.
+    if (modo !== 'DISCOVER') return aMano
+
+    if (!this.esquemas.has(actor)) {
+      const esquema = await this.pedir(`/acts/${encodeURIComponent(actor)}/builds/default`)
+        .then(async (r) => {
+          if (!r.ok) return null
+          const cuerpo = (await r.json()) as { data?: { inputSchema?: unknown } }
+          const crudo = cuerpo.data?.inputSchema
+          const parseado = typeof crudo === 'string' ? (JSON.parse(crudo) as unknown) : crudo
+          return (parseado ?? null) as EsquemaDeActor | null
+        })
+        .catch(() => null)
+      this.esquemas.set(actor, esquema)
+    }
+
+    const esquema = this.esquemas.get(actor) ?? null
+    if (!esquema?.properties) return aMano
+
+    const terminos = (params.keywords ?? []).map((k) => k.replace(/^#/, '')).filter(Boolean)
+    const tope = Math.max(1, Math.min(500, params.limit))
+    // Si el esquema pide algo que no sabemos completar, el error dice cuál: es
+    // mejor no ejecutar que ejecutar y que falle cobrado.
+    return construirEntrada(esquema, { terminos, tope })
   }
 
   async poll(job: JobHandle): Promise<JobProgress> {
