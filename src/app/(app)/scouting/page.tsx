@@ -15,7 +15,11 @@ import { ScoutingConsole } from './scouting-console'
 export const metadata: Metadata = { title: 'Scouting' }
 export const dynamic = 'force-dynamic'
 
-export default async function ScoutingPage({ searchParams }: { searchParams: Promise<{ cliente?: string }> }) {
+export default async function ScoutingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cliente?: string; campana?: string }>
+}) {
   const params = await searchParams
   const ctx = await requireContext()
 
@@ -75,6 +79,7 @@ export default async function ScoutingPage({ searchParams }: { searchParams: Pro
           budget={budget}
           runs={runs}
           campaigns={campaigns.items.map((campaign) => ({ id: campaign.id, name: campaign.name }))}
+          campaignId={campaigns.items.find((campaign) => campaign.id === params.campana)?.id ?? null}
           provider={{ name: provider.name, configured: provider.configured }}
           canManageBudget={can(ctx, 'scouting.budget.manage', clientId)}
         />

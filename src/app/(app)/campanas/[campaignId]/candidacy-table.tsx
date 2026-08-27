@@ -4,6 +4,7 @@ import * as React from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { Radar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Pagination } from '@/components/ui/pagination'
@@ -34,6 +35,8 @@ type Permissions = {
   canEditBudget: boolean
   canRunAi: boolean
   aiConfigured: boolean
+  /** Si esta persona puede disparar una búsqueda para este cliente. */
+  canRunScouting: boolean
 }
 
 const ALL_COLUMNS = [
@@ -60,6 +63,7 @@ const STORAGE_KEY_BASE = 'jc-columnas-candidaturas'
 
 export function CandidacyTable({
   campaignId,
+  clientId,
   currency,
   data,
   clusters,
@@ -68,6 +72,8 @@ export function CandidacyTable({
   filters,
 }: {
   campaignId: string
+  /** Para armar el enlace al scouting con la campaña ya elegida. */
+  clientId: string
   currency: string
   data: Paginated<CandidacyDto>
   clusters: Cluster[]
@@ -267,9 +273,24 @@ export function CandidacyTable({
 
       <Card>
         {data.items.length === 0 ? (
+          /*
+            * Una campaña recién creada aterriza acá. Antes decía qué se podía
+            * hacer y no ofrecía hacerlo: había que adivinar dónde estaba el
+            * scouting y volver a elegir el cliente y la campaña ahí.
+            */
           <EmptyState
-            title="No hay perfiles"
-            description="Agregá influencers a la campaña o importá el Excel de scouting."
+            title="Todavía no hay perfiles en esta campaña"
+            description="Buscá creadores nuevos con el scouting, sumalos desde la base que ya tenés, o importá un Excel."
+            action={
+              permissions.canRunScouting ? (
+                <Button asChild>
+                  <Link href={`/scouting?cliente=${clientId}&campana=${campaignId}`}>
+                    <Radar className="size-4" aria-hidden="true" />
+                    Buscar perfiles para esta campaña
+                  </Link>
+                </Button>
+              ) : null
+            }
           />
         ) : (
           <>

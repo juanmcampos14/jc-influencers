@@ -144,6 +144,17 @@ export type PreviewResult = {
   budget: BudgetState
   providerName: string
   providerConfigured: boolean
+  /**
+   * Si esta corrida se puede ejecutar de verdad.
+   *
+   * Existe porque antes el preflight avisaba "el proveedor no tiene dataset
+   * para esto" y el botón de ejecutar seguía habilitado: se gastaba un clic
+   * para llegar a un error que ya se sabía de antemano.
+   */
+  puedeEjecutar: boolean
+  /** Por qué no se puede. Vacío cuando sí se puede. */
+  bloqueos: string[]
+  /** Avisos que NO impiden ejecutar. */
   warnings: string[]
 }
 
@@ -168,14 +179,24 @@ export async function previewScouting(ctx: AuthContext, input: PreviewInput): Pr
   const estimated = Number((unitCost * requested).toFixed(4))
 
   const budget = await getBudgetState(ctx, input.clientId)
+
+  /*
+   * Se separa lo que IMPIDE ejecutar de lo que sólo hay que saber. Antes todo
+   * era un aviso y el botón quedaba habilitado igual: la persona gastaba un
+   * clic para llegar a un error que el sistema ya conocía.
+   */
+  const bloqueos: string[] = []
   if (!provider.configured) {
-    warnings.push('El proveedor de scouting no está configurado: esta corrida no se va a poder ejecutar.')
+    bloqueos.push('El proveedor de scouting no está configurado. Cargá las credenciales antes de buscar.')
   } else if (!provider.supports(input.platform, input.mode)) {
-    warnings.push(`El proveedor no tiene un dataset configurado para ${input.platform} en modo ${input.mode}.`)
+    const queHace = input.mode === 'DISCOVER' ? 'descubrir perfiles nuevos' : 'actualizar métricas'
+    bloqueos.push(
+      `${provider.name} no tiene un dataset para ${queHace} en ${input.platform}. Probá con otra plataforma, o cargá ese dataset en la configuración.`,
+    )
   }
   if (estimated > budget.remainingUsd) {
-    warnings.push(
-      `El costo estimado (US$ ${estimated.toFixed(2)}) supera lo que queda del tope del mes (US$ ${budget.remainingUsd.toFixed(2)}).`,
+    bloqueos.push(
+      `Cuesta US$ ${estimated.toFixed(2)} y quedan US$ ${budget.remainingUsd.toFixed(2)} del tope de este mes.`,
     )
   }
 
@@ -217,6 +238,8 @@ export async function previewScouting(ctx: AuthContext, input: PreviewInput): Pr
     budget,
     providerName: provider.name,
     providerConfigured: provider.configured,
+    puedeEjecutar: bloqueos.length === 0,
+    bloqueos,
     warnings,
   }
 }
@@ -228,7 +251,18 @@ export async function startScouting(ctx: AuthContext, runId: string): Promise<{ 
   if (!run) throw new NotFoundError()
   assertClientInScope(ctx, run.clientId)
   assertCan(ctx, 'scouting.run', run.clientId)
-  if (run.status !== 'PREVIEW') throw new ValidationError('Esta corrida ya se resolvió.')
+  /*
+   * Una corrida se ejecuta una sola vez. Que el mensaje diga QUÉ pasó y qué
+   * hacer: "ya se resolvió" es cierto y no le sirve a nadie parado frente a la
+   * pantalla.
+   */
+  if (run.status !== 'PREVIEW') {
+    throw new ValidationError(
+      run.status === 'FAILED'
+        ? 'Esta búsqueda ya se intentó y falló. Calculá el costo de nuevo para volver a intentarlo.'
+        : 'Esta búsqueda ya se ejecutó. Calculá el costo de nuevo para hacer otra.',
+    )
+  }
 
   await consumeRateLimit('scoutingRun', ctx.user.id)
 

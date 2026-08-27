@@ -62,6 +62,7 @@ export function ScoutingConsole({
   budget,
   runs,
   campaigns,
+  campaignId,
   provider,
   canManageBudget,
 }: {
@@ -70,6 +71,13 @@ export function ScoutingConsole({
   budget: BudgetState
   runs: Run[]
   campaigns: Array<{ id: string; name: string }>
+  /**
+   * Campaña que viene preseleccionada desde la URL.
+   *
+   * Es lo que hace que "buscá perfiles para esta campaña" desde la campaña
+   * vacía no te obligue a volver a elegirla acá.
+   */
+  campaignId?: string | null
   provider: { name: string; configured: boolean }
   canManageBudget: boolean
 }) {
@@ -187,6 +195,14 @@ export function ScoutingConsole({
       const result = await startScoutingAction({ runId: preview.runId })
       if (!result.ok) {
         toast.error(result.message)
+        /*
+         * Una corrida se ejecuta una sola vez: si falló, ya no sirve. Dejar el
+         * cuadro con el botón puesto invitaba a apretarlo de nuevo y chocar
+         * contra "esta búsqueda ya se resolvió", que no le dice nada a nadie.
+         */
+        setPreview(null)
+        setError(result.message)
+        router.refresh()
         return
       }
       toast.success('Scouting en marcha. Te avisamos cuando termine.')
@@ -337,7 +353,7 @@ export function ScoutingConsole({
               )}
 
               <Field label="Agregar a una campaña (opcional)" htmlFor="campaignId">
-                <Select id="campaignId" name="campaignId" defaultValue="">
+                <Select id="campaignId" name="campaignId" defaultValue={campaignId ?? ''}>
                   <option value="">No asociar a ninguna campaña</option>
                   {campaigns.map((campaign) => (
                     <option key={campaign.id} value={campaign.id}>
@@ -368,8 +384,17 @@ export function ScoutingConsole({
                   </div>
                   <div>
                     <dt className="text-xs text-ink-500">Costo estimado</dt>
+                    {/*
+                      * Sin proveedor o sin dataset, el costo no es cero: es
+                      * desconocido. Mostrar "US$ 0" se lee como "es gratis",
+                      * que es lo contrario de lo que pasa.
+                      */}
                     <dd className="font-semibold tabular-nums text-ink-900">
-                      {formatMoney(preview.estimatedCostUsd, 'USD')}
+                      {preview.unitCostUsd > 0 ? (
+                        formatMoney(preview.estimatedCostUsd, 'USD')
+                      ) : (
+                        <span className="text-ink-400">sin calcular</span>
+                      )}
                     </dd>
                   </div>
                   <div>
@@ -379,6 +404,18 @@ export function ScoutingConsole({
                     </dd>
                   </div>
                 </dl>
+                {preview.bloqueos.length > 0 ? (
+                  <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3">
+                    <p className="text-sm font-semibold text-rose-900">
+                      {preview.bloqueos.length === 1 ? 'No se puede ejecutar' : 'No se puede ejecutar, por dos motivos'}
+                    </p>
+                    <ul className="mt-1 space-y-0.5 text-xs text-rose-800">
+                      {preview.bloqueos.map((bloqueo) => (
+                        <li key={bloqueo}>{bloqueo}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
                 {preview.warnings.map((warning) => (
                   <p key={warning} className="mt-2 text-xs font-medium text-amber-800">
                     {warning}
@@ -393,15 +430,7 @@ export function ScoutingConsole({
                     onConfirm={execute}
                     pending={pending}
                   >
-                    <Button
-                      disabled={
-                        pending ||
-                        !preview.providerConfigured ||
-                        preview.estimatedCostUsd > preview.budget.remainingUsd
-                      }
-                    >
-                      Ejecutar
-                    </Button>
+                    <Button disabled={pending || !preview.puedeEjecutar}>Ejecutar</Button>
                   </ConfirmButton>
                   <Button variant="secondary" onClick={discard} disabled={pending}>
                     Descartar

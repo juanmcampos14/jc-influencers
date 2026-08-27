@@ -312,6 +312,7 @@ export default async function CampaignDetailPage({
         {tab === 'perfiles' && candidacies ? (
           <CandidacyTable
             campaignId={campaign.id}
+            clientId={clientId}
             currency={campaign.currency}
             data={candidacies}
             clusters={brief?.clusters ?? []}
@@ -323,6 +324,7 @@ export default async function CampaignDetailPage({
               canEditBudget,
               canRunAi: can(ctx, 'ai.run', clientId),
               aiConfigured: aiProvider().configured,
+              canRunScouting: can(ctx, 'scouting.run', clientId),
             }}
             filters={{ estado: query.estado ?? '', q: query.q ?? '' }}
           />

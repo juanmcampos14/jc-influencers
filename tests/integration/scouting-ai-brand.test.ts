@@ -205,8 +205,15 @@ describe('Scouting, IA e identidad visual', () => {
       keywords: ['viajes'],
       limit: 100, // costaría 1 dólar, y el tope es 0,10
     })
-    expect(preview.warnings.some((warning) => warning.includes('supera'))).toBe(true)
+    /*
+     * Pasarse del tope es un BLOQUEO, no un aviso: la pantalla apaga el botón
+     * en vez de dejar apretarlo para que falle del otro lado. Antes esto vivía
+     * en `warnings` y el botón quedaba habilitado.
+     */
+    expect(preview.puedeEjecutar).toBe(false)
+    expect(preview.bloqueos.some((bloqueo) => bloqueo.includes('quedan'))).toBe(true)
 
+    // Y aunque alguien llame a la acción sin pasar por la pantalla, se corta.
     const before = scouting.startCalls
     await expect(startScouting(scout, preview.runId)).rejects.toBeInstanceOf(ValidationError)
     expect(scouting.startCalls).toBe(before)
