@@ -208,13 +208,17 @@ export type FiltrosDeBase = {
   orden?: OrdenDeBase
 }
 
-export type OrdenDeBase =
-  | 'RECIENTE'
-  | 'SEGUIDORES_DESC'
-  | 'SEGUIDORES_ASC'
-  | 'ENGAGEMENT_DESC'
-  | 'VECES_VISTO'
-  | 'NOMBRE'
+/**
+ * Las columnas por las que se puede ordenar.
+ *
+ * Son las mismas claves que declara la pantalla, y se validan contra
+ * `resolverOrden` antes de llegar acá: una clave de más ordenaría por una
+ * columna que la lista no muestra, y el orden se convierte en una forma de
+ * leer datos ocultos de a uno.
+ */
+export type ClaveDeOrden = 'nombre' | 'seguidores' | 'engagement' | 'visto' | 'veces'
+
+export type OrdenDeBase = { clave: ClaveDeOrden; direccion: 'asc' | 'desc' }
 
 export type PerfilDeBase = {
   id: string
@@ -254,7 +258,7 @@ export async function buscarEnBase(
       tx.discoveredProfile.count({ where }),
       tx.discoveredProfile.findMany({
         where,
-        orderBy: ordenar(filtros.orden ?? 'RECIENTE'),
+        orderBy: ordenar(filtros.orden ?? { clave: 'visto', direccion: 'desc' }),
         skip: (page - 1) * pageSize,
         take: pageSize,
         select: {
@@ -369,23 +373,50 @@ function condiciones(filtros: FiltrosDeBase): Record<string, unknown> {
 }
 
 function ordenar(orden: OrdenDeBase): Record<string, unknown>[] {
-  switch (orden) {
-    case 'SEGUIDORES_DESC':
-      // `nulls: 'last'`: al que no informa seguidores no se lo premia ni castiga
-      // poniéndolo primero. Va al final, que es donde no confunde.
-      return [{ followers: { sort: 'desc', nulls: 'last' } }, { lastSeenAt: 'desc' }]
-    case 'SEGUIDORES_ASC':
-      return [{ followers: { sort: 'asc', nulls: 'last' } }, { lastSeenAt: 'desc' }]
-    case 'ENGAGEMENT_DESC':
-      return [{ engagementRate: { sort: 'desc', nulls: 'last' } }, { lastSeenAt: 'desc' }]
-    case 'VECES_VISTO':
-      return [{ timesSeen: 'desc' }, { lastSeenAt: 'desc' }]
-    case 'NOMBRE':
-      return [{ displayName: { sort: 'asc', nulls: 'last' } }]
-    case 'RECIENTE':
+  const { direccion } = orden
+  /*
+   * `nulls: 'last'` en todas las que pueden faltar: al que no informa un número
+   * no se lo premia poniéndolo primero ni se lo esconde. Va al final, que es
+   * donde no confunde, y da igual si se ordena de mayor a menor o al revés.
+   */
+  const alFinal = { sort: direccion, nulls: 'last' as const }
+
+  switch (orden.clave) {
+    case 'nombre':
+      return [{ displayName: alFinal }, { handle: alFinal }]
+    case 'seguidores':
+      return [{ followers: alFinal }, { lastSeenAt: 'desc' }]
+    case 'engagement':
+      return [{ engagementRate: alFinal }, { lastSeenAt: 'desc' }]
+    case 'veces':
+      return [{ timesSeen: direccion }, { lastSeenAt: 'desc' }]
+    case 'visto':
     default:
-      return [{ lastSeenAt: 'desc' }]
+      return [{ lastSeenAt: direccion }]
   }
+}
+
+/** Los números de arriba de la lista. */
+export type ResumenDeDescubiertos = {
+  total: number
+  /** Los que todavía no son influencers del padrón. */
+  sinIncorporar: number
+  /** Los que alguna búsqueda volvió a encontrar en los últimos 30 días. */
+  recientes: number
+}
+
+export async function resumenDeDescubiertos(ctx: AuthContext): Promise<ResumenDeDescubiertos> {
+  assertAgencyOnly(ctx)
+  const hace30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+  return scoped(ctx, async (tx) => {
+    const [total, sinIncorporar, recientes] = await Promise.all([
+      tx.discoveredProfile.count(),
+      tx.discoveredProfile.count({ where: { influencerId: null } }),
+      tx.discoveredProfile.count({ where: { lastSeenAt: { gte: hace30 } } }),
+    ])
+    return { total, sinIncorporar, recientes }
+  })
 }
 
 // ── La ficha de un perfil ────────────────────────────────────────────────────

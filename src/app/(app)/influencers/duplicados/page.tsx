@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
+import { NavDeInfluencers } from '../sub-nav'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
 import { requireContext } from '@/lib/auth/current'
@@ -38,15 +38,11 @@ export default async function DuplicatesPage({ searchParams }: { searchParams: P
   return (
     <>
       <PageHeader
-        title="Posibles duplicados"
-        description="Detectados por URL normalizada, handle y similitud de nombre. Nunca se fusionan solos."
-        breadcrumb={
-          <Link href="/influencers" className="hover:underline">
-            Influencers
-          </Link>
-        }
+        title="Influencers"
+        description="Perfiles que parecen la misma persona. Detectados por URL normalizada, handle y similitud de nombre. Nunca se fusionan solos."
       />
       <div className="px-5 py-6 sm:px-8">
+        <NavDeInfluencers ctx={ctx} activo="/influencers/duplicados" />
         <Card className={canManage ? 'px-5 pt-4' : undefined}>
           {page.items.length === 0 ? (
             <EmptyState title="No hay duplicados pendientes" description="Todo lo detectado ya fue resuelto." />

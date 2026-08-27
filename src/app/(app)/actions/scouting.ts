@@ -54,7 +54,7 @@ export const previewScoutingAction = defineAction(
 
 export const startScoutingAction = defineAction(z.object({ runId: id }), async (input, ctx) => {
   const result = await startScouting(ctx, input.runId)
-  revalidatePath('/scouting')
+  revalidatePath('/influencers/buscar')
   return result
 })
 
@@ -64,7 +64,7 @@ export const pollScoutingAction = defineAction(z.object({ runId: id }), async (i
 
 export const cancelScoutingAction = defineAction(z.object({ runId: id }), async (input, ctx) => {
   await cancelScouting(ctx, input.runId)
-  revalidatePath('/scouting')
+  revalidatePath('/influencers/buscar')
   return { ok: true }
 })
 
@@ -72,7 +72,9 @@ export const importScoutingResultsAction = defineAction(
   z.object({ runId: id, resultIds: z.array(id).min(1).max(300), campaignId: id.nullish() }),
   async (input, ctx) => {
     const result = await importScoutingResults(ctx, input.runId, input.resultIds, input.campaignId ?? null)
-    revalidatePath('/scouting')
+    revalidatePath('/influencers/buscar')
+    // La corrida que termina alimenta la base: esa lista también cambió.
+    revalidatePath('/influencers/descubiertos')
     revalidatePath('/influencers')
     if (input.campaignId) revalidatePath(`/campanas/${input.campaignId}`)
     return result
@@ -83,7 +85,9 @@ export const setScoutingBudgetAction = defineAction(
   z.object({ clientId: id.nullish(), limitUsd: z.number().min(0).max(100_000) }),
   async (input, ctx) => {
     await setBudget(ctx, { clientId: input.clientId ?? null, limitUsd: input.limitUsd })
-    revalidatePath('/scouting')
+    revalidatePath('/influencers/buscar')
+    // La corrida que termina alimenta la base: esa lista también cambió.
+    revalidatePath('/influencers/descubiertos')
     return { ok: true }
   },
 )

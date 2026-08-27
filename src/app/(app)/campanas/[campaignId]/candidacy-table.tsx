@@ -284,7 +284,7 @@ export function CandidacyTable({
             action={
               permissions.canRunScouting ? (
                 <Button asChild>
-                  <Link href={`/scouting?cliente=${clientId}&campana=${campaignId}`}>
+                  <Link href={`/influencers/buscar?cliente=${clientId}&campana=${campaignId}`}>
                     <Radar className="size-4" aria-hidden="true" />
                     Buscar perfiles para esta campaña
                   </Link>

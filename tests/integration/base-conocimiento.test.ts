@@ -186,7 +186,7 @@ describe('Base de conocimiento', () => {
      * esconde: va al final, que es donde no confunde.
      */
     it('ordenar por seguidores no pone adelante al que no informa', async () => {
-      const orden = await buscarEnBase(agencia, { orden: 'SEGUIDORES_DESC' }, { page: 1, pageSize: 10 })
+      const orden = await buscarEnBase(agencia, { orden: { clave: 'seguidores', direccion: 'desc' } }, { page: 1, pageSize: 10 })
       expect(orden.items.map((p) => p.handle)).toEqual(['entrena.mx', 'lachef.ok', 'sinnumeros'])
     })
   })

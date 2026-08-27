@@ -19,10 +19,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const nav: NavItem[] = [{ href: '/panel', label: 'Panel', icon: 'panel' }]
   if (can(ctx, 'client.view', clientId)) nav.push({ href: '/clientes', label: 'Clientes', icon: 'clientes' })
   if (can(ctx, 'campaign.view', clientId)) nav.push({ href: '/campanas', label: 'Campañas', icon: 'campanas' })
-  if (can(ctx, 'influencer.view', clientId)) nav.push({ href: '/influencers', label: 'Influencers', icon: 'influencers' })
-  if (ctx.clients.some((client) => can(ctx, 'scouting.run', client.id))) {
-    nav.push({ href: '/scouting', label: 'Scouting', icon: 'scouting' })
-  }
+  /*
+   * Scouting dejó de ser una sección propia: ahora es un lugar dentro de
+   * Influencers. La entrada aparece con cualquiera de las dos capacidades,
+   * porque los permisos son independientes y quien sólo puede buscar seguiría
+   * teniendo a dónde entrar.
+   */
+  const puedeVerInfluencers =
+    can(ctx, 'influencer.view', clientId) || ctx.clients.some((client) => can(ctx, 'scouting.run', client.id))
+  if (puedeVerInfluencers) nav.push({ href: '/influencers', label: 'Influencers', icon: 'influencers' })
   if (can(ctx, 'import.run', clientId)) nav.push({ href: '/importacion', label: 'Importación', icon: 'importacion' })
   if (can(ctx, 'membership.manage', null) || can(ctx, 'user.invite', null)) {
     nav.push({ href: '/usuarios', label: 'Usuarios', icon: 'usuarios' })

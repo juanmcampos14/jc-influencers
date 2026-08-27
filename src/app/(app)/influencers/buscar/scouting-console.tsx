@@ -155,7 +155,7 @@ export function ScoutingConsole({
   function switchClient(next: string) {
     const query = new URLSearchParams(params.toString())
     query.set('cliente', next)
-    router.push(`/scouting?${query.toString()}`)
+    router.push(`/influencers/buscar?${query.toString()}`)
   }
 
   function runPreview(event: React.FormEvent<HTMLFormElement>) {

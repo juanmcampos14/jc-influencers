@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Stat, StatStrip } from '@/components/ui/stat'
 import { Pagination } from '@/components/ui/pagination'
@@ -22,6 +21,7 @@ import { formatFollowers, formatPercent } from '@/lib/util/format'
 import { InfluencerFilters } from '../filters'
 import { CasillaDeFila, SeleccionDeInfluencers } from '../seleccion'
 import { NewInfluencerDialog } from '../new-influencer-dialog'
+import { NavDeInfluencers } from '../sub-nav'
 
 export const metadata: Metadata = { title: 'Influencers' }
 export const dynamic = 'force-dynamic'
@@ -105,18 +105,17 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
   return (
     <>
       <PageHeader
-        title="Base de influencers"
-        description="Base única de la agencia. Un influencer existe una sola vez y participa en varias campañas."
-        actions={
-          <>
-            <Button asChild variant="secondary" size="sm">
-              <Link href="/influencers/duplicados">Posibles duplicados</Link>
-            </Button>
-            {canManage ? <NewInfluencerDialog niches={niches.map((n) => ({ key: n.key, label: n.label }))} /> : null}
-          </>
-        }
+        title="Influencers"
+        description="La gente que ya incorporamos. Un influencer existe una sola vez y participa en varias campañas."
+        actions={canManage ? <NewInfluencerDialog niches={niches.map((n) => ({ key: n.key, label: n.label }))} /> : null}
       />
       <div className="space-y-4 px-5 py-6 sm:px-8">
+        {/*
+          El acceso a Duplicados vivía en un botón del encabezado. Ahora está en
+          la navegación de la sección, con su número al lado: dos caminos al
+          mismo lugar hacían dudar de si eran lo mismo.
+        */}
+        <NavDeInfluencers ctx={ctx} activo="/influencers" />
         <StatStrip>
           <Stat
             label="En la base"
