@@ -84,3 +84,37 @@ describe('aceptaUnSoloTermino', () => {
     expect(aceptaUnSoloTermino({ properties: { query: { type: 'string' } } })).toBe(true)
   })
 })
+
+/**
+ * Una corrida ABORTADA que trajo datos no es un fracaso.
+ *
+ * Apify corta la corrida sola cuando se alcanza el tope que nosotros le
+ * pasamos, y la marca ABORTED. Encontrado ejecutando de verdad: 28 perfiles
+ * traídos y cobrados (US$ 0,09), y la pantalla decía "falló". Se pagó por datos
+ * que se tiraron.
+ */
+describe('cómo leer el final de una corrida', () => {
+  const leer = (situacion: string, traidos: number): 'FAILED' | 'RUNNING' | 'COMPLETED' => {
+    const cortadaConDatos = situacion === 'ABORTED' && traidos > 0
+    if (!cortadaConDatos && ['FAILED', 'ABORTED', 'TIMED-OUT'].includes(situacion)) return 'FAILED'
+    if (situacion !== 'SUCCEEDED' && !cortadaConDatos) return 'RUNNING'
+    return 'COMPLETED'
+  }
+
+  it('abortada CON datos se toma como terminada', () => {
+    expect(leer('ABORTED', 28)).toBe('COMPLETED')
+  })
+
+  it('abortada SIN datos sí es un fracaso', () => {
+    expect(leer('ABORTED', 0)).toBe('FAILED')
+  })
+
+  it('lo que falló de verdad sigue fallando', () => {
+    expect(leer('FAILED', 12)).toBe('FAILED')
+    expect(leer('TIMED-OUT', 0)).toBe('FAILED')
+  })
+
+  it('en curso sigue en curso', () => {
+    expect(leer('RUNNING', 3)).toBe('RUNNING')
+  })
+})

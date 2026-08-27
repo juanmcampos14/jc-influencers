@@ -396,11 +396,24 @@ export class ApifyScoutingProvider implements ScoutingProvider {
     const cuerpo = (await estado.json()) as { data?: { status?: string; stats?: { itemCount?: number } } }
     const situacion = cuerpo.data?.status
 
-    if (situacion === 'FAILED' || situacion === 'ABORTED' || situacion === 'TIMED-OUT') {
+    /*
+     * Una corrida ABORTADA que trajo datos NO es un fracaso.
+     *
+     * Apify corta la corrida sola cuando se alcanza el tope que nosotros
+     * mismos le pasamos (`maxItems`), y la marca ABORTED. Encontrado
+     * ejecutando: 28 perfiles traídos y cobrados, y la pantalla decía "falló"
+     * -- se pagó por datos que se tiraron.
+     *
+     * Lo que decide es si hay resultados, no la etiqueta.
+     */
+    const traidos = cuerpo.data?.stats?.itemCount ?? 0
+    const cortadaConDatos = situacion === 'ABORTED' && traidos > 0
+
+    if (!cortadaConDatos && (situacion === 'FAILED' || situacion === 'ABORTED' || situacion === 'TIMED-OUT')) {
       return { status: 'FAILED', message: `Apify terminó la corrida como ${situacion}.` }
     }
-    if (situacion !== 'SUCCEEDED') {
-      return { status: 'RUNNING', collected: cuerpo.data?.stats?.itemCount ?? 0 }
+    if (situacion !== 'SUCCEEDED' && !cortadaConDatos) {
+      return { status: 'RUNNING', collected: traidos }
     }
 
     const items = await this.pedir(`/datasets/${encodeURIComponent(datasetId)}/items?clean=true&format=json`)
