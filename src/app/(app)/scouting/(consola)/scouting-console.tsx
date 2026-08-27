@@ -23,7 +23,7 @@ import {
   previewScoutingAction,
   setScoutingBudgetAction,
   startScoutingAction,
-} from '../actions/scouting'
+} from '../../actions/scouting'
 import { listResultsAction } from './results-action'
 
 type Run = {
