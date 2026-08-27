@@ -247,13 +247,25 @@ export function ScoutingConsole({
   function openResults(runId: string) {
     setOpenRun(runId)
     setSelected(new Set())
+    setResults([])
     startTransition(async () => {
       const result = await listResultsAction({ runId })
       if (!result.ok) {
         toast.error(result.message)
+        setOpenRun(null)
         return
       }
       setResults(result.data)
+      /*
+       * Llevar la vista a los resultados.
+       *
+       * El panel vive abajo de la tabla de búsquedas, así que tocar "Ver 30"
+       * abría algo fuera de la pantalla y se leía como que el botón no hacía
+       * nada. Pasó de verdad.
+       */
+      requestAnimationFrame(() => {
+        document.getElementById('resultados-scouting')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
     })
   }
 
@@ -603,14 +615,14 @@ export function ScoutingConsole({
         )}
       </Card>
 
-      {openRun && results.length > 0 ? (
-        <Card>
+      {openRun ? (
+        <Card id="resultados-scouting">
           <CardHeader>
             <CardTitle>Resultados</CardTitle>
             <p className="text-xs text-ink-500">
               Elegí los que valgan la pena. Los que no importes no se guardan en la base de influencers.
             </p>
-            {(() => {
+            {results.length === 0 ? null : (() => {
               const cumplen = results.filter((r) => r.veredicto === 'CUMPLE').length
               const sinDato = results.filter((r) => r.veredicto === 'SIN_DATO').length
               const fuera = results.filter((r) => r.veredicto === 'NO_CUMPLE').length
@@ -629,6 +641,29 @@ export function ScoutingConsole({
               )
             })()}
           </CardHeader>
+          {results.length === 0 ? (
+            <CardBody>
+              {pending ? (
+                <p className="text-sm text-ink-500">Trayendo los perfiles…</p>
+              ) : (
+                /*
+                 * Un panel que no aparece se lee como un botón roto. Si la
+                 * búsqueda terminó y no quedó ningún perfil guardado, hay que
+                 * decirlo: el proveedor cobró igual.
+                 */
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-ink-900">Esta búsqueda no dejó ningún perfil guardado.</p>
+                  <p className="text-xs text-ink-500">
+                    El proveedor entregó registros, pero ninguno tenía los datos mínimos para armar un perfil
+                    --nombre de usuario y enlace--. El gasto se cobró igual. Si se repite, probá con otra plataforma
+                    o avisale al equipo: puede ser el proveedor y no la búsqueda.
+                  </p>
+                </div>
+              )}
+            </CardBody>
+          ) : null}
+
+          {results.length > 0 ? (
           <CardBody className="flex flex-wrap items-end gap-3 border-b border-ink-200">
             <Field label="Agregar a la campaña" htmlFor="targetCampaign" className="w-64">
               <Select id="targetCampaign" value={targetCampaign} onChange={(event) => setTargetCampaign(event.target.value)}>
@@ -644,6 +679,8 @@ export function ScoutingConsole({
               Importar {selected.size > 0 ? `${selected.size} perfiles` : 'seleccionados'}
             </Button>
           </CardBody>
+          ) : null}
+          {results.length > 0 ? (
           <TableWrap>
             <Table>
               <thead>
@@ -726,6 +763,7 @@ export function ScoutingConsole({
               </tbody>
             </Table>
           </TableWrap>
+          ) : null}
         </Card>
       ) : null}
     </div>
