@@ -16,7 +16,10 @@ import 'server-only'
  */
 
 export type EsquemaDeActor = {
-  properties?: Record<string, { type?: string; editor?: string; default?: unknown }>
+  properties?: Record<
+    string,
+    { type?: string; editor?: string; default?: unknown; minimum?: number; maximum?: number }
+  >
   required?: string[]
 }
 
@@ -83,13 +86,43 @@ export function construirEntrada(
   }
 
   const campoTope = buscar(CAMPOS_DE_TOPE)
-  if (campoTope) entrada[campoTope] = intencion.tope
+  if (campoTope) {
+    /*
+     * El actor puede exigir un mínimo. Pasó de verdad: se pidieron 5 perfiles y
+     * el actor respondió "maxResults must be >= 30" -- una corrida fallida por
+     * un número que el esquema ya declaraba. Se respeta lo que pide, y quien
+     * llama se entera de que el pedido real no es el que escribió el usuario.
+     */
+    entrada[campoTope] = topeEfectivo(props[campoTope], intencion.tope)
+  }
 
   // Lo obligatorio que no supimos completar se declara: es mejor no ejecutar.
   const faltantes = (esquema?.required ?? []).filter((nombre) => !(nombre in entrada))
   if (faltantes.length > 0) throw new EsquemaIncompletoError(faltantes)
 
   return entrada
+}
+
+/** El tope que el actor va a aceptar, dentro de los límites que declara. */
+function topeEfectivo(
+  campo: { minimum?: number; maximum?: number } | undefined,
+  pedido: number,
+): number {
+  const minimo = typeof campo?.minimum === 'number' ? campo.minimum : 1
+  const maximo = typeof campo?.maximum === 'number' ? campo.maximum : Number.POSITIVE_INFINITY
+  return Math.min(maximo, Math.max(minimo, pedido))
+}
+
+/**
+ * Cuántos registros va a traer de verdad este actor si le pedís `pedido`.
+ *
+ * Sirve para no mentir en el costo: si el actor tiene un mínimo de 30, pedir 5
+ * no sale más barato, y el preflight tiene que decirlo ANTES de gastar.
+ */
+export function registrosRealesDe(esquema: EsquemaDeActor | null, pedido: number): number {
+  const props = esquema?.properties ?? {}
+  const campo = CAMPOS_DE_TOPE.find((nombre) => nombre in props)
+  return campo ? topeEfectivo(props[campo], pedido) : pedido
 }
 
 /** Si el actor sólo acepta un término por corrida. */
