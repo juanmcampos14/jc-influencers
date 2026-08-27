@@ -464,52 +464,88 @@ class BrightDataProvider implements ScoutingProvider {
 const isRecord = (value: ScoutingRecord | null): value is ScoutingRecord => value !== null
 
 let cached: ScoutingProvider | null = null
+let armados: { brightdata: ScoutingProvider; apify: ScoutingProvider } | null = null
 
-export function scoutingProvider(): ScoutingProvider {
-  if (cached) return cached
+function armar(): { brightdata: ScoutingProvider; apify: ScoutingProvider } {
+  if (armados) return armados
   const config = env()
 
-  if (config.SCOUTING_PROVIDER === 'apify') {
-    const apifyToken = config.APIFY_TOKEN ?? config.APIFY_API_TOKEN
-    if (!apifyToken) {
-      cached = new UnconfiguredScoutingProvider()
-      return cached
-    }
-    cached = new ApifyScoutingProvider(
-      apifyToken,
-      {
-        instagramProfiles: config.APIFY_ACTOR_INSTAGRAM_PROFILES,
-        instagramDiscover: config.APIFY_ACTOR_INSTAGRAM_DISCOVER,
-        tiktokProfiles: config.APIFY_ACTOR_TIKTOK_PROFILES,
-        tiktokDiscover: config.APIFY_ACTOR_TIKTOK_DISCOVER,
-        youtubeProfiles: config.APIFY_ACTOR_YOUTUBE_PROFILES,
-        youtubeDiscover: config.APIFY_ACTOR_YOUTUBE_DISCOVER,
-      },
-      config.APIFY_COST_PER_RECORD_USD,
-    )
-    return cached
-  }
+  const apifyToken = config.APIFY_TOKEN ?? config.APIFY_API_TOKEN
+  const apify: ScoutingProvider = apifyToken
+    ? new ApifyScoutingProvider(
+        apifyToken,
+        {
+          instagramProfiles: config.APIFY_ACTOR_INSTAGRAM_PROFILES,
+          instagramDiscover: config.APIFY_ACTOR_INSTAGRAM_DISCOVER,
+          tiktokProfiles: config.APIFY_ACTOR_TIKTOK_PROFILES,
+          tiktokDiscover: config.APIFY_ACTOR_TIKTOK_DISCOVER,
+          youtubeProfiles: config.APIFY_ACTOR_YOUTUBE_PROFILES,
+          youtubeDiscover: config.APIFY_ACTOR_YOUTUBE_DISCOVER,
+        },
+        config.APIFY_COST_PER_RECORD_USD,
+      )
+    : new UnconfiguredScoutingProvider()
 
-  if (!config.BRIGHTDATA_API_TOKEN) {
-    cached = new UnconfiguredScoutingProvider()
-    return cached
-  }
-  cached = new BrightDataProvider(
-    config.BRIGHTDATA_API_TOKEN,
-    {
-      instagramProfiles: config.BRIGHTDATA_DATASET_INSTAGRAM_PROFILES,
-      instagramDiscover: config.BRIGHTDATA_DATASET_INSTAGRAM_DISCOVER,
-      tiktokProfiles: config.BRIGHTDATA_DATASET_TIKTOK_PROFILES,
-      tiktokDiscover: config.BRIGHTDATA_DATASET_TIKTOK_DISCOVER,
-      youtubeProfiles: config.BRIGHTDATA_DATASET_YOUTUBE_PROFILES,
-      youtubeDiscover: config.BRIGHTDATA_DATASET_YOUTUBE_DISCOVER,
-    },
-    config.BRIGHTDATA_COST_PER_RECORD_USD,
-  )
+  const brightdata: ScoutingProvider = config.BRIGHTDATA_API_TOKEN
+    ? new BrightDataProvider(
+        config.BRIGHTDATA_API_TOKEN,
+        {
+          instagramProfiles: config.BRIGHTDATA_DATASET_INSTAGRAM_PROFILES,
+          instagramDiscover: config.BRIGHTDATA_DATASET_INSTAGRAM_DISCOVER,
+          tiktokProfiles: config.BRIGHTDATA_DATASET_TIKTOK_PROFILES,
+          tiktokDiscover: config.BRIGHTDATA_DATASET_TIKTOK_DISCOVER,
+          youtubeProfiles: config.BRIGHTDATA_DATASET_YOUTUBE_PROFILES,
+          youtubeDiscover: config.BRIGHTDATA_DATASET_YOUTUBE_DISCOVER,
+        },
+        config.BRIGHTDATA_COST_PER_RECORD_USD,
+      )
+    : new UnconfiguredScoutingProvider()
+
+  armados = { brightdata, apify }
+  return armados
+}
+
+/** El proveedor por defecto: el que dice `SCOUTING_PROVIDER`. */
+export function scoutingProvider(): ScoutingProvider {
+  if (cached) return cached
+  const { brightdata, apify } = armar()
+  cached = env().SCOUTING_PROVIDER === 'apify' ? apify : brightdata
   return cached
+}
+
+/**
+ * El proveedor que puede hacer ESTE trabajo.
+ *
+ * Ningún proveedor cubre todo. Bright Data, por ejemplo, no tiene descubrir por
+ * palabra clave en Instagram --su biblioteca sólo ofrece "collect by URL" y
+ * "discover by user name"--, y Apify sí. Antes eso obligaba a elegir un
+ * proveedor para TODO y perder lo que el otro hacía mejor.
+ *
+ * Se prefiere el configurado por defecto; si no puede hacer esta combinación de
+ * plataforma y modo, se usa el otro. Y si ninguno puede, se devuelve el de
+ * siempre para que el preflight lo diga con su nombre.
+ */
+export function scoutingProviderFor(platform: Platform, mode: 'DISCOVER' | 'ENRICH'): ScoutingProvider {
+  const preferido = scoutingProvider()
+  if (preferido.supports(platform, mode)) return preferido
+
+  const { brightdata, apify } = armar()
+  const alternativo = preferido === apify ? brightdata : apify
+  return alternativo.supports(platform, mode) ? alternativo : preferido
+}
+
+/** El proveedor con el que se disparó una corrida, para poder seguirla. */
+export function scoutingProviderNamed(name: string): ScoutingProvider {
+  const { brightdata, apify } = armar()
+  if (name === apify.name) return apify
+  if (name === brightdata.name) return brightdata
+  return scoutingProvider()
 }
 
 /** Sólo para tests: permite inyectar un proveedor y devolver el real después. */
 export function __setScoutingProviderForTests(provider: ScoutingProvider | null): void {
   cached = provider
+  // Los dos armados también se reinician: si no, el ruteo por plataforma
+  // seguiría devolviendo el proveedor real de la corrida anterior.
+  armados = provider ? { brightdata: provider, apify: provider } : null
 }

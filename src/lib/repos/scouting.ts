@@ -7,7 +7,7 @@ import { AUDIT, recordAudit } from '@/lib/audit'
 import { env } from '@/lib/env'
 import { withSystemScope } from '@/lib/db/scope'
 import { consumeRateLimit } from '@/lib/auth/rate-limit'
-import { scoutingProvider, ScoutingUnavailableError } from '@/lib/ports/scouting'
+import { scoutingProviderFor, scoutingProviderNamed, ScoutingUnavailableError } from '@/lib/ports/scouting'
 import { parseProfileUrl } from '@/lib/domain/normalize'
 import { detectDuplicates } from './influencers'
 import { actorOf, scoped } from './base'
@@ -164,7 +164,8 @@ export async function previewScouting(ctx: AuthContext, input: PreviewInput): Pr
   assertClientInScope(ctx, input.clientId)
   assertCan(ctx, 'scouting.run', input.clientId)
 
-  const provider = scoutingProvider()
+  // El que pueda hacer ESTA combinación de plataforma y modo, no el global.
+  const provider = scoutingProviderFor(input.platform, input.mode)
   const warnings: string[] = []
 
   if (input.mode === 'DISCOVER' && (input.keywords ?? []).length === 0) {
@@ -190,8 +191,13 @@ export async function previewScouting(ctx: AuthContext, input: PreviewInput): Pr
     bloqueos.push('El proveedor de scouting no está configurado. Cargá las credenciales antes de buscar.')
   } else if (!provider.supports(input.platform, input.mode)) {
     const queHace = input.mode === 'DISCOVER' ? 'descubrir perfiles nuevos' : 'actualizar métricas'
+    /*
+     * Ya se probó con los dos proveedores (`scoutingProviderFor`), así que si
+     * llegamos acá ninguno puede: el mensaje no debe sugerir "probá con el
+     * otro", porque no lo hay.
+     */
     bloqueos.push(
-      `${provider.name} no tiene un dataset para ${queHace} en ${input.platform}. Probá con otra plataforma, o cargá ese dataset en la configuración.`,
+      `Ningún proveedor conectado puede ${queHace} en ${input.platform}. Probá con otra plataforma, o conectá un proveedor que lo haga.`,
     )
   }
   if (estimated > budget.remainingUsd) {
@@ -266,7 +272,7 @@ export async function startScouting(ctx: AuthContext, runId: string): Promise<{ 
 
   await consumeRateLimit('scoutingRun', ctx.user.id)
 
-  const provider = scoutingProvider()
+  const provider = scoutingProviderFor(run.platform, run.mode)
   if (!provider.configured) throw new ScoutingUnavailableError('El proveedor de scouting no está configurado.')
 
   // Corte duro: se vuelve a comprobar el tope justo antes de gastar.
@@ -349,7 +355,8 @@ export async function pollScouting(ctx: AuthContext, runId: string): Promise<Pol
     return { status: run.status, collected: run.deliveredRecords }
   }
 
-  const provider = scoutingProvider()
+  // Se sigue con el proveedor que la disparó, que quedó guardado en la corrida.
+  const provider = scoutingProviderNamed(run.provider)
   const progress = await provider.poll({ jobId: run.externalJobId, provider: run.provider })
 
   if (progress.status === 'RUNNING') return { status: 'RUNNING', collected: progress.collected }
@@ -430,7 +437,9 @@ export async function cancelScouting(ctx: AuthContext, runId: string): Promise<v
   if (run.status === 'COMPLETED' || run.status === 'CANCELLED') return
 
   if (run.status === 'RUNNING' && run.externalJobId) {
-    await scoutingProvider().cancel({ jobId: run.externalJobId, provider: run.provider }).catch(() => undefined)
+    await scoutingProviderNamed(run.provider)
+      .cancel({ jobId: run.externalJobId, provider: run.provider })
+      .catch(() => undefined)
   }
   await scoped(ctx, async (tx) => {
     await tx.scoutingRun.update({ where: { id: runId }, data: { status: 'CANCELLED', finishedAt: new Date() } })
