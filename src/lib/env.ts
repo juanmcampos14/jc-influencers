@@ -42,7 +42,7 @@ const schema = z.object({
    * Qué proveedor usa el scouting. La aplicación depende de la interfaz, no de
    * ninguno de los dos: cambiar de uno a otro es cambiar esta variable.
    */
-  SCOUTING_PROVIDER: z.enum(['brightdata', 'apify']).default('brightdata'),
+  SCOUTING_PROVIDER: z.enum(['brightdata', 'apify', 'hypeauditor']).default('brightdata'),
   /*
    * Se aceptan los dos nombres: Apify llama "API token" al suyo y es fácil
    * cargarlo como APIFY_API_TOKEN. Fallar por el nombre de la variable, con el
@@ -60,6 +60,28 @@ const schema = z.object({
   /** Costo por registro entregado. Se usa para el tope de gasto y el aviso previo. */
   BRIGHTDATA_COST_PER_RECORD_USD: z.coerce.number().nonnegative().default(0.0015),
   /** Tope mensual global de la agencia, en dólares. */
+  /*
+   * HypeAuditor. A diferencia de los scrapers, filtra por AUDIENCIA --país,
+   * edad y género de los seguidores-- y por calidad de esa audiencia.
+   *
+   * Las credenciales las entrega HypeAuditor: un Client ID y un token, que
+   * viajan en X-Auth-Id y X-Auth-Token.
+   */
+  HYPEAUDITOR_AUTH_ID: z.string().optional(),
+  HYPEAUDITOR_API_TOKEN: z.string().optional(),
+  /*
+   * Qué cuesta UNA consulta, que devuelve una página de 20 perfiles. No tiene
+   * valor por defecto a propósito: sin saber el precio no se puede controlar el
+   * tope mensual, y un cero haría creer que buscar es gratis. Sin esto cargado
+   * el proveedor se declara no configurado.
+   */
+  HYPEAUDITOR_COST_PER_CALL_USD: z.coerce.number().nonnegative().optional(),
+  /** Usar el entorno de prueba de HypeAuditor en vez del real. */
+  HYPEAUDITOR_SANDBOX: z
+    .enum(['0', '1', 'true', 'false'])
+    .optional()
+    .transform((v) => v === '1' || v === 'true'),
+
   SCOUTING_MONTHLY_LIMIT_USD: z.coerce.number().nonnegative().default(50),
 
   // Análisis con IA. Sin clave, la función se muestra deshabilitada.

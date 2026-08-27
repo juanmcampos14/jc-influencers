@@ -32,7 +32,8 @@
     "scouting:check": "tsx --conditions=react-server scripts/check-scouting.ts",
     "scouting:smoke": "tsx --conditions=react-server scripts/scouting-smoke.ts",
     "scouting:descubrir": "tsx --conditions=react-server scripts/scouting-discover.ts",
-    "mail:check": "tsx --conditions=react-server scripts/check-email.ts"
+    "mail:check": "tsx --conditions=react-server scripts/check-email.ts",
+    "hypeauditor:probe": "tsx scripts/hypeauditor-probe.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",

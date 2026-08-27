@@ -1,0 +1,636 @@
+<title>Bandeja y Conjunto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+/* ============ TOKENS · página ============ */
+:root{
+  --ground:#eceef1; --ground-2:#ffffff; --ground-3:#e2e5ea;
+  --rule:#d3d7de; --rule-soft:#e2e5ea;
+  --ink:#0e1013; --ink-2:#4a515c; --ink-3:#7b8391;
+  --mark:#dff21f; --mark-ink:#0e1013;
+  --accent-text:#5c6b00; --accent-line:#b9cc00;
+  --warn:#a3620a;
+  --shadow:0 1px 2px rgba(14,16,19,.06), 0 18px 44px -22px rgba(14,16,19,.35);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0e1013; --ground-2:#16191e; --ground-3:#1d2128;
+    --rule:#282d36; --rule-soft:#1f232a;
+    --ink:#f2f4f7; --ink-2:#a8b0bd; --ink-3:#6f7886;
+    --accent-text:#d7ea1e; --accent-line:#5d6b12;
+    --warn:#f0a63a;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 26px 60px -26px rgba(0,0,0,.85);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0e1013; --ground-2:#16191e; --ground-3:#1d2128;
+  --rule:#282d36; --rule-soft:#1f232a;
+  --ink:#f2f4f7; --ink-2:#a8b0bd; --ink-3:#6f7886;
+  --accent-text:#d7ea1e; --accent-line:#5d6b12;
+  --warn:#f0a63a;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 26px 60px -26px rgba(0,0,0,.85);
+}
+/* ============ TOKENS · mockup (es una pantalla, no sigue el tema del lector) ============ */
+:root{
+  --ui-bg:#f6f7f9; --ui-bg-2:#eef0f3; --ui-surface:#ffffff;
+  --ui-border:#e4e7ec; --ui-border-2:#cfd4dd;
+  --ui-text:#16181d; --ui-text-2:#3a404b; --ui-muted:#616874;
+  --ui-nav:#0c0d10; --ui-lime:#eaff3a; --ui-lime-2:#dff21f;
+  --ui-good:#0f7a4a; --ui-good-bg:#e7f6ee;
+  --ui-warn:#8a5a06; --ui-warn-bg:#fdf3e0;
+  --ui-blue:#2f5bd6; --ui-blue-bg:#eaefff;
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:'Archivo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size:16.5px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+:focus-visible{outline:2px solid var(--accent-line); outline-offset:3px; border-radius:3px;}
+@media (prefers-reduced-motion: reduce){ *{animation-duration:.001ms !important; transition-duration:.001ms !important;} }
+
+.d-display{font-family:'Anton','Haettenschweiler','Arial Narrow Bold',Impact,sans-serif; text-transform:uppercase; font-weight:400; letter-spacing:.005em; line-height:.94; text-wrap:balance;}
+.d-mono{font-family:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; letter-spacing:.13em; text-transform:uppercase;}
+.d-eyebrow{color:var(--accent-text);}
+.d-wrap{max-width:1180px; margin:0 auto; padding:0 24px;}
+.d-sec{padding:80px 0; border-top:1px solid var(--rule);}
+.d-sec-head{display:flex; flex-direction:column; gap:14px; margin-bottom:40px;}
+.d-h2{font-size:clamp(28px,4.2vw,48px); margin:0;}
+.d-lede{font-size:17.5px; color:var(--ink-2); margin:0; max-width:64ch;}
+code{font-family:'IBM Plex Mono',monospace; font-size:12.5px; background:var(--ground-3); padding:1px 5px; border-radius:3px; color:var(--ink-2);}
+
+/* hero */
+.d-hero{padding:72px 0 52px;}
+.d-hero h1{font-size:clamp(42px,7.6vw,88px); margin:14px 0 0;}
+.d-hero h1 em{font-style:normal; background:var(--mark); color:var(--mark-ink); padding:0 .1em; box-decoration-break:clone; -webkit-box-decoration-break:clone;}
+.d-hero p{font-size:18px; color:var(--ink-2); margin:22px 0 0; max-width:60ch;}
+
+/* marco */
+.mk-frame{border:1px solid var(--rule); background:var(--ui-bg); box-shadow:var(--shadow); overflow:hidden; color:var(--ui-text); font-size:14px; line-height:1.5;}
+.mk-chrome{display:flex; align-items:center; gap:8px; background:var(--ui-nav); padding:9px 14px; border-bottom:1px solid #000;}
+.mk-dot{width:9px; height:9px; border-radius:50%; background:#33373f;}
+.mk-url{margin-left:10px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:#7d8492;}
+.mk-caption{display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; margin-top:14px; color:var(--ink-3); font-size:14px;}
+.mk-caption b{color:var(--ink-2); font-weight:600;}
+.mk-btn{font-family:'Archivo',sans-serif; font-size:13px; font-weight:600; border:1px solid var(--ui-border-2); background:var(--ui-surface); color:var(--ui-text); padding:9px 14px; border-radius:9px; cursor:pointer; line-height:1.2; transition:background .12s ease, transform .08s ease;}
+.mk-btn:hover{background:var(--ui-bg-2);}
+.mk-btn:active{transform:translateY(1px);}
+.mk-btn-primary{background:var(--ui-nav); border-color:var(--ui-nav); color:var(--ui-lime);}
+.mk-btn-primary:hover{background:#000;}
+.mk-avatar{display:grid; place-items:center; border-radius:50%; font-family:'Anton',sans-serif; letter-spacing:.02em; color:#0c0d10; flex:none;}
+
+/* ============ EL SWITCH ============ */
+.v-top{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:12px 18px; background:var(--ui-surface); border-bottom:1px solid var(--ui-border);}
+.v-crumb{display:flex; align-items:center; gap:8px; color:var(--ui-muted); font-size:13px;}
+.v-crumb b{color:var(--ui-text); font-weight:600;}
+.v-switch{display:flex; gap:3px; background:var(--ui-bg-2); padding:3px; border-radius:12px; border:1px solid var(--ui-border);}
+.v-opt{
+  display:flex; align-items:center; gap:8px; font-family:'Archivo',sans-serif; font-size:13px; font-weight:500;
+  border:0; background:transparent; color:var(--ui-muted); padding:8px 13px; border-radius:9px; cursor:pointer;
+  transition:background .15s ease, color .15s ease;
+}
+.v-opt:hover{color:var(--ui-text);}
+.v-opt svg{width:15px; height:15px; flex:none;}
+.v-opt b{font-weight:700; font-variant-numeric:tabular-nums;}
+.v-opt[aria-pressed="true"]{background:var(--ui-nav); color:#f4f5f7; font-weight:600;}
+.v-opt[aria-pressed="true"] b{color:var(--ui-lime);}
+.v-hint{display:flex; align-items:center; gap:8px; padding:7px 18px; background:var(--ui-bg-2); border-bottom:1px solid var(--ui-border); font-size:12px; color:var(--ui-muted);}
+.v-hint i{width:6px; height:6px; border-radius:50%; background:var(--ui-lime-2); flex:none;}
+.v-hint span{flex:1 1 auto; min-width:0;}
+.v-pane{display:none;}
+.v-pane.on{display:block; animation:v-fade .22s ease;}
+@keyframes v-fade{from{opacity:0; transform:translateY(5px);}}
+
+/* ============ VISTA · UNO POR UNO ============ */
+.a-progress{height:3px; background:var(--ui-bg-2);}
+.a-progress i{display:block; height:100%; background:var(--ui-lime-2); width:0; transition:width .35s cubic-bezier(.2,.7,.3,1);}
+.a-stage{position:relative; padding:26px 20px 58px; min-height:430px; display:flex; flex-direction:column; align-items:center;}
+.a-stack{position:relative; width:100%; max-width:540px;}
+.a-card{position:relative; background:var(--ui-surface); border:1px solid var(--ui-border-2); border-radius:14px; padding:20px 20px 18px; box-shadow:0 12px 30px -18px rgba(12,13,16,.5);}
+.a-card.is-out{animation:a-fly .26s ease forwards;}
+@keyframes a-fly{to{opacity:0; transform:translateY(-16px) scale(.97);}}
+.a-card.is-in{animation:a-drop .26s ease;}
+@keyframes a-drop{from{opacity:0; transform:translateY(14px) scale(.98);}}
+.a-id{display:flex; gap:13px; align-items:center;}
+.a-id h4{margin:0; font-size:19px; font-weight:700; letter-spacing:-.01em;}
+.a-id p{margin:2px 0 0; color:var(--ui-muted); font-size:12.5px; font-family:'IBM Plex Mono',monospace;}
+.a-cluster{margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; padding:5px 9px; border-radius:6px; white-space:nowrap;}
+.a-metrics{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1px; background:var(--ui-border); border:1px solid var(--ui-border); border-radius:10px; overflow:hidden; margin-top:16px;}
+.a-metric{background:var(--ui-surface); padding:10px 12px;}
+.a-metric span{display:block; font-family:'IBM Plex Mono',monospace; font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ui-muted);}
+.a-metric b{display:block; margin-top:3px; font-family:'Anton',sans-serif; font-weight:400; font-size:21px; letter-spacing:.01em; font-variant-numeric:tabular-nums;}
+.a-metric b small{font-family:'Archivo',sans-serif; font-size:11.5px; font-weight:500; color:var(--ui-muted); margin-left:3px;}
+.a-why{margin:14px 0 0; padding:11px 13px; background:var(--ui-blue-bg); border-radius:10px; font-size:13px; color:#1b3a8f;}
+.a-actions{display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;}
+.a-actions .mk-btn{flex:1; min-width:112px; padding:11px 12px;}
+.a-yes{background:var(--ui-nav); border-color:var(--ui-nav); color:var(--ui-lime);}
+.a-yes:hover{background:#000;}
+.a-bridge{display:flex; justify-content:center; margin-top:14px;}
+.a-bridge button{background:none; border:0; font-family:'Archivo',sans-serif; font-size:12.5px; color:var(--ui-blue); cursor:pointer; padding:4px 8px; border-radius:6px; font-weight:600;}
+.a-bridge button:hover{background:var(--ui-blue-bg);}
+.a-keys{display:flex; gap:14px; justify-content:center; margin-top:12px; color:var(--ui-muted); font-size:11.5px; flex-wrap:wrap;}
+.a-keys kbd{font-family:'IBM Plex Mono',monospace; font-size:10.5px; background:var(--ui-bg-2); border:1px solid var(--ui-border-2); border-bottom-width:2px; border-radius:5px; padding:2px 6px; color:var(--ui-text-2);}
+.a-done{text-align:center; padding:56px 20px; max-width:440px;}
+.a-done h4{font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:30px; margin:0 0 10px;}
+.a-done p{color:var(--ui-muted); margin:0 0 18px;}
+
+/* ============ VISTA · EL CONJUNTO ============ */
+.c-grid{display:grid; grid-template-columns:minmax(0,1fr);}
+@media(min-width:940px){ .c-grid{grid-template-columns:minmax(0,1fr) 320px;} }
+.c-pool{padding:18px 20px 24px; background:var(--ui-bg);}
+.c-pool-head{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+.c-pool-head h4{margin:0; font-size:15.5px; font-weight:700;}
+.c-pool-head span{color:var(--ui-muted); font-size:12.5px;}
+.c-chips{display:flex; flex-wrap:wrap; gap:8px;}
+.c-chip{display:flex; align-items:center; gap:10px; background:var(--ui-surface); border:1px solid var(--ui-border); border-radius:11px; padding:8px 12px 8px 8px; cursor:pointer; font-family:'Archivo',sans-serif; text-align:left; transition:border-color .12s ease, transform .1s ease, opacity .15s ease, box-shadow .2s ease;}
+.c-chip:hover{border-color:var(--ui-border-2); transform:translateY(-1px);}
+.c-chip[data-picked="1"]{background:#f7fde2; border-color:#c8dc4f;}
+.c-chip[data-picked="no"]{opacity:.4;}
+.c-chip.focus{box-shadow:0 0 0 3px rgba(47,91,214,.28); border-color:var(--ui-blue);}
+.c-chip .nm{display:block; font-size:13.5px; font-weight:600; line-height:1.2;}
+.c-chip .mt{display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ui-muted); margin-top:3px;}
+.c-panel{border-left:1px solid var(--ui-border); background:var(--ui-surface); padding:18px 18px 20px; display:flex; flex-direction:column; gap:15px;}
+.c-panel h4{margin:0; font-size:15.5px; font-weight:700; display:flex; align-items:baseline; gap:8px;}
+.c-panel h4 span{margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ui-muted); letter-spacing:.08em;}
+.c-lbl{font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.13em; text-transform:uppercase; color:var(--ui-muted);}
+.c-goal{display:flex; flex-direction:column; gap:6px;}
+.c-goal-top{display:flex; align-items:baseline; justify-content:space-between; gap:8px;}
+.c-goal-top b{font-size:15px; font-weight:700; font-variant-numeric:tabular-nums;}
+.c-bar{height:7px; border-radius:99px; background:var(--ui-bg-2); overflow:hidden;}
+.c-bar i{display:block; height:100%; background:var(--ui-lime-2); width:0; transition:width .3s cubic-bezier(.2,.7,.3,1);}
+.c-bar i.over{background:var(--ui-warn);}
+.c-mix{display:flex; flex-direction:column; gap:10px;}
+.c-mixrow{display:flex; flex-direction:column; gap:5px;}
+.c-mixtop{display:flex; align-items:baseline; gap:8px; font-size:12.5px;}
+.c-mixtop b{font-weight:600;}
+.c-mixtop em{margin-left:auto; font-style:normal; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ui-muted); font-variant-numeric:tabular-nums;}
+.c-track{height:6px; border-radius:99px; background:var(--ui-bg-2); position:relative;}
+.c-track i{display:block; height:100%; border-radius:99px; width:0; transition:width .3s cubic-bezier(.2,.7,.3,1);}
+.c-target{position:absolute; top:-3px; width:2px; height:12px; background:var(--ui-text); border-radius:1px;}
+.c-squad{display:flex; flex-direction:column; gap:6px;}
+.c-member{display:flex; align-items:center; gap:8px; background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:9px; padding:6px 8px; font-size:12.5px; animation:v-fade .2s ease;}
+.c-member b{font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.c-member em{font-style:normal; margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ui-muted);}
+.c-member button{background:none; border:0; cursor:pointer; padding:3px 5px; border-radius:5px; color:var(--ui-muted); font-size:11px; font-family:'Archivo',sans-serif; font-weight:600;}
+.c-member button:hover{background:var(--ui-bg-2); color:var(--ui-text);}
+.c-member button.rm:hover{color:#a3231c;}
+.c-empty{color:var(--ui-muted); font-size:12.5px; border:1px dashed var(--ui-border-2); border-radius:9px; padding:14px; text-align:center;}
+.c-verdict{font-size:12.5px; padding:10px 12px; border-radius:9px; background:var(--ui-bg-2); color:var(--ui-text-2);}
+.c-verdict.good{background:var(--ui-good-bg); color:var(--ui-good);}
+.c-verdict.warn{background:var(--ui-warn-bg); color:var(--ui-warn);}
+
+/* toast */
+.v-toast{position:absolute; left:50%; bottom:16px; transform:translateX(-50%); background:var(--ui-nav); color:#f4f5f7; font-size:12.5px; padding:8px 14px; border-radius:999px; display:flex; align-items:center; gap:12px; opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:5;}
+.v-toast.show{opacity:1; pointer-events:auto;}
+.v-toast button{background:none; border:0; color:var(--ui-lime); font-family:'Archivo',sans-serif; font-size:12.5px; font-weight:700; cursor:pointer; padding:0;}
+.v-body{position:relative;}
+
+/* decisiones */
+.d-cards{display:grid; gap:1px; background:var(--rule); border:1px solid var(--rule);}
+@media(min-width:760px){ .d-cards{grid-template-columns:repeat(2,minmax(0,1fr));} }
+.d-card{background:var(--ground); padding:26px 24px 28px; display:flex; flex-direction:column; gap:10px;}
+.d-card .d-mono{color:var(--ink-3);}
+.d-card h3{margin:0; font-size:18px; font-weight:600; line-height:1.3; text-wrap:balance;}
+.d-card p{margin:0; color:var(--ink-2); font-size:15px;}
+.d-card p + p{margin-top:2px;}
+
+/* código */
+.d-steps{display:flex; flex-direction:column; gap:0; border-left:2px solid var(--rule); padding-left:22px; margin-left:6px;}
+.d-step{position:relative; padding:0 0 26px;}
+.d-step::before{content:''; position:absolute; left:-28px; top:8px; width:9px; height:9px; border-radius:50%; background:var(--accent-line);}
+.d-step h4{margin:0 0 5px; font-size:16px; font-weight:600;}
+.d-step p{margin:0; color:var(--ink-2); font-size:15px; max-width:66ch;}
+
+.d-flag{border:1px solid var(--rule); border-left:4px solid var(--warn); background:var(--ground-2); padding:26px 26px 28px;}
+.d-flag h3{margin:0 0 10px; font-size:20px; font-weight:600;}
+.d-flag p{margin:0 0 10px; color:var(--ink-2); max-width:70ch;}
+.d-flag p:last-child{margin-bottom:0;}
+.d-foot{padding:40px 0 70px; color:var(--ink-3); font-size:14px; border-top:1px solid var(--rule);}
+</style>
+
+<header class="d-hero">
+  <div class="d-wrap">
+    <p class="d-mono d-eyebrow" style="margin:0;">JC Influencers · Direcciones A + C</p>
+    <h1 class="d-display">Bandeja<br>y <em>conjunto</em></h1>
+    <p>Dos vistas de la misma campaña, un control para elegir, y la elección se recuerda. El cliente que quiere despachar decide de a uno; el que quiere entender el equipo ve el conjunto. Nadie tiene que aprender las dos.</p>
+  </div>
+</header>
+
+<section class="d-wrap" style="padding-bottom:24px;">
+  <div class="mk-frame" id="mk">
+    <div class="mk-chrome"><span class="mk-dot"></span><span class="mk-dot"></span><span class="mk-dot"></span><span class="mk-url" id="mkUrl">influencers.jcmarketing.digital/kast/scouting-actual?vista=bandeja</span></div>
+
+    <div class="v-top">
+      <div class="v-crumb"><b>Kast</b><span>›</span><span>Scouting actual</span></div>
+      <div class="v-switch" role="group" aria-label="Cómo querés verlo">
+        <button class="v-opt" type="button" id="optA" aria-pressed="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3.5" y="2" width="9" height="12" rx="1.6"/></svg>
+          Uno por uno · <b id="nPend">70</b>
+        </button>
+        <button class="v-opt" type="button" id="optC" aria-pressed="false">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+          El conjunto · <b id="nSquad">0/12</b>
+        </button>
+      </div>
+    </div>
+
+    <div class="v-hint"><i aria-hidden="true"></i><span id="vHint">Entrás siempre por acá porque tenés 70 perfiles esperándote. Cambiá cuando quieras: se recuerda.</span></div>
+
+    <div class="v-body">
+      <!-- ═══ VISTA A ═══ -->
+      <div class="v-pane on" id="paneA">
+        <div class="a-progress"><i id="aBar"></i></div>
+        <div class="a-stage" id="aStage">
+          <div class="a-stack" id="aStack"><div class="a-card" id="aCard"></div></div>
+          <div class="a-bridge" id="aBridge"><button type="button">Ver el conjunto con este perfil marcado →</button></div>
+          <div class="a-keys" id="aKeys"><span><kbd>A</kbd> aprobar</span><span><kbd>D</kbd> descartar</span><span><kbd>?</kbd> más info</span><span><kbd>Z</kbd> deshacer</span><span><kbd>V</kbd> cambiar de vista</span></div>
+        </div>
+      </div>
+
+      <!-- ═══ VISTA C ═══ -->
+      <div class="v-pane" id="paneC">
+        <div class="c-grid">
+          <div class="c-pool">
+            <div class="c-pool-head"><h4>Los 75 perfiles</h4><span>ordenados por afinidad con el brief · tocá para sumar o sacar</span></div>
+            <div class="c-chips" id="cPool"></div>
+          </div>
+          <aside class="c-panel" aria-label="El squad">
+            <h4>El squad <span id="cSize">0 / 12</span></h4>
+            <div class="c-goal">
+              <div class="c-goal-top"><span class="c-lbl">Alcance combinado</span><b id="cReach">0</b></div>
+              <div class="c-bar"><i id="cReachBar"></i></div>
+              <div style="font-size:11.5px;color:var(--ui-muted);">Objetivo del brief: 250.000</div>
+            </div>
+            <div class="c-mix">
+              <div class="c-lbl">Mezcla vs. brief</div>
+              <div class="c-mixrow" data-cl="Fintech"><div class="c-mixtop"><b>Fintech / Finanzas</b><em><span class="now">0</span>% · meta 50%</em></div><div class="c-track"><i style="background:#2f5bd6;"></i><span class="c-target" style="left:50%;"></span></div></div>
+              <div class="c-mixrow" data-cl="Crypto"><div class="c-mixtop"><b>Crypto / Web3</b><em><span class="now">0</span>% · meta 20%</em></div><div class="c-track"><i style="background:#b07cff;"></i><span class="c-target" style="left:20%;"></span></div></div>
+              <div class="c-mixrow" data-cl="Lifestyle"><div class="c-mixtop"><b>Lifestyle</b><em><span class="now">0</span>% · meta 30%</em></div><div class="c-track"><i style="background:#f0913a;"></i><span class="c-target" style="left:30%;"></span></div></div>
+            </div>
+            <div class="c-goal">
+              <div class="c-goal-top"><span class="c-lbl">Costo estimado</span><b id="cCost">US$ 0</b></div>
+              <div class="c-bar"><i id="cCostBar"></i></div>
+              <div style="font-size:11.5px;color:var(--ui-muted);">Tope: US$ 6.000</div>
+            </div>
+            <div>
+              <div class="c-lbl" style="margin-bottom:8px;">Elegidos</div>
+              <div class="c-squad" id="cSquad"></div>
+            </div>
+            <div class="c-verdict" id="cVerdict">El squad está vacío.</div>
+          </aside>
+        </div>
+      </div>
+
+      <div class="v-toast" id="vToast"><span id="vToastText"></span><button type="button" id="vUndo">Deshacer</button></div>
+    </div>
+  </div>
+  <p class="mk-caption"><b>Probalo:</b> aprobá un par en «Uno por uno» y pasá a «El conjunto»: son los mismos perfiles, ya cargados. Volvé con «Revisar» desde cualquier elegido. <span style="color:var(--ink-3)">Perfiles reales de Kast; ER y costo ilustrativos.</span></p>
+</section>
+
+<!-- ═══ DECISIONES ═══ -->
+<section class="d-sec">
+  <div class="d-wrap">
+    <div class="d-sec-head">
+      <p class="d-mono d-eyebrow" style="margin:0;">El diseño del switch</p>
+      <h2 class="d-display d-h2">Cuatro decisiones para que elegir no sea una tarea más</h2>
+      <p class="d-lede">Un switch mal puesto le agrega trabajo al usuario: lo obliga a decidir cómo quiere trabajar antes de poder trabajar. Estas cuatro reglas hacen que la elección casi no se note.</p>
+    </div>
+
+    <div class="d-cards">
+      <div class="d-card">
+        <p class="d-mono">Dónde vive</p>
+        <h3>En el encabezado de la campaña, no en el menú ni en configuración</h3>
+        <p>Es una propiedad de <em>esta</em> campaña en <em>este</em> momento, no un ajuste de cuenta. Si vive en un panel de preferencias, nadie lo encuentra y nadie lo cambia.</p>
+      </div>
+      <div class="d-card">
+        <p class="d-mono">Qué muestra</p>
+        <h3>Cada opción trae su número adentro</h3>
+        <p>«Uno por uno · 70» y «El conjunto · 5/12». El usuario no elige a ciegas entre dos palabras abstractas: elige entre dos cantidades de trabajo que puede ver.</p>
+      </div>
+      <div class="d-card">
+        <p class="d-mono">Cómo se recuerda</p>
+        <h3>Se guarda por usuario y por cliente, en el servidor</h3>
+        <p>Sofía de Kast entra siempre a su vista, desde cualquier dispositivo. No es un estado de sesión que se pierde: es una preferencia con la misma vida que su cuenta.</p>
+        <p>Y como se guarda por cliente, el account de JC puede tener una vista para Kast y otra para el cliente de al lado.</p>
+      </div>
+      <div class="d-card">
+        <p class="d-mono">Qué pasa la primera vez</p>
+        <h3>El sistema propone; el usuario dispone</h3>
+        <p>Sin preferencia guardada, gana el estado de la campaña: más de 20 esperando → Bandeja. Menos de 20 → Conjunto. Y la línea debajo del switch dice por qué está viendo eso.</p>
+        <p>Apenas toca el switch una vez, esa regla no vuelve a aplicarse nunca para esa persona.</p>
+      </div>
+    </div>
+
+    <div style="margin-top:32px;" class="d-flag">
+      <h3>El único puente entre las dos</h3>
+      <p>Dos vistas separadas tienen un riesgo real: que cada una olvide lo que pasó en la otra y el usuario tenga que reconstruir dónde estaba. Se evita con <strong>un botón en cada lado</strong>, y nada más.</p>
+      <p>Desde la Bandeja: «Ver el conjunto con este perfil marcado». Desde cada elegido del Squad: «Revisar», que abre la Bandeja en ese perfil. El foco viaja; el resto de la pantalla no se comparte. Es barato de construir y es la diferencia entre dos vistas y dos productos.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CÓDIGO ═══ -->
+<section class="d-sec">
+  <div class="d-wrap">
+    <div class="d-sec-head">
+      <p class="d-mono d-eyebrow" style="margin:0;">Qué tocar</p>
+      <h2 class="d-display d-h2">Una ruta, dos paneles, una preferencia</h2>
+      <p class="d-lede">El switch no necesita estado de cliente ni un router nuevo: es el mismo patrón que ya usás en <code>tabs.tsx</code>.</p>
+    </div>
+
+    <div class="d-steps">
+      <div class="d-step">
+        <h4>La vista es un <code>searchParam</code>, no un estado de React</h4>
+        <p><code>/portal/campanas/[campaignId]?vista=bandeja|conjunto</code>. El componente de servidor lee el parámetro y renderiza un panel u otro. El switch son dos <code>&lt;Link&gt;</code>, con la misma marca optimista que ya escribiste para las pestañas: se pinta al tocar, antes de que vuelva el servidor.</p>
+      </div>
+      <div class="d-step">
+        <h4>La preferencia, una fila por usuario y cliente</h4>
+        <p>Una tabla chica —<code>user_client_prefs(userId, clientId, vista)</code>— o una columna en la membresía que ya tenés. Una server action la escribe cuando alguien toca el switch. Sin parámetro en la URL, el layout redirige a la vista guardada; sin preferencia guardada, aplica la regla del umbral.</p>
+      </div>
+      <div class="d-step">
+        <h4>Las dos vistas leen los mismos repos</h4>
+        <p><code>candidacySummary</code> alimenta los números del switch. <code>listCandidacies</code> alimenta las dos vistas: la Bandeja pide de a uno ordenado por afinidad, el Conjunto pide la página completa. Aprobar es la misma server action en los dos lados, así que nunca hay dos verdades.</p>
+      </div>
+      <div class="d-step">
+        <h4>Los permisos no cambian</h4>
+        <p>Un lector ve las dos vistas sin botones de decisión; un revisor las ve con ellos. Es la misma comprobación de <code>candidate.approve</code> que ya corre hoy, aplicada en dos lugares en vez de uno.</p>
+      </div>
+      <div class="d-step">
+        <h4>El Conjunto necesita dos datos que hoy no tenés</h4>
+        <p>Costo y alcance objetivo por campaña. Mientras no estén cargados, el panel muestra solo alcance y mezcla —que salen de datos que ya tenés— y las barras de presupuesto quedan ocultas en lugar de mostrar ceros.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="d-foot">
+  <div class="d-wrap">
+    <p><b style="color:var(--ink-2)">Una señal para mirar dentro de un mes:</b> si la mayoría de los clientes toca el switch más de dos veces por sesión, es que ninguna de las dos vistas les alcanza sola y conviene fusionarlas —dejar el panel del squad siempre presente y que el switch pase a ser solo un control de densidad. Si en cambio cada uno elige una y no la toca más, el switch está bien como está y no hay nada que hacer.</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  var CL = {
+    'Fintech':   {label:'Fintech / Finanzas', bg:'#eaefff', fg:'#2f5bd6', av:'#a3d4ff'},
+    'Crypto':    {label:'Crypto / Web3',      bg:'#f3ebff', fg:'#6b3fb5', av:'#d9c2ff'},
+    'Lifestyle': {label:'Lifestyle',          bg:'#fff1e3', fg:'#8a5a06', av:'#ffd9a3'}
+  };
+  var P = [
+    {n:'Gabriela Totaro', h:'@gt.educacionfinanciera', f:39300, er:4.1, cl:'Fintech',   why:'Es la cuenta con más alcance del lote y su formato explicativo es exactamente el tono del brief.'},
+    {n:'Ivo Pirrone',     h:'@ivopirrone.ok',          f:31600, er:5.4, cl:'Crypto',    why:'Único perfil fuerte de cripto en la lista. Cubre el 20 % del squad que el brief pide y hoy nadie más cubre.'},
+    {n:'Lautaro Navarro', h:'@lautaro.navarro',        f:26700, er:3.8, cl:'Fintech',   why:'Publica finanzas personales cinco veces por semana. Constancia alta, audiencia de 25 a 34.'},
+    {n:'Ruteando América',h:'@ruteandoamerica',        f:24500, er:6.2, cl:'Lifestyle', why:'El engagement más alto del lote. Aporta el aire de lifestyle que pidió Kast para no sonar a banco.'},
+    {n:'Max Irazoqui',    h:'@dinerofacil_ok',         f:24300, er:3.2, cl:'Fintech',   why:'Formato corto y didáctico, muy cerca del lenguaje de producto de Kast.'},
+    {n:'Iván Carrino',    h:'@ivan.carrino',           f:21200, er:2.4, cl:'Fintech',   why:'Alcance bueno, pero línea editorial marcada. Vale revisarlo con el cliente antes de avanzar.'},
+    {n:'La Lupineta',     h:'@la_lupineta',            f:19800, er:5.9, cl:'Lifestyle', why:'Comunidad chica y muy activa. Buen complemento para las cuentas grandes de finanzas.'},
+    {n:'Fernando X',      h:'@fernandxo2021',          f:19700, er:3.5, cl:'Fintech',   why:'Perfil de ahorro e inversión para principiantes. Encaja con el público que Kast quiere sumar.'},
+    {n:'Julia Renas',     h:'@juliarenas__',           f:15100, er:6.8, cl:'Lifestyle', why:'El mejor engagement por seguidor de toda la campaña. Costo bajo, retorno alto.'},
+    {n:'Agustina Savoia', h:'@finanzasinfiltro_',      f:10300, er:4.6, cl:'Fintech',   why:'Ya viene aprobada de la campaña anterior de Kast. Relación construida.'},
+    {n:'Tu Dinero XL',    h:'@tudineroxl',             f:10000, er:4.0, cl:'Fintech',   why:'Cuenta chica pero en crecimiento sostenido: creció 40 % en tres meses.'}
+  ];
+  var PEND0 = 70, META = 250000, TOPE = 6000, MAX = 12;
+
+  function ini(s){ var p = s.trim().split(/\s+/); return ((p[0]||'')[0] + (p.length>1?(p[p.length-1]||'')[0]:'')).toUpperCase(); }
+  function miles(n){ return n.toLocaleString('es-AR'); }
+  function kf(n){ return (n/1000).toFixed(1).replace('.',',') + ' k'; }
+  function costo(p){ return Math.round(p.f/1000*22); }
+
+  /* ── estado compartido: una sola verdad para las dos vistas ── */
+  var dec = {};            // idx -> 'ok' | 'no' | 'ask'
+  var cursor = 0;          // perfil actual de la bandeja
+  var vista = 'bandeja';
+  var ultimo = null;
+  var toastT = null;
+
+  var $ = function(id){ return document.getElementById(id); };
+  var optA = $('optA'), optC = $('optC'), paneA = $('paneA'), paneC = $('paneC');
+  var toast = $('vToast'), toastX = $('vToastText'), undoB = $('vUndo');
+
+  function decididos(){ return Object.keys(dec).length; }
+  function squad(){ return Object.keys(dec).filter(function(k){ return dec[k] === 'ok'; }).map(Number); }
+
+  function avisar(txt, conUndo){
+    toastX.textContent = txt;
+    undoB.style.display = conUndo ? '' : 'none';
+    toast.classList.add('show');
+    clearTimeout(toastT);
+    toastT = setTimeout(function(){ toast.classList.remove('show'); }, 3200);
+  }
+
+  /* ── el switch ── */
+  function irA(v, motivo){
+    vista = v;
+    var esA = v === 'bandeja';
+    optA.setAttribute('aria-pressed', esA ? 'true' : 'false');
+    optC.setAttribute('aria-pressed', esA ? 'false' : 'true');
+    paneA.classList.toggle('on', esA);
+    paneC.classList.toggle('on', !esA);
+    $('mkUrl').textContent = 'influencers.jcmarketing.digital/kast/scouting-actual?vista=' + (esA ? 'bandeja' : 'conjunto');
+    $('vHint').textContent = motivo || 'Vista recordada para Sofía en Kast. Vas a entrar siempre por acá.';
+    if(!esA) pintarC();
+  }
+  optA.addEventListener('click', function(){ if(vista !== 'bandeja') irA('bandeja'); });
+  optC.addEventListener('click', function(){ if(vista !== 'conjunto') irA('conjunto'); });
+
+  function contadores(){
+    $('nPend').textContent = Math.max(0, PEND0 - decididos());
+    $('nSquad').textContent = squad().length + '/' + MAX;
+  }
+
+  /* ══════════ VISTA A ══════════ */
+  var card = $('aCard'), stack = $('aStack'), stage = $('aStage'), keys = $('aKeys'), bridge = $('aBridge');
+
+  function siguientePendiente(desde){
+    for(var k = desde; k < P.length; k++){ if(!dec[k]) return k; }
+    return -1;
+  }
+
+  function pintarA(anim){
+    if(cursor < 0 || cursor >= P.length){ terminar(); return; }
+    var p = P[cursor], c = CL[p.cl], ya = dec[cursor];
+    card.innerHTML =
+      '<div class="a-id">'+
+        '<span class="mk-avatar" style="width:48px;height:48px;font-size:18px;background:'+c.av+';">'+ini(p.n)+'</span>'+
+        '<span><h4>'+p.n+'</h4><p>'+p.h+'</p></span>'+
+        '<span class="a-cluster" style="background:'+c.bg+';color:'+c.fg+';">'+c.label+'</span>'+
+      '</div>'+
+      '<div class="a-metrics">'+
+        '<div class="a-metric"><span>Seguidores</span><b>'+kf(p.f)+'</b></div>'+
+        '<div class="a-metric"><span>Engagement</span><b>'+p.er.toFixed(1).replace('.',',')+'<small>%</small></b></div>'+
+        '<div class="a-metric"><span>Costo estimado</span><b>'+costo(p)+'<small>US$</small></b></div>'+
+      '</div>'+
+      '<p class="a-why"><b>Por qué te lo proponemos.</b> '+p.why+'</p>'+
+      (ya
+        ? '<p style="margin:14px 0 0;font-size:13px;color:var(--ui-muted);">Ya lo decidiste: <b style="color:var(--ui-text);">'+(ya==='ok'?'aprobado':ya==='no'?'descartado':'pediste más info')+'</b>. Podés cambiarlo.</p>'
+        : '') +
+      '<div class="a-actions">'+
+        '<button class="mk-btn a-yes" type="button" data-v="ok">Aprobar</button>'+
+        '<button class="mk-btn" type="button" data-v="ask">Pedir más info</button>'+
+        '<button class="mk-btn" type="button" data-v="no">Descartar</button>'+
+      '</div>';
+    if(anim){ card.classList.add('is-in'); setTimeout(function(){ card.classList.remove('is-in'); }, 280); }
+    $('aBar').style.width = (decididos() / P.length * 100) + '%';
+  }
+
+  function terminar(){
+    stack.innerHTML = '<div class="a-done"><h4>Listo</h4><p>Despachaste la cola. Los aprobados ya están en el squad — miralo en «El conjunto».</p><button class="mk-btn mk-btn-primary" type="button" id="aVerC">Ver el conjunto</button></div>';
+    keys.style.visibility = 'hidden';
+    bridge.style.visibility = 'hidden';
+    $('aVerC').addEventListener('click', function(){ irA('conjunto', 'Terminaste la cola. Esto es lo que armaste.'); });
+    $('aBar').style.width = '100%';
+  }
+
+  function restaurarStack(){
+    if($('aCard')) return;
+    stack.innerHTML = '<div class="a-card" id="aCard"></div>';
+    card = $('aCard');
+    keys.style.visibility = 'visible';
+    bridge.style.visibility = 'visible';
+  }
+
+  function decidir(v){
+    if(cursor < 0 || cursor >= P.length) return;
+    var p = P[cursor], previo = dec[cursor];
+    ultimo = {i:cursor, previo:previo};
+    dec[cursor] = v;
+    card.classList.add('is-out');
+    var prox = siguientePendiente(cursor + 1);
+    setTimeout(function(){
+      card.classList.remove('is-out');
+      cursor = prox;
+      contadores();
+      pintarA(true);
+    }, 250);
+    avisar((v === 'ok' ? 'Aprobaste a ' : v === 'no' ? 'Descartaste a ' : 'Pediste más info sobre ') + p.n, true);
+  }
+
+  stack.addEventListener('click', function(e){
+    var b = e.target.closest('button[data-v]');
+    if(b) decidir(b.getAttribute('data-v'));
+  });
+
+  undoB.addEventListener('click', function(){
+    if(!ultimo) return;
+    if(ultimo.previo) dec[ultimo.i] = ultimo.previo; else delete dec[ultimo.i];
+    cursor = ultimo.i; ultimo = null;
+    toast.classList.remove('show');
+    restaurarStack();
+    contadores(); pintarA(true);
+    if(vista === 'conjunto') pintarC();
+  });
+
+  bridge.addEventListener('click', function(){
+    var i = cursor;
+    irA('conjunto', 'Marcado: ' + (P[i] ? P[i].n : '') + '. Es el mismo perfil que estabas viendo.');
+    var chip = $('cPool').querySelector('.c-chip[data-i="' + i + '"]');
+    if(chip){
+      document.querySelectorAll('.c-chip.focus').forEach(function(c){ c.classList.remove('focus'); });
+      chip.classList.add('focus');
+      chip.scrollIntoView({block:'nearest', behavior:'smooth'});
+    }
+  });
+
+  var sobre = false;
+  stage.addEventListener('mouseenter', function(){ sobre = true; });
+  stage.addEventListener('mouseleave', function(){ sobre = false; });
+  document.addEventListener('keydown', function(e){
+    if(!sobre || vista !== 'bandeja') return;
+    var k = e.key.toLowerCase();
+    if(k === 'a'){ e.preventDefault(); decidir('ok'); }
+    else if(k === 'd'){ e.preventDefault(); decidir('no'); }
+    else if(k === '?' || k === '/'){ e.preventDefault(); decidir('ask'); }
+    else if(k === 'z'){ e.preventDefault(); undoB.click(); }
+    else if(k === 'v'){ e.preventDefault(); irA('conjunto'); }
+  });
+
+  /* ══════════ VISTA C ══════════ */
+  var pool = $('cPool'), squadEl = $('cSquad');
+
+  P.forEach(function(p, idx){
+    var c = CL[p.cl];
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'c-chip';
+    b.setAttribute('data-i', idx); b.setAttribute('data-picked', '0');
+    b.innerHTML = '<span class="mk-avatar" style="width:30px;height:30px;font-size:12px;background:'+c.av+';">'+ini(p.n)+'</span>'+
+                  '<span><span class="nm">'+p.n+'</span><span class="mt">'+kf(p.f)+' · ER '+p.er.toFixed(1).replace('.',',')+'% · US$ '+costo(p)+'</span></span>';
+    pool.appendChild(b);
+  });
+
+  function pintarC(){
+    var s = squad(), alcance = 0, gasto = 0, cl = {Fintech:0, Crypto:0, Lifestyle:0};
+    s.forEach(function(i){ alcance += P[i].f; gasto += costo(P[i]); cl[P[i].cl]++; });
+
+    $('cSize').textContent = s.length + ' / ' + MAX;
+    $('cReach').textContent = miles(alcance);
+    $('cReachBar').style.width = Math.min(100, alcance / META * 100) + '%';
+    $('cCost').textContent = 'US$ ' + miles(gasto);
+    var cb = $('cCostBar');
+    cb.style.width = Math.min(100, gasto / TOPE * 100) + '%';
+    cb.className = gasto > TOPE ? 'over' : '';
+
+    document.querySelectorAll('.c-mixrow').forEach(function(row){
+      var k = row.getAttribute('data-cl');
+      var pct = s.length ? Math.round(cl[k] / s.length * 100) : 0;
+      row.querySelector('.now').textContent = pct;
+      row.querySelector('.c-track i').style.width = pct + '%';
+    });
+
+    P.forEach(function(_, i){
+      var chip = pool.querySelector('.c-chip[data-i="' + i + '"]');
+      if(chip) chip.setAttribute('data-picked', dec[i] === 'ok' ? '1' : dec[i] === 'no' ? 'no' : '0');
+    });
+
+    squadEl.innerHTML = s.length
+      ? s.map(function(i){
+          return '<div class="c-member"><b>'+P[i].n+'</b><em>'+kf(P[i].f)+'</em>'+
+                 '<button type="button" data-rev="'+i+'">Revisar</button>'+
+                 '<button type="button" class="rm" data-rm="'+i+'" aria-label="Sacar del squad">×</button></div>';
+        }).join('')
+      : '<div class="c-empty">Todavía no elegiste a nadie</div>';
+
+    var v = $('cVerdict'), falta = META - alcance;
+    if(!s.length){ v.className = 'c-verdict'; v.textContent = 'El squad está vacío.'; }
+    else if(gasto > TOPE){ v.className = 'c-verdict warn'; v.textContent = 'Te pasaste US$ ' + miles(gasto - TOPE) + ' del tope.'; }
+    else if(!cl.Crypto){ v.className = 'c-verdict warn'; v.textContent = 'Falta cripto: el brief pide 20 % y hoy no hay ninguno.'; }
+    else if(falta > 0){ v.className = 'c-verdict'; v.textContent = 'Faltan ' + miles(falta) + ' seguidores para el objetivo.'; }
+    else { v.className = 'c-verdict good'; v.textContent = 'Alcance cubierto y dentro del presupuesto. Listo para proponer.'; }
+  }
+
+  pool.addEventListener('click', function(e){
+    var chip = e.target.closest('.c-chip');
+    if(!chip) return;
+    var i = Number(chip.getAttribute('data-i'));
+    ultimo = {i:i, previo:dec[i]};
+    if(dec[i] === 'ok'){ delete dec[i]; avisar('Sacaste a ' + P[i].n + ' del squad', true); }
+    else if(squad().length < MAX){ dec[i] = 'ok'; avisar('Sumaste a ' + P[i].n + ' al squad', true); }
+    else { avisar('El squad ya tiene ' + MAX + ' perfiles', false); return; }
+    contadores(); pintarC();
+  });
+
+  squadEl.addEventListener('click', function(e){
+    var rm = e.target.closest('button[data-rm]'), rev = e.target.closest('button[data-rev]');
+    if(rm){
+      var i = Number(rm.getAttribute('data-rm'));
+      ultimo = {i:i, previo:dec[i]};
+      delete dec[i];
+      contadores(); pintarC();
+      avisar('Sacaste a ' + P[i].n + ' del squad', true);
+    } else if(rev){
+      var j = Number(rev.getAttribute('data-rev'));
+      cursor = j;
+      restaurarStack();
+      pintarA(true);
+      irA('bandeja', 'Abriste la Bandeja en ' + P[j].n + '. Es el mismo perfil que tocaste en el conjunto.');
+    }
+  });
+
+  /* arranque */
+  cursor = 0;
+  contadores(); pintarA(false); pintarC();
+})();
+</script>

@@ -3,6 +3,9 @@ import type { Platform } from '@/generated/prisma/enums'
 import { env } from '@/lib/env'
 import { parseFollowers, parseProfileUrl } from '@/lib/domain/normalize'
 import { ApifyScoutingProvider } from './scouting-apify'
+import { HypeAuditorScoutingProvider } from './scouting-hypeauditor'
+import type { FiltrosDeScouting } from '@/lib/domain/filtros-scouting'
+import type { FiltrosDeAudiencia } from './hypeauditor-consulta'
 
 /**
  * Proveedor de scouting.
@@ -39,6 +42,23 @@ export type DiscoverParams = {
   minFollowers?: number | null
   maxFollowers?: number | null
   limit: number
+  /**
+   * Los filtros pedidos, para el proveedor que sepa aplicarlos.
+   *
+   * Los scrapers no filtran: devuelven lo que encuentran y recién después se
+   * marca cada resultado (`filtros-scouting.ts`). Un proveedor de datos, en
+   * cambio, filtra en el origen, y eso cambia lo que se paga: no se traen 200
+   * perfiles para quedarse con 12. Quien no sepa usarlos los ignora, y el
+   * marcado posterior sigue funcionando igual.
+   */
+  filtros?: FiltrosDeScouting | null
+  /**
+   * Filtros sobre el PÚBLICO del creador, no sobre el creador.
+   *
+   * Ningún scraper puede contestarlos. Van aparte para que quede a la vista
+   * que sólo un proveedor de datos los aplica.
+   */
+  audiencia?: FiltrosDeAudiencia | null
 }
 
 export type EnrichParams = {
@@ -464,9 +484,9 @@ class BrightDataProvider implements ScoutingProvider {
 const isRecord = (value: ScoutingRecord | null): value is ScoutingRecord => value !== null
 
 let cached: ScoutingProvider | null = null
-let armados: { brightdata: ScoutingProvider; apify: ScoutingProvider } | null = null
+let armados: ScoutingProvider[] | null = null
 
-function armar(): { brightdata: ScoutingProvider; apify: ScoutingProvider } {
+function armar(): ScoutingProvider[] {
   if (armados) return armados
   const config = env()
 
@@ -501,15 +521,32 @@ function armar(): { brightdata: ScoutingProvider; apify: ScoutingProvider } {
       )
     : new UnconfiguredScoutingProvider()
 
-  armados = { brightdata, apify }
+  const hypeauditor: ScoutingProvider = new HypeAuditorScoutingProvider({
+    authId: config.HYPEAUDITOR_AUTH_ID ?? '',
+    token: config.HYPEAUDITOR_API_TOKEN ?? '',
+    costoPorConsultaUsd: config.HYPEAUDITOR_COST_PER_CALL_USD ?? null,
+    sandbox: config.HYPEAUDITOR_SANDBOX === true,
+  })
+
+  /*
+   * El orden importa: es el que se recorre cuando el preferido no puede hacer
+   * el trabajo. HypeAuditor va primero porque es el único que filtra por
+   * audiencia --si está conectado y la búsqueda la pide, es el que corresponde--
+   * y los scrapers quedan detrás, que es donde estaban.
+   */
+  armados = [hypeauditor, apify, brightdata]
   return armados
+}
+
+function porNombre(nombre: string): ScoutingProvider | null {
+  return armar().find((p) => p.name === nombre) ?? null
 }
 
 /** El proveedor por defecto: el que dice `SCOUTING_PROVIDER`. */
 export function scoutingProvider(): ScoutingProvider {
   if (cached) return cached
-  const { brightdata, apify } = armar()
-  cached = env().SCOUTING_PROVIDER === 'apify' ? apify : brightdata
+  const elegido = porNombre(env().SCOUTING_PROVIDER)
+  cached = elegido ?? armar()[armar().length - 1]!
   return cached
 }
 
@@ -518,34 +555,31 @@ export function scoutingProvider(): ScoutingProvider {
  *
  * Ningún proveedor cubre todo. Bright Data, por ejemplo, no tiene descubrir por
  * palabra clave en Instagram --su biblioteca sólo ofrece "collect by URL" y
- * "discover by user name"--, y Apify sí. Antes eso obligaba a elegir un
- * proveedor para TODO y perder lo que el otro hacía mejor.
+ * "discover by user name"--, y Apify sí. HypeAuditor descubre en cinco redes
+ * pero no actualiza métricas. Antes eso obligaba a elegir un proveedor para
+ * TODO y perder lo que el otro hacía mejor.
  *
  * Se prefiere el configurado por defecto; si no puede hacer esta combinación de
- * plataforma y modo, se usa el otro. Y si ninguno puede, se devuelve el de
- * siempre para que el preflight lo diga con su nombre.
+ * plataforma y modo, se recorre el resto en orden. Y si ninguno puede, se
+ * devuelve el de siempre para que el preflight lo diga con su nombre.
  */
 export function scoutingProviderFor(platform: Platform, mode: 'DISCOVER' | 'ENRICH'): ScoutingProvider {
   const preferido = scoutingProvider()
-  if (preferido.supports(platform, mode)) return preferido
+  if (preferido.configured && preferido.supports(platform, mode)) return preferido
 
-  const { brightdata, apify } = armar()
-  const alternativo = preferido === apify ? brightdata : apify
-  return alternativo.supports(platform, mode) ? alternativo : preferido
+  const alternativo = armar().find((p) => p !== preferido && p.configured && p.supports(platform, mode))
+  return alternativo ?? preferido
 }
 
 /** El proveedor con el que se disparó una corrida, para poder seguirla. */
 export function scoutingProviderNamed(name: string): ScoutingProvider {
-  const { brightdata, apify } = armar()
-  if (name === apify.name) return apify
-  if (name === brightdata.name) return brightdata
-  return scoutingProvider()
+  return porNombre(name) ?? scoutingProvider()
 }
 
 /** Sólo para tests: permite inyectar un proveedor y devolver el real después. */
 export function __setScoutingProviderForTests(provider: ScoutingProvider | null): void {
   cached = provider
-  // Los dos armados también se reinician: si no, el ruteo por plataforma
-  // seguiría devolviendo el proveedor real de la corrida anterior.
-  armados = provider ? { brightdata: provider, apify: provider } : null
+  // La lista también se reinicia: si no, el ruteo por plataforma seguiría
+  // devolviendo el proveedor real de la corrida anterior.
+  armados = provider ? [provider] : null
 }

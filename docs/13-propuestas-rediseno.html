@@ -1,0 +1,1113 @@
+<title>Sacar el menú del medio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+/* ============================================================
+   TOKENS — la página (pared del estudio)
+   ============================================================ */
+:root{
+  /* claro por defecto */
+  --ground:#eceef1;
+  --ground-2:#ffffff;
+  --ground-3:#e2e5ea;
+  --rule:#d3d7de;
+  --rule-soft:#e2e5ea;
+  --ink:#0e1013;
+  --ink-2:#4a515c;
+  --ink-3:#7b8391;
+  --mark:#dff21f;
+  --mark-ink:#0e1013;
+  --accent-text:#5c6b00;
+  --accent-line:#b9cc00;
+  --signal:#2f5bd6;
+  --signal-soft:rgba(47,91,214,.10);
+  --good:#137a4a;
+  --warn:#a3620a;
+  --bad:#b3261e;
+  --shadow:0 1px 2px rgba(14,16,19,.06), 0 18px 44px -22px rgba(14,16,19,.35);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0e1013;
+    --ground-2:#16191e;
+    --ground-3:#1d2128;
+    --rule:#282d36;
+    --rule-soft:#1f232a;
+    --ink:#f2f4f7;
+    --ink-2:#a8b0bd;
+    --ink-3:#6f7886;
+    --accent-text:#d7ea1e;
+    --accent-line:#5d6b12;
+    --signal:#8aadff;
+    --signal-soft:rgba(138,173,255,.12);
+    --good:#4fce93;
+    --warn:#f0a63a;
+    --bad:#ff8a80;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 26px 60px -26px rgba(0,0,0,.85);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0e1013;
+  --ground-2:#16191e;
+  --ground-3:#1d2128;
+  --rule:#282d36;
+  --rule-soft:#1f232a;
+  --ink:#f2f4f7;
+  --ink-2:#a8b0bd;
+  --ink-3:#6f7886;
+  --accent-text:#d7ea1e;
+  --accent-line:#5d6b12;
+  --signal:#8aadff;
+  --signal-soft:rgba(138,173,255,.12);
+  --good:#4fce93;
+  --warn:#f0a63a;
+  --bad:#ff8a80;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 26px 60px -26px rgba(0,0,0,.85);
+}
+
+/* ============================================================
+   TOKENS — los mockups (son pantallas, no siguen el tema del lector)
+   ============================================================ */
+:root{
+  --ui-bg:#f6f7f9;
+  --ui-bg-2:#eef0f3;
+  --ui-surface:#ffffff;
+  --ui-border:#e4e7ec;
+  --ui-border-2:#cfd4dd;
+  --ui-text:#16181d;
+  --ui-text-2:#3a404b;
+  --ui-muted:#616874;
+  --ui-nav:#0c0d10;
+  --ui-nav-2:#16181d;
+  --ui-lime:#eaff3a;
+  --ui-lime-2:#dff21f;
+  --ui-good:#0f7a4a;
+  --ui-good-bg:#e7f6ee;
+  --ui-warn:#8a5a06;
+  --ui-warn-bg:#fdf3e0;
+  --ui-blue:#2f5bd6;
+  --ui-blue-bg:#eaefff;
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:'Archivo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size:16.5px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+:focus-visible{outline:2px solid var(--accent-line); outline-offset:3px; border-radius:3px;}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001ms !important; transition-duration:.001ms !important;}
+}
+
+/* ---------- tipografía base ---------- */
+.d-display{
+  font-family:'Anton', 'Haettenschweiler', 'Arial Narrow Bold', Impact, sans-serif;
+  text-transform:uppercase;
+  font-weight:400;
+  letter-spacing:.005em;
+  line-height:.94;
+  text-wrap:balance;
+}
+.d-mono{
+  font-family:'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size:11px;
+  letter-spacing:.13em;
+  text-transform:uppercase;
+}
+.d-eyebrow{color:var(--accent-text);}
+
+/* ---------- layout ---------- */
+.d-wrap{max-width:1240px; margin:0 auto; padding:0 24px;}
+.d-narrow{max-width:64ch;}
+.d-sec{padding:88px 0; border-top:1px solid var(--rule);}
+.d-sec:first-of-type{border-top:0;}
+.d-sec-head{display:flex; flex-direction:column; gap:14px; margin-bottom:44px;}
+.d-h2{font-size:clamp(30px,4.4vw,52px); margin:0;}
+.d-lede{font-size:18px; color:var(--ink-2); margin:0; max-width:62ch;}
+
+/* ---------- hero ---------- */
+.d-hero{padding:76px 0 72px; position:relative; overflow:hidden;}
+.d-hero-grid{
+  display:grid; gap:40px;
+  grid-template-columns:minmax(0,1fr);
+}
+@media(min-width:960px){ .d-hero-grid{grid-template-columns:minmax(0,1.45fr) minmax(0,1fr); align-items:end;} }
+.d-hero h1{font-size:clamp(46px,8.6vw,104px); margin:14px 0 0;}
+.d-hero h1 em{font-style:normal; background:var(--mark); color:var(--mark-ink); padding:0 .12em; box-decoration-break:clone; -webkit-box-decoration-break:clone;}
+.d-hero p{font-size:19px; color:var(--ink-2); margin:22px 0 0; max-width:56ch;}
+.d-facts{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; background:var(--rule); border:1px solid var(--rule);}
+.d-fact{background:var(--ground); padding:16px 18px;}
+.d-fact b{display:block; font-family:'Anton',sans-serif; font-size:30px; line-height:1; letter-spacing:.01em; font-weight:400;}
+.d-fact span{display:block; margin-top:6px; color:var(--ink-3);}
+
+/* ---------- hallazgos ---------- */
+.d-finds{display:grid; gap:1px; background:var(--rule); border:1px solid var(--rule);}
+@media(min-width:720px){ .d-finds{grid-template-columns:repeat(2,minmax(0,1fr));} }
+@media(min-width:1080px){ .d-finds{grid-template-columns:repeat(3,minmax(0,1fr));} }
+.d-find{background:var(--ground); padding:26px 24px 28px; display:flex; flex-direction:column; gap:10px;}
+.d-find .d-mono{color:var(--ink-3);}
+.d-find h3{margin:0; font-size:17px; font-weight:600; line-height:1.35; text-wrap:balance;}
+.d-find p{margin:0; color:var(--ink-2); font-size:15px;}
+.d-find code{
+  font-family:'IBM Plex Mono',monospace; font-size:12.5px;
+  background:var(--ground-3); padding:1px 5px; border-radius:3px; color:var(--ink-2);
+}
+
+/* ---------- tesis ---------- */
+.d-thesis{
+  border:1px solid var(--rule); border-left:4px solid var(--accent-line);
+  background:var(--ground-2); padding:34px 32px;
+  display:grid; gap:24px;
+}
+@media(min-width:860px){ .d-thesis{grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:center;} }
+.d-thesis h3{margin:0; font-size:clamp(24px,3vw,34px);}
+.d-thesis p{margin:0; color:var(--ink-2);}
+.d-swap{display:flex; flex-direction:column; gap:12px;}
+.d-swap-row{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+.d-old{color:var(--ink-3); text-decoration:line-through; text-decoration-thickness:1px;}
+.d-arrow{color:var(--accent-text);}
+.d-new{font-weight:600;}
+
+/* ---------- direcciones ---------- */
+.d-dir{padding:0 0 96px;}
+.d-dir-head{
+  display:grid; gap:26px; padding:64px 0 34px;
+  border-top:1px solid var(--rule);
+}
+@media(min-width:960px){ .d-dir-head{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); align-items:start; gap:56px;} }
+.d-tag{
+  display:inline-flex; align-items:center; gap:9px;
+  background:var(--mark); color:var(--mark-ink);
+  padding:5px 11px 4px; font-family:'IBM Plex Mono',monospace;
+  font-size:11px; letter-spacing:.14em; text-transform:uppercase; font-weight:500;
+}
+.d-dir h2{font-size:clamp(32px,5vw,60px); margin:16px 0 0;}
+.d-dir-sub{font-size:18px; color:var(--ink-2); margin:16px 0 0;}
+.d-specs{display:flex; flex-direction:column; gap:18px; padding-top:8px;}
+.d-spec{display:grid; grid-template-columns:104px minmax(0,1fr); gap:16px; align-items:start;}
+.d-spec dt{color:var(--ink-3); font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.13em; text-transform:uppercase; padding-top:5px;}
+.d-spec dd{margin:0; font-size:15px; color:var(--ink-2);}
+.d-spec dd strong{color:var(--ink); font-weight:600;}
+
+/* ---------- marco del mockup ---------- */
+.mk-frame{
+  border:1px solid var(--rule);
+  background:var(--ui-bg);
+  box-shadow:var(--shadow);
+  overflow:hidden;
+  color:var(--ui-text);
+  font-size:14px;
+  line-height:1.5;
+}
+.mk-chrome{
+  display:flex; align-items:center; gap:8px;
+  background:var(--ui-nav); padding:9px 14px;
+  border-bottom:1px solid #000;
+}
+.mk-dot{width:9px; height:9px; border-radius:50%; background:#33373f;}
+.mk-url{
+  margin-left:10px; font-family:'IBM Plex Mono',monospace; font-size:11px;
+  color:#7d8492; letter-spacing:.02em; text-transform:none;
+}
+.mk-caption{
+  display:flex; gap:14px; align-items:baseline; flex-wrap:wrap;
+  margin-top:14px; color:var(--ink-3); font-size:14px;
+}
+.mk-caption b{color:var(--ink-2); font-weight:600;}
+
+/* botones dentro de mockups */
+.mk-btn{
+  font:inherit; font-size:13px; font-weight:600; font-family:'Archivo',sans-serif;
+  border:1px solid var(--ui-border-2); background:var(--ui-surface); color:var(--ui-text);
+  padding:9px 14px; border-radius:9px; cursor:pointer; line-height:1.2;
+  transition:background .12s ease, border-color .12s ease, transform .08s ease;
+}
+.mk-btn:hover{background:var(--ui-bg-2);}
+.mk-btn:active{transform:translateY(1px);}
+.mk-btn-primary{background:var(--ui-nav); border-color:var(--ui-nav); color:var(--ui-lime);}
+.mk-btn-primary:hover{background:#000;}
+.mk-btn-ghost{border-color:transparent; background:transparent; color:var(--ui-muted);}
+.mk-btn-ghost:hover{background:var(--ui-bg-2); color:var(--ui-text);}
+.mk-btn:disabled{opacity:.4; cursor:not-allowed;}
+
+.mk-mono{font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase;}
+.mk-avatar{
+  display:grid; place-items:center; border-radius:50%;
+  font-family:'Anton',sans-serif; letter-spacing:.02em; color:#0c0d10; flex:none;
+}
+
+/* ============================================================
+   MOCKUP A — bandeja
+   ============================================================ */
+.a-top{
+  display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  padding:14px 20px; background:var(--ui-surface); border-bottom:1px solid var(--ui-border);
+}
+.a-crumb{display:flex; align-items:center; gap:8px; color:var(--ui-muted); font-size:13px;}
+.a-crumb b{color:var(--ui-text); font-weight:600;}
+.a-queues{display:flex; gap:4px; background:var(--ui-bg-2); padding:3px; border-radius:10px;}
+.a-queue{
+  font:inherit; font-size:12.5px; font-family:'Archivo',sans-serif; border:0; cursor:pointer;
+  background:transparent; color:var(--ui-muted); padding:6px 11px; border-radius:8px; font-weight:500;
+}
+.a-queue[aria-pressed="true"]{background:var(--ui-nav); color:var(--ui-lime); font-weight:600;}
+.a-progress{height:3px; background:var(--ui-bg-2);}
+.a-progress i{display:block; height:100%; background:var(--ui-lime-2); width:0; transition:width .35s cubic-bezier(.2,.7,.3,1);}
+.a-stage{position:relative; padding:30px 20px 62px; min-height:440px; display:flex; flex-direction:column; align-items:center;}
+.a-stack{position:relative; width:100%; max-width:560px;}
+.a-ghost{
+  position:absolute; left:0; right:0; top:0; height:100%;
+  background:var(--ui-surface); border:1px solid var(--ui-border); border-radius:14px;
+}
+.a-ghost.g1{transform:translateY(10px) scale(.978); opacity:.75;}
+.a-ghost.g2{transform:translateY(20px) scale(.956); opacity:.45;}
+.a-card{
+  position:relative; background:var(--ui-surface); border:1px solid var(--ui-border-2);
+  border-radius:14px; padding:22px 22px 20px; box-shadow:0 12px 30px -18px rgba(12,13,16,.5);
+}
+.a-card.is-out{animation:a-fly .28s ease forwards;}
+@keyframes a-fly{to{opacity:0; transform:translateY(-16px) scale(.97);}}
+.a-card.is-in{animation:a-drop .28s ease;}
+@keyframes a-drop{from{opacity:0; transform:translateY(14px) scale(.98);}}
+.a-id{display:flex; gap:14px; align-items:center;}
+.a-id h4{margin:0; font-size:20px; font-weight:700; letter-spacing:-.01em;}
+.a-id p{margin:2px 0 0; color:var(--ui-muted); font-size:13px; font-family:'IBM Plex Mono',monospace; letter-spacing:0; text-transform:none;}
+.a-cluster{
+  margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.1em;
+  text-transform:uppercase; padding:5px 9px; border-radius:6px; white-space:nowrap;
+}
+.a-metrics{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1px; background:var(--ui-border); border:1px solid var(--ui-border); border-radius:10px; overflow:hidden; margin-top:18px;}
+.a-metric{background:var(--ui-surface); padding:11px 13px;}
+.a-metric span{display:block; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ui-muted);}
+.a-metric b{display:block; margin-top:4px; font-family:'Anton',sans-serif; font-weight:400; font-size:22px; letter-spacing:.01em; font-variant-numeric:tabular-nums;}
+.a-metric b small{font-family:'Archivo',sans-serif; font-size:12px; font-weight:500; color:var(--ui-muted); margin-left:3px;}
+.a-why{margin:16px 0 0; padding:12px 14px; background:var(--ui-blue-bg); border-radius:10px; font-size:13.5px; color:#1b3a8f;}
+.a-why b{font-weight:700;}
+.a-actions{display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;}
+.a-actions .mk-btn{flex:1; min-width:118px; padding:11px 12px; font-size:13.5px;}
+.a-yes{background:var(--ui-nav); border-color:var(--ui-nav); color:var(--ui-lime);}
+.a-yes:hover{background:#000;}
+.a-keys{display:flex; gap:16px; justify-content:center; margin-top:16px; color:var(--ui-muted); font-size:11.5px;}
+.a-keys kbd{
+  font-family:'IBM Plex Mono',monospace; font-size:10.5px; background:var(--ui-bg-2);
+  border:1px solid var(--ui-border-2); border-bottom-width:2px; border-radius:5px; padding:2px 6px; color:var(--ui-text-2);
+}
+.a-done{text-align:center; padding:60px 20px; max-width:460px;}
+.a-done h4{font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:32px; margin:0 0 10px; letter-spacing:.01em;}
+.a-done p{color:var(--ui-muted); margin:0 0 20px;}
+.a-toast{
+  position:absolute; left:50%; bottom:14px; transform:translateX(-50%);
+  background:var(--ui-nav); color:#f4f5f7; font-size:12.5px; padding:8px 14px; border-radius:999px;
+  display:flex; align-items:center; gap:12px; opacity:0; pointer-events:none; transition:opacity .2s ease;
+}
+.a-toast.show{opacity:1; pointer-events:auto;}
+.a-toast button{background:none; border:0; color:var(--ui-lime); font:inherit; font-weight:700; cursor:pointer; padding:0;}
+
+/* ============================================================
+   MOCKUP B — documento vivo
+   ============================================================ */
+.b-grid{display:grid; grid-template-columns:minmax(0,1fr);}
+@media(min-width:900px){ .b-grid{grid-template-columns:198px minmax(0,1fr);} }
+.b-index{
+  border-right:1px solid var(--ui-border); background:var(--ui-surface); padding:20px 14px;
+  display:none;
+}
+@media(min-width:900px){ .b-index{display:block;} }
+.b-index p{margin:0 0 12px; padding:0 8px;}
+.b-index a{
+  display:flex; align-items:center; gap:9px; padding:7px 9px; border-radius:8px;
+  color:var(--ui-muted); text-decoration:none; font-size:13px; border-left:2px solid transparent;
+}
+.b-index a:hover{background:var(--ui-bg-2); color:var(--ui-text);}
+.b-index a.on{background:var(--ui-bg-2); color:var(--ui-text); font-weight:600; border-left-color:var(--ui-lime-2);}
+.b-index a i{
+  font-style:normal; margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:10.5px;
+  color:var(--ui-muted); font-weight:400;
+}
+.b-doc{max-height:520px; overflow-y:auto; background:var(--ui-bg); scroll-behavior:smooth;}
+.b-page{max-width:none; padding:0 0 40px;}
+.b-hero{background:var(--ui-surface); border-bottom:1px solid var(--ui-border); padding:26px 28px 22px;}
+.b-hero h4{margin:0; font-size:24px; font-weight:700; letter-spacing:-.015em;}
+.b-hero p{margin:8px 0 0; color:var(--ui-muted); font-size:13.5px;}
+.b-block{display:grid; grid-template-columns:minmax(0,1fr); gap:0; padding:26px 28px 6px;}
+@media(min-width:1060px){ .b-block{grid-template-columns:minmax(0,1fr) 224px; gap:26px;} }
+.b-body h5{
+  margin:0 0 12px; font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ui-muted);
+}
+.b-body p{margin:0 0 12px; color:var(--ui-text-2); font-size:14.5px; max-width:62ch;}
+.b-facts{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 8px;}
+.b-fact{background:var(--ui-surface); border:1px solid var(--ui-border); border-radius:9px; padding:9px 13px;}
+.b-fact span{display:block; font-family:'IBM Plex Mono',monospace; font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ui-muted);}
+.b-fact b{display:block; font-size:15px; font-weight:600; margin-top:3px; font-variant-numeric:tabular-nums;}
+.b-rows{border:1px solid var(--ui-border); border-radius:11px; overflow:hidden; background:var(--ui-surface);}
+.b-row{display:flex; align-items:center; gap:12px; padding:10px 13px; border-bottom:1px solid var(--ui-border);}
+.b-row:last-child{border-bottom:0;}
+.b-row .nm{font-weight:600; font-size:14px;}
+.b-row .hd{color:var(--ui-muted); font-size:12px; font-family:'IBM Plex Mono',monospace;}
+.b-row .sp{margin-left:auto; display:flex; align-items:center; gap:10px;}
+.b-pill{font-size:11.5px; font-weight:600; padding:3px 9px; border-radius:999px; white-space:nowrap;}
+.b-pill.ok{background:var(--ui-good-bg); color:var(--ui-good);}
+.b-pill.wait{background:var(--ui-warn-bg); color:var(--ui-warn);}
+.b-pill.no{background:#fdeceb; color:#a3231c;}
+.b-margin{display:flex; flex-direction:column; gap:10px;}
+.b-note{
+  background:var(--ui-surface); border:1px solid var(--ui-border); border-left:3px solid var(--ui-blue);
+  border-radius:9px; padding:10px 12px; font-size:12.5px; color:var(--ui-text-2);
+  animation:b-pop .22s ease;
+}
+@keyframes b-pop{from{opacity:0; transform:translateX(8px);}}
+.b-note b{display:block; font-size:11px; color:var(--ui-muted); font-weight:600; margin-bottom:3px;}
+.b-note.mine{border-left-color:var(--ui-lime-2);}
+.b-addnote{
+  border:1px dashed var(--ui-border-2); background:transparent; border-radius:9px; padding:9px 12px;
+  font:inherit; font-family:'Archivo',sans-serif; font-size:12.5px; color:var(--ui-muted); cursor:pointer; text-align:left;
+}
+.b-addnote:hover{border-color:var(--ui-blue); color:var(--ui-blue);}
+.b-timeline{display:flex; flex-direction:column; gap:0; border-left:2px solid var(--ui-border); padding-left:16px; margin-left:5px;}
+.b-ev{position:relative; padding:0 0 16px;}
+.b-ev::before{content:''; position:absolute; left:-21px; top:6px; width:8px; height:8px; border-radius:50%; background:var(--ui-border-2);}
+.b-ev.hi::before{background:var(--ui-lime-2);}
+.b-ev p{margin:0; font-size:13.5px; color:var(--ui-text-2);}
+.b-ev time{font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ui-muted); display:block; margin-bottom:2px;}
+
+/* ============================================================
+   MOCKUP C — squad builder
+   ============================================================ */
+.c-grid{display:grid; grid-template-columns:minmax(0,1fr);}
+@media(min-width:940px){ .c-grid{grid-template-columns:minmax(0,1fr) 330px;} }
+.c-pool{padding:18px 20px 22px; background:var(--ui-bg);}
+.c-pool-head{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+.c-pool-head h4{margin:0; font-size:16px; font-weight:700;}
+.c-pool-head span{color:var(--ui-muted); font-size:13px;}
+.c-chips{display:flex; flex-wrap:wrap; gap:8px;}
+.c-chip{
+  display:flex; align-items:center; gap:10px; background:var(--ui-surface);
+  border:1px solid var(--ui-border); border-radius:11px; padding:8px 12px 8px 8px;
+  cursor:pointer; font:inherit; font-family:'Archivo',sans-serif; text-align:left;
+  transition:border-color .12s ease, transform .1s ease, opacity .15s ease;
+}
+.c-chip:hover{border-color:var(--ui-border-2); transform:translateY(-1px);}
+.c-chip[data-picked="1"]{opacity:.35; border-style:dashed;}
+.c-chip .nm{display:block; font-size:13.5px; font-weight:600; line-height:1.2;}
+.c-chip .mt{display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ui-muted); margin-top:3px;}
+.c-panel{border-left:1px solid var(--ui-border); background:var(--ui-surface); padding:18px 18px 20px; display:flex; flex-direction:column; gap:16px;}
+.c-panel h4{margin:0; font-size:16px; font-weight:700; display:flex; align-items:baseline; gap:8px;}
+.c-panel h4 span{margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ui-muted); letter-spacing:.08em;}
+.c-goal{display:flex; flex-direction:column; gap:6px;}
+.c-goal-top{display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-size:12.5px;}
+.c-goal-top b{font-size:15px; font-weight:700; font-variant-numeric:tabular-nums;}
+.c-goal-top em{font-style:normal; color:var(--ui-muted); font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase;}
+.c-bar{height:7px; border-radius:99px; background:var(--ui-bg-2); overflow:hidden; position:relative;}
+.c-bar i{display:block; height:100%; background:var(--ui-nav); width:0; transition:width .3s cubic-bezier(.2,.7,.3,1);}
+.c-bar i.lime{background:var(--ui-lime-2);}
+.c-bar i.over{background:var(--ui-warn);}
+.c-mix{display:flex; flex-direction:column; gap:11px;}
+.c-mixrow{display:flex; flex-direction:column; gap:5px;}
+.c-mixtop{display:flex; align-items:baseline; gap:8px; font-size:12.5px;}
+.c-mixtop b{font-weight:600;}
+.c-mixtop em{margin-left:auto; font-style:normal; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ui-muted); font-variant-numeric:tabular-nums;}
+.c-track{height:6px; border-radius:99px; background:var(--ui-bg-2); position:relative; overflow:visible;}
+.c-track i{display:block; height:100%; border-radius:99px; width:0; transition:width .3s cubic-bezier(.2,.7,.3,1);}
+.c-target{position:absolute; top:-3px; width:2px; height:12px; background:var(--ui-text); border-radius:1px;}
+.c-squad{display:flex; flex-direction:column; gap:6px; min-height:52px;}
+.c-member{display:flex; align-items:center; gap:9px; background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:9px; padding:7px 9px; font-size:13px; animation:b-pop .2s ease;}
+.c-member b{font-weight:600;}
+.c-member em{font-style:normal; margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ui-muted);}
+.c-member button{background:none; border:0; color:var(--ui-muted); cursor:pointer; font-size:15px; line-height:1; padding:2px 4px; border-radius:5px;}
+.c-member button:hover{background:var(--ui-bg-2); color:#a3231c;}
+.c-empty{color:var(--ui-muted); font-size:13px; border:1px dashed var(--ui-border-2); border-radius:9px; padding:14px; text-align:center;}
+.c-verdict{font-size:12.5px; padding:10px 12px; border-radius:9px; background:var(--ui-bg-2); color:var(--ui-text-2);}
+.c-verdict.good{background:var(--ui-good-bg); color:var(--ui-good);}
+.c-verdict.warn{background:var(--ui-warn-bg); color:var(--ui-warn);}
+
+/* ---------- comparativa ---------- */
+.d-tablewrap{overflow-x:auto; border:1px solid var(--rule);}
+table.d-table{border-collapse:collapse; width:100%; min-width:720px; font-size:14.5px;}
+.d-table th, .d-table td{text-align:left; padding:14px 16px; border-bottom:1px solid var(--rule-soft); vertical-align:top;}
+.d-table thead th{
+  font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.13em; text-transform:uppercase;
+  color:var(--ink-3); background:var(--ground-2); border-bottom:1px solid var(--rule);
+}
+.d-table tbody th{font-weight:700; color:var(--ink); width:170px;}
+.d-table td{color:var(--ink-2);}
+.d-table tr:last-child th, .d-table tr:last-child td{border-bottom:0;}
+
+/* ---------- cierre ---------- */
+.d-keep{display:grid; gap:1px; background:var(--rule); border:1px solid var(--rule);}
+@media(min-width:780px){ .d-keep{grid-template-columns:repeat(2,minmax(0,1fr));} }
+.d-keep div{background:var(--ground); padding:22px 22px 24px;}
+.d-keep h4{margin:0 0 6px; font-size:15px; font-weight:600;}
+.d-keep p{margin:0; color:var(--ink-2); font-size:14.5px;}
+.d-keep code{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--accent-text);}
+.d-foot{padding:44px 0 72px; color:var(--ink-3); font-size:14px; border-top:1px solid var(--rule);}
+.d-foot p{max-width:70ch; margin:0 0 8px;}
+</style>
+
+<!-- ══════════════════════════ HERO ══════════════════════════ -->
+<header class="d-hero">
+  <div class="d-wrap d-hero-grid">
+    <div>
+      <p class="d-mono d-eyebrow" style="margin:0;">JC Influencers · Revisión de UX/UI · Agosto 2026</p>
+      <h1 class="d-display">Sacar el<br><em>menú</em> del medio</h1>
+      <p>Tres direcciones de diseño para la plataforma. Ninguna agrega funciones: las tres sacan capas de navegación y ponen el trabajo en primer plano. Los mockups de esta página son navegables y usan los perfiles reales de tu campaña Kast.</p>
+    </div>
+    <div class="d-facts">
+      <div class="d-fact"><b>2</b><span class="d-mono">Lados: agencia y portal</span></div>
+      <div class="d-fact"><b>8</b><span class="d-mono">Ítems en la barra lateral</span></div>
+      <div class="d-fact"><b>3</b><span class="d-mono">Niveles antes del dato</span></div>
+      <div class="d-fact"><b>248<small style="font-family:'Archivo';font-size:14px">px</small></b><span class="d-mono">Que el cliente no usa</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════ DIAGNÓSTICO ══════════════════════════ -->
+<section class="d-sec">
+  <div class="d-wrap">
+    <div class="d-sec-head">
+      <p class="d-mono d-eyebrow" style="margin:0;">Lo que encontré</p>
+      <h2 class="d-display d-h2">El producto está bien construido.<br>La interfaz está pidiendo permiso.</h2>
+      <p class="d-lede">Los datos, los permisos y el aislamiento entre clientes están resueltos con criterio. Lo que no está resuelto es la pregunta que la pantalla le hace al usuario: hoy le pregunta <em>dónde querés ir</em>, cuando lo que necesita es que le diga <em>qué tenés que decidir</em>.</p>
+    </div>
+
+    <div class="d-finds">
+      <div class="d-find">
+        <p class="d-mono">Portal del cliente</p>
+        <h3>Una barra lateral de 248&nbsp;px para un solo ítem</h3>
+        <p>En <code>(portal)/layout.tsx</code> el <code>nav</code> tiene exactamente una entrada: «Mis campañas». Todo el peso visual del panel interno se replica para un menú que no navega a ningún lado.</p>
+      </div>
+      <div class="d-find">
+        <p class="d-mono">Jerarquía</p>
+        <h3>Tres capas antes de ver un perfil</h3>
+        <p>Barra lateral → pestañas de campaña (<code>tabs.tsx</code>, 6 pestañas) → filtros. El cliente entra a aprobar y tiene que atravesar un organigrama para llegar.</p>
+      </div>
+      <div class="d-find">
+        <p class="d-mono">Tablero</p>
+        <h3>El 60&nbsp;% del funnel está vacío</h3>
+        <p>Screening 57, Propuesta 18, y tres columnas en cero. Negociación, Producción y Cerrado ocupan más de la mitad del ancho para decir «nadie».</p>
+      </div>
+      <div class="d-find">
+        <p class="d-mono">Tarjetas</p>
+        <h3>Los badges no distinguen nada</h3>
+        <p>«En screening / Pendiente» aparece idéntico en cada tarjeta de la columna. Un atributo que comparten todos los elementos de un grupo no es información: es ruido con borde redondeado.</p>
+      </div>
+      <div class="d-find">
+        <p class="d-mono">Contenido</p>
+        <h3>Se eligen personas sin ver una cara</h3>
+        <p>No hay una sola foto ni un solo posteo en la interfaz. La decisión de un influencer es visual y hoy se toma leyendo un @ y cuatro estrellas.</p>
+      </div>
+      <div class="d-find">
+        <p class="d-mono">Dato</p>
+        <h3>«70 esperando» no lleva a ningún lado</h3>
+        <p>El número más importante del negocio es tipografía estática arriba, y los 18 de «Propuesta» viven abajo. Dos verdades separadas por un scroll y sin un botón que las conecte.</p>
+      </div>
+    </div>
+
+    <div style="margin-top:44px;">
+      <div class="d-thesis">
+        <div>
+          <p class="d-mono d-eyebrow" style="margin:0 0 12px;">El hilo común de las tres</p>
+          <h3 class="d-display">La navegación deja de ser un mapa y pasa a ser una cola de trabajo</h3>
+          <p style="margin-top:14px;">Ninguna de las tres direcciones inventa una interacción rara. Las tres hacen la misma jugada: eliminan la barra lateral permanente y devuelven ese espacio y esa atención al contenido. Cambia dónde vive el contexto, no cuánta gente sabe usarlo.</p>
+        </div>
+        <div class="d-swap">
+          <div class="d-swap-row"><span class="d-old">Barra lateral fija</span><span class="d-arrow">→</span><span class="d-new">Contexto en el encabezado</span></div>
+          <div class="d-swap-row"><span class="d-old">Pestañas de sección</span><span class="d-arrow">→</span><span class="d-new">Una sola superficie</span></div>
+          <div class="d-swap-row"><span class="d-old">Filtrar para encontrar</span><span class="d-arrow">→</span><span class="d-new">Llega ordenado por urgencia</span></div>
+          <div class="d-swap-row"><span class="d-old">«¿Dónde estoy?»</span><span class="d-arrow">→</span><span class="d-new">«¿Qué tengo que decidir?»</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ DIRECCIÓN A ══════════════════════════ -->
+<section class="d-dir">
+  <div class="d-wrap">
+    <div class="d-dir-head">
+      <div>
+        <span class="d-tag">Dirección A</span>
+        <h2 class="d-display">Bandeja</h2>
+        <p class="d-dir-sub">Un perfil por vez, a pantalla completa, con dos teclas. La app no es un archivo que se consulta: es una fila que se despacha.</p>
+      </div>
+      <dl class="d-specs">
+        <div class="d-spec"><dt>Idea</dt><dd>El home no es un tablero, es <strong>la próxima decisión</strong>. La cola se arma sola por prioridad y quien entra no elige por dónde empezar.</dd></div>
+        <div class="d-spec"><dt>Desaparece</dt><dd>Barra lateral, pestañas, filtros, paginación de 60 en 60.</dd></div>
+        <div class="d-spec"><dt>Aparece</dt><dd>Foto y contexto grandes, «por qué te lo proponemos», atajos de teclado, deshacer.</dd></div>
+        <div class="d-spec"><dt>Para quién</dt><dd>El cliente que tiene 70 perfiles esperándolo. Y el scout, con su propia cola: duplicados, perfiles sin métricas, importaciones a confirmar.</dd></div>
+        <div class="d-spec"><dt>Riesgo</dt><dd>Quien quiere ver el conjunto se siente encerrado. Se resuelve con una vista «Ver los 75» que sigue existiendo, en segundo plano.</dd></div>
+      </dl>
+    </div>
+
+    <div class="mk-frame" id="mkA">
+      <div class="mk-chrome"><span class="mk-dot"></span><span class="mk-dot"></span><span class="mk-dot"></span><span class="mk-url">influencers.jcmarketing.digital</span></div>
+      <div class="a-top">
+        <div class="a-crumb"><b>Kast</b><span>›</span><span>Scouting actual</span></div>
+        <div class="a-queues" role="group" aria-label="Colas">
+          <button class="a-queue" type="button" aria-pressed="true">Esperan tu decisión · <span id="aCount">70</span></button>
+          <button class="a-queue" type="button" aria-pressed="false">Shortlist · 10</button>
+          <button class="a-queue" type="button" aria-pressed="false">Ver los 75</button>
+        </div>
+      </div>
+      <div class="a-progress"><i id="aBar"></i></div>
+      <div class="a-stage" id="aStage">
+        <div class="a-stack" id="aStack">
+          <div class="a-ghost g2" aria-hidden="true"></div>
+          <div class="a-ghost g1" aria-hidden="true"></div>
+          <div class="a-card" id="aCard"></div>
+        </div>
+        <div class="a-keys" id="aKeys">
+          <span><kbd>A</kbd> aprobar</span><span><kbd>D</kbd> descartar</span><span><kbd>?</kbd> pedir más info</span><span><kbd>Z</kbd> deshacer</span>
+        </div>
+        <div class="a-toast" id="aToast"><span id="aToastText"></span><button type="button" id="aUndo">Deshacer</button></div>
+      </div>
+    </div>
+    <p class="mk-caption"><b>Probalo:</b> aprobá o descartá y mirá cómo baja el contador. El teclado funciona cuando el cursor está sobre la tarjeta.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════ DIRECCIÓN B ══════════════════════════ -->
+<section class="d-dir">
+  <div class="d-wrap">
+    <div class="d-dir-head">
+      <div>
+        <span class="d-tag">Dirección B</span>
+        <h2 class="d-display">Documento vivo</h2>
+        <p class="d-dir-sub">La campaña deja de ser una app con secciones y vuelve a ser lo que el cliente ya sabía leer: un documento. Pero con las decisiones adentro y los comentarios al margen.</p>
+      </div>
+      <dl class="d-specs">
+        <div class="d-spec"><dt>Idea</dt><dd>Una sola página que se lee de arriba a abajo: brief → perfiles → decisiones. <strong>Cero pestañas.</strong> El índice flotante reemplaza al menú.</dd></div>
+        <div class="d-spec"><dt>Desaparece</dt><dd>Las 6 pestañas de campaña, el panel de actividad separado, el «Brief» como sección aparte.</dd></div>
+        <div class="d-spec"><dt>Aparece</dt><dd>Comentarios anclados al párrafo, como en un Google Doc. La conversación queda donde ocurrió, no en un feed cronológico.</dd></div>
+        <div class="d-spec"><dt>Para quién</dt><dd>Es el reemplazo directo del Excel y del PPT de propuesta. El cliente no aprende una plataforma: lee un documento que se actualiza solo.</dd></div>
+        <div class="d-spec"><dt>Riesgo</dt><dd>Con 200 perfiles el scroll se vuelve largo. Se resuelve agrupando por cluster y colapsando lo ya decidido.</dd></div>
+      </dl>
+    </div>
+
+    <div class="mk-frame" id="mkB">
+      <div class="mk-chrome"><span class="mk-dot"></span><span class="mk-dot"></span><span class="mk-dot"></span><span class="mk-url">influencers.jcmarketing.digital/kast/scouting-actual</span></div>
+      <div class="b-grid">
+        <nav class="b-index" aria-label="Índice del documento">
+          <p class="mk-mono" style="color:var(--ui-muted);">Kast · Scouting</p>
+          <a href="#bs1" class="on" data-t="bs1">Qué buscamos</a>
+          <a href="#bs2" data-t="bs2">Esperan tu ok <i>70</i></a>
+          <a href="#bs3" data-t="bs3">Ya aprobados <i>5</i></a>
+          <a href="#bs4" data-t="bs4">Qué pasó</a>
+        </nav>
+
+        <div class="b-doc" id="bDoc">
+          <div class="b-page">
+            <div class="b-hero">
+              <h4>Scouting actual</h4>
+              <p>Kast · Instagram y TikTok · 75 perfiles propuestos · actualizado hoy 11:40</p>
+            </div>
+
+            <section class="b-block" id="bs1">
+              <div class="b-body">
+                <h5>Qué buscamos</h5>
+                <p>Perfiles de finanzas personales y cripto en Argentina, con audiencia adulta joven y tono didáctico. Priorizamos engagement por sobre alcance: preferimos diez cuentas de 20&nbsp;k que hablen todos los días a una de 300&nbsp;k que postea una vez por mes.</p>
+                <div class="b-facts">
+                  <div class="b-fact"><span>País</span><b>Argentina</b></div>
+                  <div class="b-fact"><span>Seguidores</span><b>10 k – 60 k</b></div>
+                  <div class="b-fact"><span>ER mínimo</span><b>3,0 %</b></div>
+                  <div class="b-fact"><span>Squad objetivo</span><b>12 perfiles</b></div>
+                </div>
+              </div>
+              <div class="b-margin" data-margin="bs1">
+                <div class="b-note"><b>Sofía · Kast · ayer</b>Sumemos algo de lifestyle para no sonar solo a banco.</div>
+                <button class="b-addnote" type="button" data-add="bs1">+ Comentar este bloque</button>
+              </div>
+            </section>
+
+            <section class="b-block" id="bs2">
+              <div class="b-body">
+                <h5>Esperan tu ok · 70</h5>
+                <p>Ordenados por afinidad con el brief. Tocá el estado para cambiarlo; queda registrado con tu nombre y la hora.</p>
+                <div class="b-rows">
+                  <div class="b-row"><span class="mk-avatar" style="width:30px;height:30px;font-size:12px;background:#e6c9ff;">GT</span><span><span class="nm">Gabriela Totaro</span><br><span class="hd">@gt.educacionfinanciera · 39,3 k</span></span><span class="sp"><span class="b-pill wait">Esperando</span></span></div>
+                  <div class="b-row"><span class="mk-avatar" style="width:30px;height:30px;font-size:12px;background:#ffd9a3;">IP</span><span><span class="nm">Ivo Pirrone</span><br><span class="hd">@ivopirrone.ok · 31,6 k</span></span><span class="sp"><span class="b-pill wait">Esperando</span></span></div>
+                  <div class="b-row"><span class="mk-avatar" style="width:30px;height:30px;font-size:12px;background:#b8e6c8;">LN</span><span><span class="nm">Lautaro Navarro</span><br><span class="hd">@lautaro.navarro · 26,7 k</span></span><span class="sp"><span class="b-pill wait">Esperando</span></span></div>
+                  <div class="b-row"><span class="mk-avatar" style="width:30px;height:30px;font-size:12px;background:#a3d4ff;">MI</span><span><span class="nm">Max Irazoqui</span><br><span class="hd">@dinerofacil_ok · 24,3 k</span></span><span class="sp"><span class="b-pill wait">Esperando</span></span></div>
+                  <div class="b-row"><span class="mk-avatar" style="width:30px;height:30px;font-size:12px;background:#ffc9c9;">RA</span><span><span class="nm">Ruteando América</span><br><span class="hd">@ruteandoamerica · 24,5 k</span></span><span class="sp"><span class="b-pill wait">Esperando</span></span></div>
+                </div>
+              </div>
+              <div class="b-margin" data-margin="bs2">
+                <div class="b-note"><b>Juan · JC · hoy 09:12</b>Los tres primeros son los que más se parecen a lo que pediste.</div>
+                <button class="b-addnote" type="button" data-add="bs2">+ Comentar este bloque</button>
+              </div>
+            </section>
+
+            <section class="b-block" id="bs3">
+              <div class="b-body">
+                <h5>Ya aprobados · 5</h5>
+                <p>Pasan a negociación. Desde acá salen las condiciones y el calendario de publicación.</p>
+                <div class="b-rows">
+                  <div class="b-row"><span class="mk-avatar" style="width:30px;height:30px;font-size:12px;background:#dff21f;">AS</span><span><span class="nm">Agustina Savoia</span><br><span class="hd">@finanzasinfiltro_ · 10,3 k</span></span><span class="sp"><span class="b-pill ok">Aprobado</span></span></div>
+                  <div class="b-row"><span class="mk-avatar" style="width:30px;height:30px;font-size:12px;background:#dff21f;">TD</span><span><span class="nm">Tu Dinero XL</span><br><span class="hd">@tudineroxl · 10 k</span></span><span class="sp"><span class="b-pill ok">Aprobado</span></span></div>
+                  <div class="b-row"><span class="mk-avatar" style="width:30px;height:30px;font-size:12px;background:#cfd4dd;">IC</span><span><span class="nm">Iván Carrino</span><br><span class="hd">@ivan.carrino · 21,2 k</span></span><span class="sp"><span class="b-pill no">Descartado</span></span></div>
+                </div>
+              </div>
+              <div class="b-margin" data-margin="bs3">
+                <div class="b-note"><b>Sofía · Kast · ayer</b>Carrino no, por línea editorial. El resto va.</div>
+                <button class="b-addnote" type="button" data-add="bs3">+ Comentar este bloque</button>
+              </div>
+            </section>
+
+            <section class="b-block" id="bs4">
+              <div class="b-body">
+                <h5>Qué pasó</h5>
+                <div class="b-timeline">
+                  <div class="b-ev hi"><time>Hoy 11:40</time><p><b>Juan</b> importó 75 perfiles desde el Excel. 3 posibles duplicados marcados.</p></div>
+                  <div class="b-ev"><time>Ayer 18:05</time><p><b>Sofía (Kast)</b> aprobó 5 perfiles y descartó 1.</p></div>
+                  <div class="b-ev"><time>Ayer 15:22</time><p><b>Juan</b> propuso 18 perfiles al cliente.</p></div>
+                  <div class="b-ev"><time>22 ago</time><p><b>Sofía (Kast)</b> confirmó el brief.</p></div>
+                </div>
+              </div>
+              <div class="b-margin" data-margin="bs4"><button class="b-addnote" type="button" data-add="bs4">+ Comentar este bloque</button></div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="mk-caption"><b>Probalo:</b> scrolleá el documento y mirá el índice; tocá «Comentar este bloque» para dejar una nota al margen.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════ DIRECCIÓN C ══════════════════════════ -->
+<section class="d-dir">
+  <div class="d-wrap">
+    <div class="d-dir-head">
+      <div>
+        <span class="d-tag">Dirección C</span>
+        <h2 class="d-display">Armar el squad</h2>
+        <p class="d-dir-sub">No se aprueban perfiles de a uno: se compone un equipo contra el brief. Cada perfil que entra recalcula alcance, mezcla y presupuesto en vivo.</p>
+      </div>
+      <dl class="d-specs">
+        <div class="d-spec"><dt>Idea</dt><dd>La pantalla deja de ser una lista con filtros y pasa a ser <strong>un instrumento</strong>: el brief es la restricción y el squad es lo que estás construyendo.</dd></div>
+        <div class="d-spec"><dt>Desaparece</dt><dd>El funnel de 5 columnas con 3 vacías, la shortlist como pestaña aparte, el cálculo de alcance en un Excel paralelo.</dd></div>
+        <div class="d-spec"><dt>Aparece</dt><dd>Distancia al objetivo en vivo. Los clusters del brief (que ya existen en tu modelo de datos) pasan de etiqueta a meta medible.</dd></div>
+        <div class="d-spec"><dt>Para quién</dt><dd>El account que arma la propuesta y el cliente que quiere entender por qué son <em>estos</em> doce y no otros doce.</dd></div>
+        <div class="d-spec"><dt>Riesgo</dt><dd>Es la más ambiciosa de las tres. Necesita costo y alcance por perfil cargados; hoy los números entran a mano.</dd></div>
+      </dl>
+    </div>
+
+    <div class="mk-frame" id="mkC">
+      <div class="mk-chrome"><span class="mk-dot"></span><span class="mk-dot"></span><span class="mk-dot"></span><span class="mk-url">influencers.jcmarketing.digital/kast/squad</span></div>
+      <div class="a-top">
+        <div class="a-crumb"><b>Kast</b><span>›</span><span>Scouting actual</span><span>›</span><span>Squad</span></div>
+        <button class="mk-btn mk-btn-primary" type="button" id="cSend">Proponer al cliente</button>
+      </div>
+      <div class="c-grid">
+        <div class="c-pool">
+          <div class="c-pool-head">
+            <h4>Perfiles disponibles</h4>
+            <span id="cPoolCount">11 de 75 · ordenados por afinidad</span>
+          </div>
+          <div class="c-chips" id="cPool"></div>
+        </div>
+        <aside class="c-panel" aria-label="El squad">
+          <h4>El squad <span id="cSize">0 / 12</span></h4>
+
+          <div class="c-goal">
+            <div class="c-goal-top"><em>Alcance combinado</em><b id="cReach">0</b></div>
+            <div class="c-bar"><i id="cReachBar" class="lime"></i></div>
+            <div style="font-size:11.5px;color:var(--ui-muted);">Objetivo del brief: 250.000 seguidores</div>
+          </div>
+
+          <div class="c-mix">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ui-muted);">Mezcla vs. brief</div>
+            <div class="c-mixrow" data-cl="Fintech">
+              <div class="c-mixtop"><b>Fintech / Finanzas</b><em><span class="now">0</span>% · meta 50%</em></div>
+              <div class="c-track"><i style="background:#2f5bd6;"></i><span class="c-target" style="left:50%;"></span></div>
+            </div>
+            <div class="c-mixrow" data-cl="Crypto">
+              <div class="c-mixtop"><b>Crypto / Web3</b><em><span class="now">0</span>% · meta 20%</em></div>
+              <div class="c-track"><i style="background:#b07cff;"></i><span class="c-target" style="left:20%;"></span></div>
+            </div>
+            <div class="c-mixrow" data-cl="Lifestyle">
+              <div class="c-mixtop"><b>Lifestyle</b><em><span class="now">0</span>% · meta 30%</em></div>
+              <div class="c-track"><i style="background:#f0913a;"></i><span class="c-target" style="left:30%;"></span></div>
+            </div>
+          </div>
+
+          <div class="c-goal">
+            <div class="c-goal-top"><em>Costo estimado</em><b id="cCost">US$ 0</b></div>
+            <div class="c-bar"><i id="cCostBar"></i></div>
+            <div style="font-size:11.5px;color:var(--ui-muted);">Tope de campaña: US$ 6.000</div>
+          </div>
+
+          <div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ui-muted);margin-bottom:8px;">Elegidos</div>
+            <div class="c-squad" id="cSquad"><div class="c-empty">Tocá un perfil para sumarlo</div></div>
+          </div>
+
+          <div class="c-verdict" id="cVerdict">El squad está vacío.</div>
+        </aside>
+      </div>
+    </div>
+    <p class="mk-caption"><b>Probalo:</b> tocá perfiles del pool y mirá cómo se mueven las tres métricas. <span style="color:var(--ink-3)">El ER y el costo son ilustrativos; los perfiles y los seguidores salen de tu campaña Kast.</span></p>
+  </div>
+</section>
+
+<!-- ══════════════════════════ COMPARATIVA ══════════════════════════ -->
+<section class="d-sec">
+  <div class="d-wrap">
+    <div class="d-sec-head">
+      <p class="d-mono d-eyebrow" style="margin:0;">Cómo elegir</p>
+      <h2 class="d-display d-h2">Las tres son compatibles entre sí</h2>
+      <p class="d-lede">No son tres productos: son tres respuestas a momentos distintos del mismo trabajo. Lo que sigue es cuánto cuesta cada una y qué resuelve.</p>
+    </div>
+
+    <div class="d-tablewrap">
+      <table class="d-table">
+        <thead>
+          <tr><th>Dirección</th><th>Resuelve</th><th>Esfuerzo</th><th>Dónde encaja</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>A · Bandeja</th>
+            <td>Los 70 perfiles esperando. Convierte el número muerto del encabezado en la pantalla principal.</td>
+            <td>Bajo. Reusa <code>listCandidacies</code> y las acciones de aprobación que ya existen. Es una vista nueva, no un modelo nuevo.</td>
+            <td>Home del portal, y home del panel con la cola del scout.</td>
+          </tr>
+          <tr>
+            <th>B · Documento vivo</th>
+            <td>Que el cliente no tenga que aprender una plataforma. Reemplaza el Excel con algo que se lee igual.</td>
+            <td>Medio. Fusiona 4 de las 6 pestañas en una sola ruta y ancla los comentarios a un bloque en vez de a la campaña.</td>
+            <td>La vista de campaña completa, de los dos lados.</td>
+          </tr>
+          <tr>
+            <th>C · Armar el squad</th>
+            <td>Justificar la propuesta con números en vez de con estrellas. El «por qué estos doce».</td>
+            <td>Alto. Necesita costo y alcance por perfil, y los clusters del brief como meta y no como etiqueta.</td>
+            <td>Momento de armado, antes de proponer. Fase 2.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:40px;" class="d-thesis">
+      <div>
+        <p class="d-mono d-eyebrow" style="margin:0 0 12px;">Mi recomendación</p>
+        <h3 class="d-display">A como puerta, B como sala</h3>
+      </div>
+      <div>
+        <p style="margin:0;">Arrancaría con <strong>A</strong>: es la de menor costo y la que ataca el problema con nombre y apellido —70 decisiones trabadas—. Después <strong>B</strong>, que es el argumento comercial: «te sacamos el Excel». <strong>C</strong> queda para cuando tengas costo y alcance cargados por perfil, y ahí sí es un diferencial que ninguna planilla puede copiar.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ LO QUE NO SE TOCA ══════════════════════════ -->
+<section class="d-sec">
+  <div class="d-wrap">
+    <div class="d-sec-head">
+      <p class="d-mono d-eyebrow" style="margin:0;">Tranquilidad</p>
+      <h2 class="d-display d-h2">Nada de esto es reescribir la app</h2>
+      <p class="d-lede">Las tres direcciones cambian la capa de presentación. Todo lo que te costó construir queda intacto.</p>
+    </div>
+    <div class="d-keep">
+      <div><h4>Los tokens de marca</h4><p>Las variables de <code>globals.css</code> y el <code>ThemeScope</code> por cliente siguen funcionando igual: cambia el chasis, no la pintura. El negro y el lima se usan mejor, no menos.</p></div>
+      <div><h4>Permisos y aislamiento</h4><p><code>src/lib/authz/</code> y las tres barreras entre clientes no se tocan. Una vista nueva llama a las mismas capacidades.</p></div>
+      <div><h4>Los repos</h4><p><code>listCandidacies</code>, <code>candidacySummary</code>, <code>listComments</code> ya devuelven exactamente lo que estas pantallas necesitan.</p></div>
+      <div><h4>El importador</h4><p>Sigue siendo la única puerta de entrada de datos reales. Lo que cambia es qué hacés con ellos apenas entran.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer class="d-foot">
+  <div class="d-wrap">
+    <p><b style="color:var(--ink-2)">Sobre los datos de esta página:</b> los nombres, handles y seguidores salen de tu campaña Kast tal como se ven hoy en la plataforma. El engagement, el costo estimado y los comentarios son de ejemplo, para que los mockups se puedan probar.</p>
+    <p>Un detalle que apareció mirando la pantalla: «Agustina Savoia» y «Agustina Savoia (FinanzasSinFiltro)» son dos fichas del mismo perfil en la columna Propuesta. Tenés la ruta <code style="font-family:'IBM Plex Mono',monospace;color:var(--accent-text)">/influencers/duplicados</code> construida para eso — vale traer ese aviso al frente de la campaña en vez de dejarlo en una sección aparte.</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+
+  var CL = {
+    'Fintech':   {label:'Fintech / Finanzas', bg:'#eaefff', fg:'#2f5bd6', av:'#a3d4ff'},
+    'Crypto':    {label:'Crypto / Web3',      bg:'#f3ebff', fg:'#6b3fb5', av:'#d9c2ff'},
+    'Lifestyle': {label:'Lifestyle',          bg:'#fff1e3', fg:'#8a5a06', av:'#ffd9a3'}
+  };
+
+  var PERFILES = [
+    {n:'Gabriela Totaro', h:'@gt.educacionfinanciera', f:39300, er:4.1, cl:'Fintech',   why:'Es la cuenta con más alcance del lote y su formato explicativo es exactamente el tono del brief.'},
+    {n:'Ivo Pirrone',     h:'@ivopirrone.ok',          f:31600, er:5.4, cl:'Crypto',    why:'Único perfil fuerte de cripto en la lista. Cubre el 20 % del squad que el brief pide y hoy nadie más cubre.'},
+    {n:'Lautaro Navarro', h:'@lautaro.navarro',        f:26700, er:3.8, cl:'Fintech',   why:'Publica finanzas personales cinco veces por semana. Constancia alta, audiencia de 25 a 34.'},
+    {n:'Ruteando América',h:'@ruteandoamerica',        f:24500, er:6.2, cl:'Lifestyle', why:'El engagement más alto del lote. Aporta el aire de lifestyle que pidió Kast para no sonar a banco.'},
+    {n:'Max Irazoqui',    h:'@dinerofacil_ok',         f:24300, er:3.2, cl:'Fintech',   why:'Formato corto y didáctico, muy cerca del lenguaje de producto de Kast.'},
+    {n:'Iván Carrino',    h:'@ivan.carrino',           f:21200, er:2.4, cl:'Fintech',   why:'Alcance bueno, pero línea editorial marcada. Vale revisarlo con el cliente antes de avanzar.'},
+    {n:'La Lupineta',     h:'@la_lupineta',            f:19800, er:5.9, cl:'Lifestyle', why:'Comunidad chica y muy activa. Buen complemento para las cuentas grandes de finanzas.'},
+    {n:'Fernando X',      h:'@fernandxo2021',          f:19700, er:3.5, cl:'Fintech',   why:'Perfil de ahorro e inversión para principiantes. Encaja con el público que Kast quiere sumar.'},
+    {n:'Julia Renas',     h:'@juliarenas__',           f:15100, er:6.8, cl:'Lifestyle', why:'El mejor engagement por seguidor de toda la campaña. Costo bajo, retorno alto.'},
+    {n:'Agustina Savoia', h:'@finanzasinfiltro_',      f:10300, er:4.6, cl:'Fintech',   why:'Ya viene aprobada de la campaña anterior de Kast. Relación construida.'},
+    {n:'Tu Dinero XL',    h:'@tudineroxl',             f:10000, er:4.0, cl:'Fintech',   why:'Cuenta chica pero en crecimiento sostenido: creció 40 % en tres meses.'}
+  ];
+
+  function iniciales(nombre){
+    var p = nombre.trim().split(/\s+/);
+    return ((p[0]||'')[0] + (p.length>1 ? (p[p.length-1]||'')[0] : '')).toUpperCase();
+  }
+  function miles(n){ return n.toLocaleString('es-AR'); }
+  function kf(n){ return (n/1000).toFixed(1).replace('.',',') + ' k'; }
+  function costo(p){ return Math.round(p.f/1000*22); }
+
+  /* ═══════════ A · BANDEJA ═══════════ */
+  (function(){
+    var card = document.getElementById('aCard');
+    var stage = document.getElementById('aStage');
+    var stack = document.getElementById('aStack');
+    var keys  = document.getElementById('aKeys');
+    var bar   = document.getElementById('aBar');
+    var cnt   = document.getElementById('aCount');
+    var toast = document.getElementById('aToast');
+    var ttext = document.getElementById('aToastText');
+    var undoB = document.getElementById('aUndo');
+    if(!card) return;
+
+    var TOTAL = 70, i = 0, hechos = 0, ultimo = null, tid = null;
+
+    function render(anim){
+      if(i >= PERFILES.length){ terminar(); return; }
+      var p = PERFILES[i], c = CL[p.cl];
+      card.innerHTML =
+        '<div class="a-id">'+
+          '<span class="mk-avatar" style="width:52px;height:52px;font-size:19px;background:'+c.av+';">'+iniciales(p.n)+'</span>'+
+          '<span><h4>'+p.n+'</h4><p>'+p.h+'</p></span>'+
+          '<span class="a-cluster" style="background:'+c.bg+';color:'+c.fg+';">'+c.label+'</span>'+
+        '</div>'+
+        '<div class="a-metrics">'+
+          '<div class="a-metric"><span>Seguidores</span><b>'+kf(p.f)+'</b></div>'+
+          '<div class="a-metric"><span>Engagement</span><b>'+p.er.toFixed(1).replace('.',',')+'<small>%</small></b></div>'+
+          '<div class="a-metric"><span>Costo estimado</span><b>'+costo(p)+'<small>US$</small></b></div>'+
+        '</div>'+
+        '<p class="a-why"><b>Por qué te lo proponemos.</b> '+p.why+'</p>'+
+        '<div class="a-actions">'+
+          '<button class="mk-btn a-yes" type="button" data-v="ok">Aprobar</button>'+
+          '<button class="mk-btn" type="button" data-v="ask">Pedir más info</button>'+
+          '<button class="mk-btn" type="button" data-v="no">Descartar</button>'+
+        '</div>';
+      if(anim){ card.classList.add('is-in'); setTimeout(function(){ card.classList.remove('is-in'); }, 300); }
+    }
+
+    function terminar(){
+      stack.innerHTML = '<div class="a-done"><h4>Listo</h4><p>Despachaste toda la cola. La agencia ya lo ve en su tablero y los aprobados pasan a negociación.</p><button class="mk-btn mk-btn-primary" type="button" id="aReset">Volver a empezar</button></div>';
+      keys.style.visibility = 'hidden';
+      document.getElementById('aReset').addEventListener('click', reiniciar);
+    }
+
+    function reiniciar(){
+      i = 0; hechos = 0; ultimo = null;
+      stack.innerHTML = '<div class="a-ghost g2" aria-hidden="true"></div><div class="a-ghost g1" aria-hidden="true"></div><div class="a-card" id="aCard"></div>';
+      card = document.getElementById('aCard');
+      keys.style.visibility = 'visible';
+      actualizar(); render(true);
+    }
+
+    function actualizar(){
+      cnt.textContent = TOTAL - hechos;
+      bar.style.width = (hechos / PERFILES.length * 100) + '%';
+    }
+
+    function decidir(v){
+      if(i >= PERFILES.length) return;
+      var p = PERFILES[i];
+      ultimo = {i:i, hechos:hechos};
+      card.classList.add('is-out');
+      setTimeout(function(){
+        card.classList.remove('is-out');
+        i++; hechos++; actualizar(); render(true);
+      }, 260);
+      var msg = v === 'ok' ? 'Aprobaste a ' + p.n : v === 'no' ? 'Descartaste a ' + p.n : 'Pediste más info sobre ' + p.n;
+      ttext.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(tid);
+      tid = setTimeout(function(){ toast.classList.remove('show'); }, 3200);
+    }
+
+    stack.addEventListener('click', function(e){
+      var b = e.target.closest('button[data-v]');
+      if(b) decidir(b.getAttribute('data-v'));
+    });
+
+    undoB.addEventListener('click', function(){
+      if(!ultimo) return;
+      i = ultimo.i; hechos = ultimo.hechos; ultimo = null;
+      toast.classList.remove('show');
+      if(!document.getElementById('aCard')){
+        stack.innerHTML = '<div class="a-ghost g2" aria-hidden="true"></div><div class="a-ghost g1" aria-hidden="true"></div><div class="a-card" id="aCard"></div>';
+        card = document.getElementById('aCard');
+        keys.style.visibility = 'visible';
+      }
+      actualizar(); render(true);
+    });
+
+    var sobre = false;
+    stage.addEventListener('mouseenter', function(){ sobre = true; });
+    stage.addEventListener('mouseleave', function(){ sobre = false; });
+    document.addEventListener('keydown', function(e){
+      if(!sobre) return;
+      var k = e.key.toLowerCase();
+      if(k === 'a'){ e.preventDefault(); decidir('ok'); }
+      else if(k === 'd'){ e.preventDefault(); decidir('no'); }
+      else if(k === '?' || k === '/'){ e.preventDefault(); decidir('ask'); }
+      else if(k === 'z'){ e.preventDefault(); undoB.click(); }
+    });
+
+    actualizar(); render(false);
+  })();
+
+  /* ═══════════ B · DOCUMENTO VIVO ═══════════ */
+  (function(){
+    var doc = document.getElementById('bDoc');
+    if(!doc) return;
+    var links = Array.prototype.slice.call(document.querySelectorAll('.b-index a'));
+    var secs  = links.map(function(a){ return document.getElementById(a.getAttribute('data-t')); });
+
+    function marcar(){
+      var top = doc.scrollTop + 70, activo = 0;
+      secs.forEach(function(s, n){ if(s && s.offsetTop <= top) activo = n; });
+      links.forEach(function(a, n){ a.classList.toggle('on', n === activo); });
+    }
+    doc.addEventListener('scroll', marcar, {passive:true});
+    marcar();
+
+    links.forEach(function(a){
+      a.addEventListener('click', function(e){
+        e.preventDefault();
+        var s = document.getElementById(a.getAttribute('data-t'));
+        if(s) doc.scrollTo({top:s.offsetTop - 8, behavior:'smooth'});
+      });
+    });
+
+    var ejemplos = [
+      'Este me cierra. Avancemos.',
+      '¿Podemos ver dos reels suyos antes de decidir?',
+      'Ojo con la superposición de audiencia con el anterior.',
+      'De acuerdo, pero ajustemos el mensaje a producto.'
+    ];
+    var n = 0;
+    document.querySelectorAll('.b-addnote').forEach(function(b){
+      b.addEventListener('click', function(){
+        var caja = b.parentNode;
+        var nota = document.createElement('div');
+        nota.className = 'b-note mine';
+        nota.innerHTML = '<b>Vos · ahora</b>' + ejemplos[n % ejemplos.length];
+        n++;
+        caja.insertBefore(nota, b);
+      });
+    });
+  })();
+
+  /* ═══════════ C · ARMAR EL SQUAD ═══════════ */
+  (function(){
+    var pool = document.getElementById('cPool');
+    if(!pool) return;
+    var squadEl = document.getElementById('cSquad');
+    var META_ALCANCE = 250000, TOPE = 6000, MAX = 12;
+    var METAS = {Fintech:50, Crypto:20, Lifestyle:30};
+    var elegidos = [];
+
+    PERFILES.forEach(function(p, idx){
+      var c = CL[p.cl];
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'c-chip';
+      b.setAttribute('data-i', idx);
+      b.setAttribute('data-picked', '0');
+      b.innerHTML = '<span class="mk-avatar" style="width:30px;height:30px;font-size:12px;background:'+c.av+';">'+iniciales(p.n)+'</span>'+
+                    '<span><span class="nm">'+p.n+'</span><span class="mt">'+kf(p.f)+' · ER '+p.er.toFixed(1).replace('.',',')+'% · US$ '+costo(p)+'</span></span>';
+      pool.appendChild(b);
+    });
+
+    function pintar(){
+      var alcance = 0, gasto = 0, porCl = {Fintech:0, Crypto:0, Lifestyle:0};
+      elegidos.forEach(function(idx){
+        var p = PERFILES[idx];
+        alcance += p.f; gasto += costo(p); porCl[p.cl]++;
+      });
+
+      document.getElementById('cSize').textContent = elegidos.length + ' / ' + MAX;
+      document.getElementById('cReach').textContent = miles(alcance);
+      document.getElementById('cReachBar').style.width = Math.min(100, alcance / META_ALCANCE * 100) + '%';
+      document.getElementById('cCost').textContent = 'US$ ' + miles(gasto);
+
+      var cb = document.getElementById('cCostBar');
+      cb.style.width = Math.min(100, gasto / TOPE * 100) + '%';
+      cb.className = gasto > TOPE ? 'over' : '';
+
+      document.querySelectorAll('.c-mixrow').forEach(function(row){
+        var cl = row.getAttribute('data-cl');
+        var pct = elegidos.length ? Math.round(porCl[cl] / elegidos.length * 100) : 0;
+        row.querySelector('.now').textContent = pct;
+        row.querySelector('.c-track i').style.width = pct + '%';
+      });
+
+      if(!elegidos.length){
+        squadEl.innerHTML = '<div class="c-empty">Tocá un perfil para sumarlo</div>';
+      } else {
+        squadEl.innerHTML = elegidos.map(function(idx){
+          var p = PERFILES[idx];
+          return '<div class="c-member"><b>'+p.n+'</b><em>'+kf(p.f)+'</em>'+
+                 '<button type="button" data-rm="'+idx+'" aria-label="Quitar '+p.n+'">×</button></div>';
+        }).join('');
+      }
+
+      var v = document.getElementById('cVerdict');
+      var falta = META_ALCANCE - alcance;
+      if(!elegidos.length){
+        v.className = 'c-verdict'; v.textContent = 'El squad está vacío.';
+      } else if(gasto > TOPE){
+        v.className = 'c-verdict warn';
+        v.textContent = 'Te pasaste US$ ' + miles(gasto - TOPE) + ' del tope. Sacá una cuenta grande o negociá el paquete.';
+      } else if(porCl.Crypto === 0){
+        v.className = 'c-verdict warn';
+        v.textContent = 'Falta cripto: el brief pide 20 % y hoy no hay ninguno. Ivo Pirrone es el único del lote que lo cubre.';
+      } else if(falta > 0){
+        v.className = 'c-verdict';
+        v.textContent = 'Faltan ' + miles(falta) + ' seguidores para llegar al objetivo de alcance.';
+      } else {
+        v.className = 'c-verdict good';
+        v.textContent = 'Alcance cubierto y dentro del presupuesto. Listo para proponer.';
+      }
+    }
+
+    pool.addEventListener('click', function(e){
+      var chip = e.target.closest('.c-chip');
+      if(!chip) return;
+      var idx = Number(chip.getAttribute('data-i'));
+      var pos = elegidos.indexOf(idx);
+      if(pos > -1){ elegidos.splice(pos, 1); chip.setAttribute('data-picked','0'); }
+      else if(elegidos.length < MAX){ elegidos.push(idx); chip.setAttribute('data-picked','1'); }
+      pintar();
+    });
+
+    squadEl.addEventListener('click', function(e){
+      var b = e.target.closest('button[data-rm]');
+      if(!b) return;
+      var idx = Number(b.getAttribute('data-rm'));
+      elegidos.splice(elegidos.indexOf(idx), 1);
+      var chip = pool.querySelector('.c-chip[data-i="'+idx+'"]');
+      if(chip) chip.setAttribute('data-picked','0');
+      pintar();
+    });
+
+    document.getElementById('cSend').addEventListener('click', function(){
+      var b = this, t = b.textContent;
+      b.textContent = elegidos.length ? 'Propuesto · ' + elegidos.length + ' perfiles' : 'Elegí al menos uno';
+      setTimeout(function(){ b.textContent = t; }, 1800);
+    });
+
+    pintar();
+  })();
+})();
+</script>

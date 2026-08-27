@@ -16,6 +16,7 @@ import { consumeRateLimit } from '@/lib/auth/rate-limit'
 import { scoutingProviderFor, scoutingProviderNamed, ScoutingUnavailableError } from '@/lib/ports/scouting'
 import { parseProfileUrl } from '@/lib/domain/normalize'
 import { detectDuplicates } from './influencers'
+import { registrarHallazgos, vincularConInfluencer } from './base-conocimiento'
 import { actorOf, scoped } from './base'
 
 /**
@@ -295,7 +296,12 @@ export async function startScouting(ctx: AuthContext, runId: string): Promise<{ 
     )
   }
 
-  const query = run.query as { keywords?: string[]; urls?: string[]; limit?: number }
+  const query = run.query as {
+    keywords?: string[]
+    urls?: string[]
+    limit?: number
+    filtros?: FiltrosDeScouting | null
+  }
   try {
     const job =
       run.mode === 'DISCOVER'
@@ -303,6 +309,14 @@ export async function startScouting(ctx: AuthContext, runId: string): Promise<{ 
             platform: run.platform,
             keywords: query.keywords ?? [],
             limit: query.limit ?? run.requestedRecords,
+            /*
+             * Los filtros viajan al proveedor, no sólo al marcado posterior.
+             * El que sabe filtrar en el origen --HypeAuditor-- devuelve
+             * directamente lo que sirve en vez de hacernos pagar 200 perfiles
+             * para quedarnos con 12. El que no sabe los ignora, y el marcado
+             * de `filtros-scouting.ts` sigue haciendo su trabajo igual.
+             */
+            filtros: query.filtros ?? null,
           })
         : await provider.startEnrich({ platform: run.platform, urls: query.urls ?? [] })
 
@@ -419,6 +433,29 @@ export async function pollScouting(ctx: AuthContext, runId: string): Promise<Pol
           },
         })
       }
+
+      /*
+       * Lo que se pagó una vez queda en la base de la agencia. Va acá adentro,
+       * en la misma transacción que registra la corrida: no hay forma de que se
+       * cobre una búsqueda y no quede nada aprendido.
+       */
+      const query = run.query as { keywords?: string[] }
+      await registrarHallazgos(tx, {
+        provider: run.provider,
+        keywords: query.keywords ?? [],
+        hallazgos: records.map((r) => ({
+          platform: r.platform,
+          url: r.url,
+          urlNormalized: r.urlNormalized,
+          handle: r.handle,
+          displayName: r.displayName,
+          followers: r.followers,
+          engagementRate: r.engagementRate,
+          country: r.country,
+          bio: r.bio,
+          profileImageUrl: r.profileImageUrl,
+        })),
+      })
 
       await tx.scoutingRun.update({
         where: { id: runId },
@@ -652,6 +689,16 @@ export async function importScoutingResults(
         await tx.scoutingResult.update({
           where: { id: result.id },
           data: { imported: true, importedAt: new Date(), matchedInfluencerId: influencerId },
+        })
+        /*
+         * Se ata el perfil de la base al influencer del padrón. Es el puente por
+         * el que la ficha muestra campañas y pagos: no se copian, se leen de la
+         * campaña, así que no puede haber dos verdades sobre la misma plata.
+         */
+        await vincularConInfluencer(tx, {
+          platform: result.platform,
+          urlNormalized: result.urlNormalized,
+          influencerId,
         })
         await detectDuplicates(tx, influencerId)
       }

@@ -478,6 +478,7 @@ model Influencer {
   sources     SourceReference[]
   duplicatesA InfluencerDuplicate[] @relation("DuplicateA")
   duplicatesB InfluencerDuplicate[] @relation("DuplicateB")
+  discovered  DiscoveredProfile[]
 
   @@index([status])
   @@index([country])
@@ -1571,4 +1572,89 @@ model CampaignGoal {
   @@unique([campaignId, metric])
   @@index([clientId, campaignId])
   @@map("campaign_goals")
+}
+
+/// Base de conocimiento propia de la agencia.
+///
+/// Cada búsqueda que se paga deja acá lo que encontró. La diferencia con
+/// `ScoutingResult` es el alcance y la vida útil: aquél es el recibo de UNA
+/// corrida para UN cliente --se archiva con ella--, y esto es lo que la agencia
+/// sabe, acumulado, sin dueño.
+///
+/// Es la única tabla del sistema sin `clientId`, y es a propósito: un perfil de
+/// Instagram no le pertenece a ningún cliente. Por eso la política de acceso no
+/// es de aislamiento por cliente sino de agencia --sólo la agencia entra--, lo
+/// mismo que ya rige para ejecutar scouting.
+///
+/// La idea detrás: cada consulta que se paga tiene que valer más de una vez.
+model DiscoveredProfile {
+  id String @id @default(cuid())
+
+  platform      Platform
+  url           String
+  /// La URL canónica. Es la identidad del perfil: dos corridas que traen al
+  /// mismo creador escriben la misma fila.
+  urlNormalized String
+  handle        String?
+  displayName   String?
+
+  /// Lo último que se supo. El recorrido completo vive en `metrics`.
+  followers       Int?
+  engagementRate  Decimal? @db.Decimal(6, 3)
+  country         String?
+  bio             String?
+  profileImageUrl String?
+
+  /// Con qué palabras apareció. Se acumulan: es cómo lo vuelve a encontrar
+  /// quien busque por tema sin acordarse del nombre.
+  keywords  String[] @default([])
+  /// Intereses o categorías que informó el proveedor, cuando los informa.
+  interests String[] @default([])
+  /// Quiénes lo devolvieron. Procedencia: el producto siempre puede decir de
+  /// dónde salió un dato.
+  providers String[] @default([])
+
+  /// Cuántas búsquedas distintas lo trajeron. Un perfil que aparece siempre
+  /// para un tema es una señal, no ruido.
+  timesSeen   Int      @default(1)
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  /// Notas de la agencia sobre este perfil. Nunca se muestran a un cliente.
+  internalNotes String?
+
+  /// El influencer del padrón, cuando este perfil ya fue incorporado.
+  /// Es el puente por el que la ficha muestra campañas y pagos sin copiarlos.
+  influencerId String?
+  influencer   Influencer? @relation(fields: [influencerId], references: [id], onDelete: SetNull)
+
+  metrics DiscoveredProfileMetric[]
+
+  @@unique([platform, urlNormalized])
+  @@index([platform, followers])
+  @@index([country])
+  @@index([lastSeenAt])
+  @@index([influencerId])
+  @@map("discovered_profiles")
+}
+
+/// Cómo fueron cambiando los números de un perfil.
+///
+/// Se agrega una fila sólo cuando el dato cambió. Con el tiempo esto contesta
+/// gratis algo por lo que hoy habría que pagarle a un proveedor: si un creador
+/// está creciendo o cayendo.
+model DiscoveredProfileMetric {
+  id        String @id @default(cuid())
+  profileId String
+
+  followers      Int?
+  engagementRate Decimal? @db.Decimal(6, 3)
+  /// Quién lo midió. Dos proveedores pueden no coincidir, y hay que poder verlo.
+  provider       String
+  seenAt         DateTime @default(now())
+
+  profile DiscoveredProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, seenAt])
+  @@map("discovered_profile_metrics")
 }
