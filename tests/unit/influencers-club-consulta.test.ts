@@ -187,6 +187,11 @@ describe('leer un creador', () => {
     },
   }
 
+  /*
+   * El traductor sí la lee: la decisión de no guardarla es del adaptador, que
+   * es quien sabe que nuestro CSP la bloquea. Separarlo deja el traductor fiel
+   * al contrato.
+   */
   it('lee los campos anidados como los manda', () => {
     expect(leerCreador('INSTAGRAM', creador)).toMatchObject({
       handle: 'lachef.ok',

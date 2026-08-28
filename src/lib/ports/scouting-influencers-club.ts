@@ -247,7 +247,19 @@ export class InfluencersClubScoutingProvider implements ScoutingProvider {
            */
           country: null,
           bio: null,
-          profileImageUrl: perfil.profileImageUrl,
+          /*
+           * La foto no se guarda, y es a propósito.
+           *
+           * Su URL caduca a las 24 horas y además vive en un dominio de ellos
+           * que nuestro CSP no deja cargar --`img-src 'self' data: blob:`--.
+           * Guardarla llena la base de enlaces muertos que nadie va a ver: el
+           * avatar cae a las iniciales igual, pero sin cuatro errores en la
+           * consola y sin un campo que miente sobre tener una foto.
+           *
+           * El arreglo de verdad es bajarla a nuestro almacenamiento al
+           * importar el perfil. Queda anotado, no hecho.
+           */
+          profileImageUrl: null,
           raw: perfil.raw,
         })
         if (registros.length >= pedido.n) break

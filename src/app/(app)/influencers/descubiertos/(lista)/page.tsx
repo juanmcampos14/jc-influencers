@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/states'
 import { Pagination } from '@/components/ui/pagination'
 import { Stat, StatStrip } from '@/components/ui/stat'
 import { columnaFija, Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
+import { TamanoDePagina } from '@/components/ui/tamano-de-pagina'
 import { ThOrdenable } from '@/components/ui/ordenar'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
@@ -20,6 +21,7 @@ import { formatDate, formatFollowers, formatPercent } from '@/lib/util/format'
 import type { Platform } from '@/generated/prisma/enums'
 import { NavDeInfluencers } from '../../sub-nav'
 import { FiltrosDeDescubiertos } from './filtros'
+import { CasillaDeFila, SeleccionDeDescubiertos } from './seleccion'
 
 export const metadata: Metadata = { title: 'Descubiertos' }
 export const dynamic = 'force-dynamic'
@@ -58,13 +60,23 @@ export default async function DescubiertosPage({
   const orden = resolverOrden(COLUMNAS, params)
   const filtros = leerFiltros(params, orden)
   const pagina = Math.max(1, numero(params.pagina) ?? 1)
+  const porPagina = numero(params.porPagina) ?? 25
 
   const { resultados, resumen } = await loadPage(async () => ({
-    resultados: await buscarEnBase(ctx, filtros, { page: pagina, pageSize: 25 }),
+    resultados: await buscarEnBase(ctx, filtros, { page: pagina, pageSize: porPagina }),
     resumen: await resumenDeDescubiertos(ctx),
   }))
 
   const puedeBuscar = ctx.clients.some((client) => can(ctx, 'scouting.run', client.id))
+  const puedeImportar = can(ctx, 'influencer.manage', null)
+  /*
+   * Sin permiso para gestionar influencers no hay nada que elegir, así que la
+   * columna de casillas tampoco aparece: una casilla que no lleva a ninguna
+   * acción es ruido.
+   */
+  const Envoltorio = puedeImportar
+    ? SeleccionDeDescubiertos
+    : ({ children }: { idsDeLaPagina: string[]; children: React.ReactNode }) => <>{children}</>
 
   return (
     <>
@@ -83,6 +95,15 @@ export default async function DescubiertosPage({
         </StatStrip>
 
         <FiltrosDeDescubiertos filtros={filtros} />
+
+        {resultados.total > 25 ? (
+          <TamanoDePagina
+            base="/influencers/descubiertos"
+            params={params}
+            actual={resultados.pageSize}
+            total={resultados.total}
+          />
+        ) : null}
 
         {resultados.items.length === 0 ? (
           <Card>
@@ -113,11 +134,20 @@ export default async function DescubiertosPage({
             )}
           </Card>
         ) : (
-          <Card className="p-0">
+          <Card className={puedeImportar ? 'px-5 pt-4' : 'p-0'}>
+            {/*
+              * Sólo los que todavía no están en el padrón. Así "elegir todos"
+              * no marca fichas que después van a volver como omitidas, y el
+              * contador dice cuántas se van a importar de verdad.
+              */}
+            <Envoltorio
+              idsDeLaPagina={resultados.items.filter((p) => p.influencerId === null).map((p) => p.id)}
+            >
             <TableWrap>
               <Table>
                 <thead>
                   <Tr>
+                    {puedeImportar ? <Th className="w-10" aria-label="Elegir" /> : null}
                     <ThOrdenable
                       columna={columna('nombre')}
                       orden={orden}
@@ -174,6 +204,15 @@ export default async function DescubiertosPage({
                     const ficha = `/influencers/descubiertos/${perfil.id}`
                     return (
                       <Tr key={perfil.id}>
+                        {puedeImportar ? (
+                          <Td>
+                            <CasillaDeFila
+                              id={perfil.id}
+                              nombre={nombre}
+                              deshabilitada={perfil.influencerId !== null}
+                            />
+                          </Td>
+                        ) : null}
                         <Td className={columnaFija}>
                           <Link href={ficha} className="flex items-center gap-3">
                             <Avatar name={nombre} src={perfil.profileImageUrl} size="sm" />
@@ -246,6 +285,7 @@ export default async function DescubiertosPage({
                 </tbody>
               </Table>
             </TableWrap>
+            </Envoltorio>
           </Card>
         )}
 

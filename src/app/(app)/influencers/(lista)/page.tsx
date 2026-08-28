@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/app-shell'
 import { Card } from '@/components/ui/card'
 import { Stat, StatStrip } from '@/components/ui/stat'
 import { Pagination } from '@/components/ui/pagination'
+import { TamanoDePagina } from '@/components/ui/tamano-de-pagina'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
@@ -36,6 +37,7 @@ type SearchParams = {
   er?: string
   estado?: string
   pagina?: string
+  porPagina?: string
   orden?: string
   dir?: string
 }
@@ -83,7 +85,12 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
         minEngagement: params.er ? Number(params.er) : null,
         statuses: params.estado ? [params.estado as never] : null,
       },
-      { page: Number(params.pagina ?? 1) || 1, pageSize: 30 },
+      /*
+       * Cuántos por página lo elige quien mira. Antes eran 30 fijos y revisar
+       * una base de mil obligaba a pasar treinta y cuatro páginas: comparar
+       * perfiles pide verlos juntos, y saltar de página pierde el hilo.
+       */
+      { page: Number(params.pagina ?? 1) || 1, pageSize: Number(params.porPagina ?? 30) || 30 },
       orden,
     )
     // Campañas abiertas donde este usuario puede sumar gente. Sin esto la base
@@ -242,14 +249,17 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                   </tbody>
                 </Table>
               </TableWrap>
-              <Pagination
-                base="/influencers"
-                params={query}
-                page={page.page}
-                pageCount={page.pageCount}
-                total={page.total}
-                unidad="influencers"
-              />
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <TamanoDePagina base="/influencers" params={query} actual={page.pageSize} total={page.total} />
+                <Pagination
+                  base="/influencers"
+                  params={query}
+                  page={page.page}
+                  pageCount={page.pageCount}
+                  total={page.total}
+                  unidad="influencers"
+                />
+              </div>
             </SeleccionDeInfluencers>
           )}
         </Card>

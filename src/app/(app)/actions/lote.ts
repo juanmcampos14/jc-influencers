@@ -11,8 +11,14 @@ import {
   fusionarDuplicados,
 } from '@/lib/repos/lote'
 import { dismissDuplicate } from '@/lib/repos/influencers'
+import { importarDescubiertos } from '@/lib/repos/base-conocimiento'
 
-const ids = z.array(z.string().min(1).max(60)).min(1).max(200)
+/*
+ * Hasta 500 porque la lista de Descubiertos puede mostrar 500 por página y
+ * "elegir todos" tiene que poder importarlos. El repositorio vuelve a acotar,
+ * que es donde el tope de verdad tiene que estar.
+ */
+const ids = z.array(z.string().min(1).max(60)).min(1).max(500)
 
 export const archivarClientesAction = defineAction(
   z.object({ ids, destino: z.enum(['ARCHIVED', 'ACTIVE']) }),
@@ -83,6 +89,19 @@ export const fusionarDuplicadosAction = defineAction(z.object({ ids }), async (i
   const resultado = await fusionarDuplicados(ctx, input.ids)
   revalidatePath('/influencers/duplicados')
   // Fusionar cambia el padrón: alguien queda archivado y otro absorbe sus datos.
+  revalidatePath('/influencers')
+  return resultado
+})
+
+/**
+ * Pasa varios perfiles descubiertos al padrón.
+ *
+ * El que ya estaba vuelve en `omitidos`: decir "importé 30" cuando 12 ya
+ * estaban haría creer que hay 30 fichas nuevas para trabajar.
+ */
+export const importarDescubiertosAction = defineAction(z.object({ ids }), async (input, ctx) => {
+  const resultado = await importarDescubiertos(ctx, input.ids)
+  revalidatePath('/influencers/descubiertos')
   revalidatePath('/influencers')
   return resultado
 })

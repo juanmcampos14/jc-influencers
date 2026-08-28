@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { withSystemScope } from '@/lib/db/scope'
 import {
   buscarEnBase,
+  importarDescubiertos,
   fichaDeBase,
   registrarHallazgos,
   vincularConInfluencer,
@@ -261,5 +262,65 @@ describe('Base de conocimiento', () => {
     await expect(buscarEnBase(clienteCtx, {}, { page: 1, pageSize: 10 })).rejects.toBeInstanceOf(NotFoundError)
     const encontrados = await buscarEnBase(agencia, {}, { page: 1, pageSize: 1 })
     await expect(fichaDeBase(clienteCtx, encontrados.items[0]!.id)).rejects.toBeInstanceOf(NotFoundError)
+  })
+})
+
+describe('pasar descubiertos al padrón', () => {
+  let agencia: AuthContext
+  let clienteCtx: AuthContext
+
+  beforeAll(async () => {
+    await resetDatabase()
+    await seedCatalogs()
+    const cliente = await createClientTenant('Puente')
+    const admin = await createUser({ agencyRole: 'AGENCY_ADMIN' })
+    const usuarioCliente = await createUser({
+      clientMemberships: [{ clientId: cliente.id, role: 'CLIENT_ADMIN' }],
+    })
+    agencia = await contextFor(admin.id)
+    clienteCtx = await contextFor(usuarioCliente.id)
+
+    await withSystemScope((tx) =>
+      registrarHallazgos(tx, { provider: 'influencers-club', keywords: ['vino'], hallazgos: [perfil()] }),
+    )
+  })
+
+  it('crea la ficha en el padrón con lo que sabía la base', async () => {
+    const antes = await buscarEnBase(agencia, {}, { page: 1, pageSize: 10 })
+    const resultado = await importarDescubiertos(agencia, [antes.items[0]!.id])
+
+    expect(resultado).toMatchObject({ hechos: 1, creados: 1, vinculados: 0 })
+    expect(resultado.omitidos).toEqual([])
+
+    const influencer = await withSystemScope((tx) =>
+      tx.influencer.findFirst({ where: { primaryHandle: 'lachef.ok' }, include: { profiles: true } }),
+    )
+    expect(influencer?.displayName).toBe('La Chef')
+    expect(influencer?.country).toBe('AR')
+    expect(influencer?.profiles[0]?.followers).toBe(48_210)
+    // Procedencia: la ficha dice de dónde salió ese número.
+    expect(influencer?.profiles[0]?.metricSource).toContain('influencers-club')
+  })
+
+  /*
+   * Decir "importé 30" cuando 12 ya estaban haría creer que hay 30 fichas
+   * nuevas para trabajar.
+   */
+  it('el que ya está no se cuenta como importado ni se duplica', async () => {
+    const enBase = await buscarEnBase(agencia, {}, { page: 1, pageSize: 10 })
+    const resultado = await importarDescubiertos(agencia, [enBase.items[0]!.id])
+
+    expect(resultado.hechos).toBe(0)
+    expect(resultado.omitidos[0]?.motivo).toContain('Ya estaba en el padrón')
+
+    const cuantos = await withSystemScope((tx) =>
+      tx.influencer.count({ where: { primaryHandle: 'lachef.ok' } }),
+    )
+    expect(cuantos).toBe(1)
+  })
+
+  it('un usuario de cliente no puede importar nada', async () => {
+    const enBase = await buscarEnBase(agencia, {}, { page: 1, pageSize: 1 })
+    await expect(importarDescubiertos(clienteCtx, [enBase.items[0]!.id])).rejects.toThrow()
   })
 })

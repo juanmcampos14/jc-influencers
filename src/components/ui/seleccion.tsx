@@ -102,13 +102,27 @@ export function Seleccion({
 }
 
 /** Casilla de una fila. Sin selección activa no se renderiza nada. */
-export function CasillaDeFila({ id, nombre }: { id: string; nombre: string }) {
+export function CasillaDeFila({
+  id,
+  nombre,
+  deshabilitada = false,
+}: {
+  id: string
+  nombre: string
+  /**
+   * Para la fila sobre la que la acción no tiene sentido --ya importada, ya
+   * resuelta--. Se deja la casilla en su lugar en vez de sacarla: si desaparece,
+   * las columnas se corren y cuesta seguir la fila con la vista.
+   */
+  deshabilitada?: boolean
+}) {
   const contexto = React.useContext(Ctx)
   if (!contexto) return null
   return (
     <Checkbox
       aria-label={`Elegir ${nombre}`}
-      checked={contexto.elegidos.has(id)}
+      disabled={deshabilitada}
+      checked={!deshabilitada && contexto.elegidos.has(id)}
       onChange={() => contexto.alternar(id)}
     />
   )

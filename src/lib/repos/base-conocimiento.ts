@@ -2,7 +2,9 @@ import 'server-only'
 import type { Platform } from '@/generated/prisma/enums'
 import type { AuthContext } from '@/lib/authz/context'
 import { NotFoundError } from '@/lib/authz/errors'
-import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, scoped, type Paginated } from './base'
+import { assertCan } from '@/lib/authz/context'
+import { AUDIT, recordAudit } from '@/lib/audit'
+import { actorOf, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, scoped, type Paginated } from './base'
 import type { Tx } from '@/lib/db/scope'
 
 /**
@@ -182,6 +184,128 @@ const normalizarPalabras = (valores: string[]): string[] => {
 }
 
 const unir = (previas: string[], nuevas: string[]): string[] => [...new Set([...previas, ...nuevas])]
+
+// ── Pasar al padrón ─────────────────────────────────────────────────────────
+
+/**
+ * Importa perfiles descubiertos al padrón.
+ *
+ * Descubiertos y padrón contestan preguntas distintas --"¿a quién vimos alguna
+ * vez?" contra "¿con quién trabajamos?"-- y por eso son dos tablas. Esto es el
+ * puente: elegís del mercado y pasa a tu agenda.
+ *
+ * El que ya está en el padrón no se duplica: se ata al influencer que ya
+ * existe. Y el que ya estaba atado se informa como omitido en vez de contarse
+ * como importado, porque decir "importé 30" cuando 12 ya estaban es la mentira
+ * chica que después cuesta cara.
+ */
+export async function importarDescubiertos(
+  ctx: AuthContext,
+  ids: string[],
+): Promise<{ hechos: number; creados: number; vinculados: number; omitidos: Array<{ nombre: string; motivo: string }> }> {
+  assertAgencyOnly(ctx)
+  assertCan(ctx, 'influencer.manage', null)
+
+  const omitidos: Array<{ nombre: string; motivo: string }> = []
+  let creados = 0
+  let vinculados = 0
+
+  // Un lote llega de la selección de una página; el tope evita que un pedido
+  // armado a mano barra la base entera.
+  const unicos = [...new Set(ids)].slice(0, 500)
+
+  for (const id of unicos) {
+    try {
+      await scoped(ctx, async (tx) => {
+        const perfil = await tx.discoveredProfile.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            platform: true,
+            url: true,
+            urlNormalized: true,
+            handle: true,
+            displayName: true,
+            followers: true,
+            engagementRate: true,
+            country: true,
+            bio: true,
+            providers: true,
+            influencerId: true,
+          },
+        })
+        if (!perfil) {
+          omitidos.push({ nombre: id, motivo: 'Ese perfil ya no está.' })
+          return
+        }
+
+        const nombre = perfil.displayName ?? (perfil.handle ? `@${perfil.handle}` : perfil.url)
+
+        if (perfil.influencerId) {
+          omitidos.push({ nombre, motivo: 'Ya estaba en el padrón.' })
+          return
+        }
+
+        /*
+         * Puede estar en el padrón sin que la base lo sepa: se cargó a mano, o
+         * se importó desde una corrida antes de que existiera este puente.
+         * Buscarlo por su perfil social evita crear un duplicado.
+         */
+        const existente = await tx.socialProfile.findFirst({
+          where: { platform: perfil.platform, urlNormalized: perfil.urlNormalized },
+          select: { influencerId: true },
+        })
+
+        let influencerId = existente?.influencerId ?? null
+        if (influencerId) {
+          vinculados += 1
+        } else {
+          const creado = await tx.influencer.create({
+            data: {
+              displayName: nombre,
+              primaryHandle: perfil.handle,
+              country: perfil.country,
+              bio: perfil.bio,
+              status: 'NEW',
+              createdById: ctx.user.id,
+            },
+          })
+          influencerId = creado.id
+          creados += 1
+
+          await tx.socialProfile.create({
+            data: {
+              influencerId,
+              platform: perfil.platform,
+              url: perfil.url,
+              urlNormalized: perfil.urlNormalized,
+              handle: perfil.handle,
+              followers: perfil.followers,
+              engagementRate: perfil.engagementRate,
+              /* Procedencia: de dónde salió este número, y de qué proveedor. */
+              metricSource: `Descubiertos · ${perfil.providers.join(', ') || 'sin proveedor'}`,
+              measuredAt: new Date(),
+              verificationStatus: 'UNVERIFIED',
+              isPrimary: true,
+            },
+          })
+        }
+
+        await tx.discoveredProfile.update({ where: { id: perfil.id }, data: { influencerId } })
+        await recordAudit(tx, actorOf(ctx), {
+          action: AUDIT.SCOUTING_IMPORTED,
+          entityType: 'Influencer',
+          entityId: influencerId,
+          metadata: { desde: 'descubiertos', perfil: nombre },
+        })
+      })
+    } catch (error) {
+      omitidos.push({ nombre: id, motivo: error instanceof Error ? error.message : 'No se pudo importar.' })
+    }
+  }
+
+  return { hechos: creados + vinculados, creados, vinculados, omitidos }
+}
 
 // ── Buscar ───────────────────────────────────────────────────────────────────
 

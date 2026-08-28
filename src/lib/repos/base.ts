@@ -10,7 +10,13 @@ export function scoped<T>(ctx: AuthContext, fn: (tx: Tx) => Promise<T>, timeoutM
 }
 
 export const DEFAULT_PAGE_SIZE = 25
-export const MAX_PAGE_SIZE = 100
+/*
+ * Hasta 500. Antes eran 100 y obligaba a paginar seis veces para revisar una
+ * base de mil: quien mira perfiles necesita verlos juntos para comparar, y
+ * saltar de página pierde el hilo. Es un tope duro contra un `pageSize`
+ * armado a mano, no una sugerencia.
+ */
+export const MAX_PAGE_SIZE = 500
 
 export type Pagination = { page: number; pageSize: number }
 export type Paginated<T> = { items: T[]; total: number; page: number; pageSize: number; pageCount: number }
