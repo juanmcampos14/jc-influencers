@@ -1603,7 +1603,10 @@ model DiscoveredProfile {
   engagementRate  Decimal? @db.Decimal(6, 3)
   country         String?
   bio             String?
+  /// La URL que devolvió el proveedor. Suele caducar: no se muestra.
   profileImageUrl String?
+  /// La foto guardada por nosotros, en `stored_blobs`. Es la que se muestra.
+  profileImageKey String?
 
   /// Con qué palabras apareció. Se acumulan: es cómo lo vuelve a encontrar
   /// quien busque por tema sin acordarse del nombre.

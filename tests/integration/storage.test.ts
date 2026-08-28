@@ -93,4 +93,28 @@ describe('Almacenamiento de archivos', () => {
     await fileStorage().remove(guardado.key, { clientId: clienteA })
     await expect(fileStorage().get(guardado.key, { clientId: clienteA })).rejects.toBeInstanceOf(UnsupportedFileError)
   })
+
+  /*
+   * Un archivo de la agencia, sin cliente dueño.
+   *
+   * La política de `stored_blobs` dejaba leer y escribir un blob sin cliente
+   * sólo con `app_is_agency()`, pero el almacenamiento --cuando no hay cliente--
+   * corre en scope de SISTEMA, que no es lo mismo. La inserción se rechazaba
+   * con "new row violates row-level security policy".
+   *
+   * Nunca había molestado porque ningún archivo era de la agencia; las fotos de
+   * los perfiles descubiertos fueron las primeras, y las cinco se perdieron
+   * calladas. Este test es para que no vuelva a pasar en silencio.
+   */
+  it('guarda y devuelve un archivo de la agencia, sin cliente dueño', async () => {
+    const guardado = await fileStorage().put({
+      filename: 'foto.png',
+      contentType: 'image/png',
+      data: Buffer.from('agencia'),
+      clientId: null,
+    })
+    expect(guardado.key).toBeTruthy()
+    const leido = await fileStorage().get(guardado.key, { clientId: null })
+    expect(leido.toString()).toBe('agencia')
+  })
 })

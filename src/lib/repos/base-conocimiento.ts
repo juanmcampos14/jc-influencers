@@ -395,7 +395,7 @@ export async function buscarEnBase(
           engagementRate: true,
           country: true,
           bio: true,
-          profileImageUrl: true,
+          profileImageKey: true,
           keywords: true,
           interests: true,
           providers: true,
@@ -419,7 +419,12 @@ export async function buscarEnBase(
         engagementRate: f.engagementRate === null ? null : Number(f.engagementRate),
         country: f.country,
         bio: f.bio,
-        profileImageUrl: f.profileImageUrl,
+        /*
+         * La foto la sirve la aplicación, no el proveedor: su URL caduca y
+         * nuestro CSP no la deja cargar. Sin imagen guardada va null, y el
+         * avatar muestra las iniciales.
+         */
+        profileImageUrl: f.profileImageKey ? `/api/descubiertos/${f.id}/foto` : null,
         keywords: f.keywords,
         interests: f.interests,
         providers: f.providers,
@@ -580,7 +585,7 @@ export async function fichaDeBase(ctx: AuthContext, id: string): Promise<FichaDe
         engagementRate: true,
         country: true,
         bio: true,
-        profileImageUrl: true,
+        profileImageKey: true,
         keywords: true,
         interests: true,
         providers: true,
@@ -626,6 +631,8 @@ export async function fichaDeBase(ctx: AuthContext, id: string): Promise<FichaDe
       perfil: {
         ...perfil,
         engagementRate: perfil.engagementRate === null ? null : Number(perfil.engagementRate),
+        // La sirve la aplicación, igual que en la lista.
+        profileImageUrl: perfil.profileImageKey ? `/api/descubiertos/${perfil.id}/foto` : null,
         campanas: candidaturas.length,
       },
       historialDeMetricas: metricas.map((m) => ({

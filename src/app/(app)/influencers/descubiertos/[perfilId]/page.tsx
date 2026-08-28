@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/app-shell'
+import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -85,6 +86,14 @@ export default async function PerfilDeBasePage({ params }: { params: Promise<{ p
             </CardDescription>
           </CardHeader>
           <CardBody className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Avatar name={perfil.displayName ?? perfil.handle ?? 'Perfil'} src={perfil.profileImageUrl} size="lg" />
+              <div>
+                <p className="text-sm font-medium text-ink-900">{perfil.displayName ?? '—'}</p>
+                {perfil.handle ? <p className="text-xs text-ink-600">@{perfil.handle}</p> : null}
+              </div>
+            </div>
+
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Dato titulo="Red" valor={platformLabel(perfil.platform)} />
               <Dato titulo="Seguidores" valor={exacto(perfil.followers)} />

@@ -19,6 +19,7 @@ import { scoutingProviderFor, scoutingProviderNamed, ScoutingUnavailableError } 
 import { parseProfileUrl } from '@/lib/domain/normalize'
 import { detectDuplicates } from './influencers'
 import { registrarHallazgos, vincularConInfluencer } from './base-conocimiento'
+import { guardarFotosPendientes } from './fotos-de-perfil'
 import { actorOf, scoped } from './base'
 
 /**
@@ -498,6 +499,15 @@ export async function pollScouting(ctx: AuthContext, runId: string): Promise<Pol
     },
     120_000,
   )
+
+  /*
+   * Las fotos se bajan DESPUÉS de cerrar la transacción y a propósito: treinta
+   * descargas pueden tardar segundos, y sostener una transacción abierta ese
+   * rato traba filas que otros necesitan. Es el único momento en que sirve
+   * --la URL del proveedor caduca a las 24 horas-- y si falla no pasa nada: el
+   * avatar cae a las iniciales, como antes.
+   */
+  await guardarFotosPendientes(records.map((r) => r.urlNormalized)).catch(() => 0)
 
   return { status: 'COMPLETED', collected: records.length }
 }
