@@ -5,6 +5,7 @@ import type { AuthContext } from '@/lib/authz/context'
 import { assertCan, capabilitiesFor } from '@/lib/authz/context'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/authz/errors'
 import { AUDIT, recordAudit } from '@/lib/audit'
+import { motivoPorHandle, motivoPorNombre, motivoPorUrl } from '@/lib/domain/parecido'
 import { fieldPermissionsFor, toInfluencerDto, type InfluencerDto } from '@/lib/domain/dto'
 import { nameSimilarity, normalizeHandle, parseProfileUrl } from '@/lib/domain/normalize'
 import { STALE_METRIC_DAYS } from '@/lib/domain/statuses'
@@ -447,7 +448,7 @@ export async function detectDuplicates(tx: Tx, influencerId: string): Promise<nu
       select: { influencerId: true },
     })
     for (const match of sameUrl) {
-      candidates.set(match.influencerId, { reason: `Misma URL normalizada (${profile.urlNormalized})`, score: 95 })
+      candidates.set(match.influencerId, { reason: motivoPorUrl(profile.urlNormalized), score: 95 })
     }
     if (profile.handle) {
       const sameHandle = await tx.socialProfile.findMany({
@@ -457,7 +458,7 @@ export async function detectDuplicates(tx: Tx, influencerId: string): Promise<nu
       for (const match of sameHandle) {
         if (!candidates.has(match.influencerId)) {
           candidates.set(match.influencerId, {
-            reason: `Mismo handle @${profile.handle} en ${profile.platform}`,
+            reason: motivoPorHandle(profile.handle, profile.platform),
             score: 90,
           })
         }
@@ -474,7 +475,7 @@ export async function detectDuplicates(tx: Tx, influencerId: string): Promise<nu
     const score = nameSimilarity(subject.displayName, other.displayName)
     if (score >= 0.86 && !candidates.has(other.id)) {
       candidates.set(other.id, {
-        reason: `Nombre muy parecido a "${other.displayName}" (${Math.round(score * 100)}%)`,
+        reason: motivoPorNombre(other.displayName, Math.round(score * 100)),
         score: Math.round(score * 100),
       })
     }

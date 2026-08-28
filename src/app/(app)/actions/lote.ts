@@ -8,6 +8,7 @@ import {
   borrarInfluencers,
   cambiarEstadoDeInfluencers,
   cerrarCampanas,
+  fusionarDuplicados,
 } from '@/lib/repos/lote'
 import { dismissDuplicate } from '@/lib/repos/influencers'
 
@@ -69,4 +70,19 @@ export const descartarDuplicadosAction = defineAction(z.object({ ids }), async (
   }
   revalidatePath('/influencers/duplicados')
   return { hechos, omitidos }
+})
+
+/**
+ * Fusiona varios duplicados de una vez.
+ *
+ * Sólo los que coinciden al 100 %, que son los que empatan por URL: ahí no hay
+ * nada que juzgar. Los demás vuelven en `omitidos` con el motivo, para que se
+ * miren de a uno.
+ */
+export const fusionarDuplicadosAction = defineAction(z.object({ ids }), async (input, ctx) => {
+  const resultado = await fusionarDuplicados(ctx, input.ids)
+  revalidatePath('/influencers/duplicados')
+  // Fusionar cambia el padrón: alguien queda archivado y otro absorbe sus datos.
+  revalidatePath('/influencers')
+  return resultado
 })
