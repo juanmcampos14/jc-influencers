@@ -42,7 +42,18 @@ const schema = z.object({
    * Qué proveedor usa el scouting. La aplicación depende de la interfaz, no de
    * ninguno de los dos: cambiar de uno a otro es cambiar esta variable.
    */
-  SCOUTING_PROVIDER: z.enum(['brightdata', 'apify', 'hypeauditor', 'influencers-club']).default('brightdata'),
+  /*
+   * El preferido. Por defecto influencers.club: es el motor principal de
+   * descubrimiento, cubre cinco redes y es el único que filtra por audiencia.
+   *
+   * Cambiar esto es seguro: si el preferido no está configurado --o no puede
+   * hacer esa combinación de red y modo--, el ruteo recorre el resto en orden.
+   * Sin la clave de influencers.club, todo sigue funcionando con los scrapers
+   * exactamente como antes.
+   */
+  SCOUTING_PROVIDER: z
+    .enum(['brightdata', 'apify', 'hypeauditor', 'influencers-club'])
+    .default('influencers-club'),
   /*
    * Se aceptan los dos nombres: Apify llama "API token" al suyo y es fácil
    * cargarlo como APIFY_API_TOKEN. Fallar por el nombre de la variable, con el

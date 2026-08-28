@@ -9,7 +9,7 @@
  */
 
 import type { Platform } from '@/generated/prisma/enums'
-import type { FiltrosDeAudiencia, FiltrosDeScouting } from '@/lib/domain/filtros-scouting'
+import type { ClaveDeFiltro, FiltrosDeAudiencia, FiltrosDeScouting } from '@/lib/domain/filtros-scouting'
 
 /** Las redes que sabe buscar, con el nombre que usa él. */
 const REDES: Partial<Record<Platform, string>> = {
@@ -176,6 +176,33 @@ export function cuerpoDeBusqueda(consulta: ConsultaDeDescubrimiento): Record<str
       page: Math.max(0, consulta.pagina - 1),
     },
   }
+}
+
+/**
+ * Qué filtros va a aplicar ÉL, no nosotros después.
+ *
+ * Se deduce del cuerpo que efectivamente se arma, no de lo que se pidió: un
+ * país que no supimos traducir no viajó, así que tampoco está garantizado.
+ * Deducirlo del pedido y no del cuerpo haría que un filtro omitido se
+ * informara como cumplido.
+ */
+export function filtrosEnOrigen(consulta: ConsultaDeDescubrimiento): ClaveDeFiltro[] {
+  const cuerpo = cuerpoDeBusqueda(consulta)
+  const filtros = cuerpo.filters as Record<string, unknown>
+  const claves: ClaveDeFiltro[] = []
+
+  if (filtros.location) claves.push('pais')
+  if (filtros.number_of_followers) claves.push('seguidores')
+  if (filtros.engagement_percent) claves.push('engagement')
+  /*
+   * La zona y la mención viajan juntas en `keywords_in_bio`, así que se
+   * garantizan juntas: él busca las dos dentro de la bio.
+   */
+  if (filtros.keywords_in_bio) {
+    if (consulta.filtros.zona) claves.push('zona')
+    if (consulta.filtros.bioMenciona) claves.push('bioMenciona')
+  }
+  return claves
 }
 
 // ── Leer la respuesta ────────────────────────────────────────────────────────

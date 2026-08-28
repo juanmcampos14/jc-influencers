@@ -1,5 +1,6 @@
 import 'server-only'
 import type { Platform } from '@/generated/prisma/enums'
+import type { ClaveDeFiltro } from '@/lib/domain/filtros-scouting'
 import { construirEntrada, type EsquemaDeActor } from './apify-esquema'
 import { parseProfileUrl } from '@/lib/domain/normalize'
 import {
@@ -237,6 +238,10 @@ export function apifyInput(
 export class ApifyScoutingProvider implements ScoutingProvider {
   readonly name = 'apify'
   readonly filtraPorAudiencia = false
+  /** Un scraper no filtra: trae lo que encuentra y se comprueba después. */
+  filtrosEnOrigen(): ClaveDeFiltro[] {
+    return []
+  }
   readonly configured = true
   /** Esquemas ya leídos, por actor. No cambian entre corridas. */
   private readonly esquemas = new Map<string, EsquemaDeActor | null>()

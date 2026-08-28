@@ -1,8 +1,9 @@
 import 'server-only'
 import type { Platform } from '@/generated/prisma/enums'
-import type { FiltrosDeAudiencia, FiltrosDeScouting } from '@/lib/domain/filtros-scouting'
+import type { ClaveDeFiltro, FiltrosDeAudiencia, FiltrosDeScouting } from '@/lib/domain/filtros-scouting'
 import {
   cuerpoDeBusqueda,
+  filtrosEnOrigen as filtrosQueAplicaEl,
   leerCreador,
   leerSobre,
   MAXIMO_POR_PAGINA,
@@ -124,6 +125,18 @@ export class InfluencersClubScoutingProvider implements ScoutingProvider {
      */
     if (mode !== 'DISCOVER') return false
     return redDe(platform) !== null
+  }
+
+  filtrosEnOrigen(params: DiscoverParams): ClaveDeFiltro[] {
+    if (!this.supports(params.platform, 'DISCOVER')) return []
+    return filtrosQueAplicaEl({
+      platform: params.platform,
+      palabras: params.keywords,
+      filtros: params.filtros ?? {},
+      audiencia: params.audiencia ?? {},
+      pagina: 1,
+      limite: params.limit,
+    })
   }
 
   async startDiscover(params: DiscoverParams): Promise<JobHandle> {

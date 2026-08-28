@@ -32,6 +32,9 @@ import {
  */
 class FakeScoutingProvider implements ScoutingProvider {
   readonly filtraPorAudiencia = false
+  filtrosEnOrigen(): [] {
+    return []
+  }
   readonly name = 'fake'
   readonly configured = true
   startCalls = 0

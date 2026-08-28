@@ -5,7 +5,7 @@ import { parseFollowers, parseProfileUrl } from '@/lib/domain/normalize'
 import { ApifyScoutingProvider } from './scouting-apify'
 import { HypeAuditorScoutingProvider } from './scouting-hypeauditor'
 import { InfluencersClubScoutingProvider } from './scouting-influencers-club'
-import type { FiltrosDeAudiencia, FiltrosDeScouting } from '@/lib/domain/filtros-scouting'
+import type { ClaveDeFiltro, FiltrosDeAudiencia, FiltrosDeScouting } from '@/lib/domain/filtros-scouting'
 
 /**
  * Proveedor de scouting.
@@ -96,6 +96,14 @@ export interface ScoutingProvider {
   /** Costo por registro entregado, en dólares. */
   unitCostUsd(platform: Platform): number
   supports(platform: Platform, mode: 'DISCOVER' | 'ENRICH'): boolean
+  /**
+   * Qué filtros aplica ÉL antes de devolver.
+   *
+   * Los scrapers devuelven `[]`: no filtran, sólo traen. Un proveedor de datos
+   * devuelve las claves que garantiza, y esos resultados no se vuelven a
+   * marcar como "no se pudo comprobar".
+   */
+  filtrosEnOrigen(params: DiscoverParams): ClaveDeFiltro[]
   startDiscover(params: DiscoverParams): Promise<JobHandle>
   startEnrich(params: EnrichParams): Promise<JobHandle>
   poll(job: JobHandle): Promise<JobProgress>
@@ -118,6 +126,9 @@ class UnconfiguredScoutingProvider implements ScoutingProvider {
   }
   supports(): boolean {
     return false
+  }
+  filtrosEnOrigen(): ClaveDeFiltro[] {
+    return []
   }
   async startDiscover(): Promise<JobHandle> {
     throw new ScoutingUnavailableError(NOT_CONFIGURED)
@@ -253,6 +264,10 @@ class BrightDataProvider implements ScoutingProvider {
   readonly name = 'brightdata'
   readonly configured = true
   readonly filtraPorAudiencia = false
+  /** Un scraper no filtra: trae lo que encuentra y se comprueba después. */
+  filtrosEnOrigen(): ClaveDeFiltro[] {
+    return []
+  }
 
   constructor(
     private readonly token: string,

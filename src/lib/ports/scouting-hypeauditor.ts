@@ -1,6 +1,6 @@
 import 'server-only'
 import type { Platform } from '@/generated/prisma/enums'
-import type { FiltrosDeScouting } from '@/lib/domain/filtros-scouting'
+import type { ClaveDeFiltro, FiltrosDeScouting } from '@/lib/domain/filtros-scouting'
 import {
   cuerpoDeBusqueda,
   leerCreador,
@@ -136,6 +136,15 @@ export class HypeAuditorScoutingProvider implements ScoutingProvider {
      */
     if (mode !== 'DISCOVER') return false
     return redDe(platform) !== null
+  }
+
+  filtrosEnOrigen(params: DiscoverParams): ClaveDeFiltro[] {
+    const f = params.filtros ?? {}
+    const claves: ClaveDeFiltro[] = []
+    if (f.pais) claves.push('pais')
+    if (f.seguidoresDesde != null || f.seguidoresHasta != null) claves.push('seguidores')
+    if (f.engagementMinimo != null) claves.push('engagement')
+    return claves
   }
 
   async startDiscover(params: DiscoverParams): Promise<JobHandle> {

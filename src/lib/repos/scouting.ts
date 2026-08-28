@@ -4,6 +4,7 @@ import type { AuthContext } from '@/lib/authz/context'
 import {
   evaluarCreador,
   hayFiltros,
+  type ClaveDeFiltro,
   type FiltrosDeAudiencia,
   type FiltrosDeScouting,
   type Veredicto,
@@ -314,29 +315,41 @@ export async function startScouting(ctx: AuthContext, runId: string): Promise<{ 
     filtros?: FiltrosDeScouting | null
     audiencia?: FiltrosDeAudiencia | null
   }
+  const parametrosDeBusqueda = {
+    platform: run.platform,
+    keywords: query.keywords ?? [],
+    limit: query.limit ?? run.requestedRecords,
+    filtros: query.filtros ?? null,
+    audiencia: query.audiencia ?? null,
+  }
+  const garantizados: ClaveDeFiltro[] =
+    run.mode === 'DISCOVER' ? provider.filtrosEnOrigen(parametrosDeBusqueda) : []
   try {
     const job =
       run.mode === 'DISCOVER'
-        ? await provider.startDiscover({
-            platform: run.platform,
-            keywords: query.keywords ?? [],
-            limit: query.limit ?? run.requestedRecords,
-            /*
-             * Los filtros viajan al proveedor, no sólo al marcado posterior.
-             * El que sabe filtrar en el origen --HypeAuditor-- devuelve
-             * directamente lo que sirve en vez de hacernos pagar 200 perfiles
-             * para quedarnos con 12. El que no sabe los ignora, y el marcado
-             * de `filtros-scouting.ts` sigue haciendo su trabajo igual.
-             */
-            filtros: query.filtros ?? null,
-            audiencia: query.audiencia ?? null,
-          })
+        ? /*
+           * Los filtros viajan al proveedor, no sólo al marcado posterior. El
+           * que sabe filtrar en el origen devuelve directamente lo que sirve en
+           * vez de hacernos pagar 200 perfiles para quedarnos con 12. El que no
+           * sabe los ignora, y el marcado de `filtros-scouting.ts` sigue
+           * haciendo su trabajo igual.
+           */
+          await provider.startDiscover(parametrosDeBusqueda)
         : await provider.startEnrich({ platform: run.platform, urls: query.urls ?? [] })
 
     await scoped(ctx, async (tx) => {
       await tx.scoutingRun.update({
         where: { id: runId },
-        data: { status: 'RUNNING', externalJobId: job.jobId },
+        data: {
+          status: 'RUNNING',
+          externalJobId: job.jobId,
+          /*
+           * Qué garantizó el proveedor. Se guarda con la corrida y no se vuelve
+           * a calcular: mañana el proveedor puede cambiar, y los resultados de
+           * ayer se evaluaron con lo que valía ayer.
+           */
+          query: { ...query, filtrosEnOrigen: garantizados } as never,
+        },
       })
       // El gasto se reserva al disparar: si algo falla después, se libera.
       await upsertSpend(tx, run.clientId, estimated)
@@ -525,6 +538,8 @@ export type ScoutingResultDto = {
   matchedInfluencerId: string | null
   imported: boolean
   discarded: boolean
+  /** Quién lo trajo. Procedencia: siempre se puede decir de dónde salió. */
+  provider: string
 }
 
 export async function listScoutingResults(ctx: AuthContext, runId: string): Promise<ScoutingResultDto[]> {
@@ -537,9 +552,10 @@ export async function listScoutingResults(ctx: AuthContext, runId: string): Prom
   const rows = await scoped(ctx, (tx) =>
     tx.scoutingResult.findMany({ where: { runId }, orderBy: [{ followers: 'desc' }], take: 500 }),
   )
-  const query = run.query as { filtros?: FiltrosDeScouting | null }
+  const query = run.query as { filtros?: FiltrosDeScouting | null; filtrosEnOrigen?: ClaveDeFiltro[] }
   const filtros = query.filtros ?? {}
   const conFiltros = hayFiltros(filtros)
+  const garantizados = query.filtrosEnOrigen ?? []
 
   return rows.map((row) => ({
     /*
@@ -556,6 +572,7 @@ export async function listScoutingResults(ctx: AuthContext, runId: string): Prom
             bio: row.bio,
           },
           filtros,
+          garantizados,
         )
       : { veredicto: 'CUMPLE' as const, motivos: [] }),
     id: row.id,
@@ -567,6 +584,7 @@ export async function listScoutingResults(ctx: AuthContext, runId: string): Prom
     engagementRate: row.engagementRate === null ? null : Number(row.engagementRate),
     country: row.country,
     bio: row.bio,
+    provider: run.provider,
     matchedInfluencerId: row.matchedInfluencerId,
     imported: row.imported,
     discarded: row.discarded,

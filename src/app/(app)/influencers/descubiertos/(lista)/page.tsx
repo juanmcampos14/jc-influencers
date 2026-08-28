@@ -16,7 +16,7 @@ import { can } from '@/lib/authz/context'
 import { resolverOrden, type ColumnaOrdenable } from '@/lib/domain/orden'
 import { platformLabel } from '@/lib/domain/labels'
 import { buscarEnBase, resumenDeDescubiertos, type ClaveDeOrden, type FiltrosDeBase } from '@/lib/repos/base-conocimiento'
-import { formatFollowers, formatPercent } from '@/lib/util/format'
+import { formatDate, formatFollowers, formatPercent } from '@/lib/util/format'
 import type { Platform } from '@/generated/prisma/enums'
 import { NavDeInfluencers } from '../../sub-nav'
 import { FiltrosDeDescubiertos } from './filtros'
@@ -157,6 +157,14 @@ export default async function DescubiertosPage({
                     >
                       Veces
                     </ThOrdenable>
+                    <ThOrdenable
+                      columna={columna('visto')}
+                      orden={orden}
+                      base="/influencers/descubiertos"
+                      params={params}
+                    >
+                      Última vez
+                    </ThOrdenable>
                     <Th>Estado</Th>
                   </Tr>
                 </thead>
@@ -205,6 +213,17 @@ export default async function DescubiertosPage({
                           )}
                         </Td>
                         <Td className="text-right tabular-nums">{perfil.timesSeen}</Td>
+                        <Td className="whitespace-nowrap text-xs text-ink-600">
+                          {formatDate(perfil.lastSeenAt)}
+                          {/*
+                            Cuando lo encontramos una sola vez, las dos fechas
+                            son la misma y repetirlas no dice nada. Con más de
+                            una, el "desde" cuenta hace cuánto lo conocemos.
+                          */}
+                          {perfil.timesSeen > 1 ? (
+                            <span className="block text-ink-500">desde {formatDate(perfil.firstSeenAt)}</span>
+                          ) : null}
+                        </Td>
                         <Td>
                           {perfil.influencerId ? (
                             <div className="flex flex-col gap-1">

@@ -85,3 +85,49 @@ describe('hayFiltros', () => {
     expect(hayFiltros({ seguidoresDesde: 10_000 })).toBe(true)
   })
 })
+
+/**
+ * Lo que el proveedor ya filtró.
+ *
+ * Esto salió de un caso real: se pidieron creadores argentinos a un proveedor
+ * que filtra por país en el origen pero no devuelve el país en la respuesta.
+ * La pantalla mostró "0 cumplen · 5 no se pudieron comprobar" sobre cinco
+ * resultados que el proveedor había garantizado argentinos. Decir que no se
+ * pudo comprobar algo que sí se garantizó es tan poco honesto como afirmar lo
+ * que no se sabe.
+ */
+describe('filtros que aplicó el proveedor', () => {
+  const sinDatos: CreadorFiltrable = {
+    followers: 48_000,
+    engagementRate: null,
+    country: null,
+    bio: null,
+  }
+
+  it('sin garantía, la falta del dato se marca', () => {
+    const r = evaluarCreador(sinDatos, { pais: 'AR' })
+    expect(r.veredicto).toBe('SIN_DATO')
+    expect(r.motivos).toContain('no dice de qué país es')
+  })
+
+  it('con la garantía del proveedor, cumple aunque no venga el dato', () => {
+    expect(evaluarCreador(sinDatos, { pais: 'AR' }, ['pais']).veredicto).toBe('CUMPLE')
+  })
+
+  it('la garantía es por filtro, no en bloque', () => {
+    // El país lo filtró él; el engagement no, y ese dato falta.
+    const r = evaluarCreador(sinDatos, { pais: 'AR', engagementMinimo: 3 }, ['pais'])
+    expect(r.veredicto).toBe('SIN_DATO')
+    expect(r.motivos).toEqual(['no informa engagement'])
+  })
+
+  /*
+   * Un incumplimiento seguro sigue ganando: si el proveedor dijo que filtró por
+   * seguidores y aun así llegó alguien fuera de rango, se informa. La garantía
+   * no puede tapar un dato que la contradice.
+   */
+  it('lo que no se garantizó y no da, sigue quedando fuera', () => {
+    const r = evaluarCreador({ ...sinDatos, followers: 500 }, { pais: 'AR', seguidoresDesde: 10_000 }, ['pais'])
+    expect(r.veredicto).toBe('NO_CUMPLE')
+  })
+})

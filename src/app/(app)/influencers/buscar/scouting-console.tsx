@@ -12,7 +12,7 @@ import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { ConfirmButton } from '@/components/ui/confirm'
 import { ExternalLink } from '@/components/status-badge'
 import { platformLabel } from '@/lib/domain/labels'
-import { formatDateTime, formatFollowers, formatMoney, formatPercent } from '@/lib/util/format'
+import { formatDateTime, formatFollowers, formatMoney, formatMoneyFino, formatPercent } from '@/lib/util/format'
 import { SelectorDeRed, type Red } from '@/components/scouting/selector-de-red'
 import { FiltrosAvanzados } from '@/components/scouting/filtros-avanzados'
 import type { BudgetState, PreviewResult, ScoutingResultDto } from '@/lib/repos/scouting'
@@ -65,7 +65,7 @@ export function ScoutingConsole({
   runs,
   campaigns,
   campaignId,
-  provider,
+  proveedorPorRed,
   canManageBudget,
   puedeFiltrarAudiencia,
 }: {
@@ -81,7 +81,14 @@ export function ScoutingConsole({
    * vacía no te obligue a volver a elegirla acá.
    */
   campaignId?: string | null
-  provider: { name: string; configured: boolean }
+  /**
+   * Quién hace el trabajo, por red, con su costo por perfil.
+   *
+   * Es por red porque no es el mismo para todas: Bright Data no descubre por
+   * palabra clave en Instagram y ahí entra otro. Decir el proveedor por defecto
+   * mostraba el nombre y el precio equivocados justo antes de gastar.
+   */
+  proveedorPorRed: Record<string, { name: string; configured: boolean; unitCostUsd: number }>
   /**
    * Si hay un proveedor conectado que filtre por el público del creador.
    *
@@ -97,6 +104,10 @@ export function ScoutingConsole({
   const [preview, setPreview] = React.useState<PreviewResult | null>(null)
   const [red, setRed] = React.useState<Red>('INSTAGRAM')
   const [filtrosAbiertos, setFiltrosAbiertos] = React.useState(false)
+  /* Vive en estado para poder decir el costo mientras se escribe. */
+  const [limite, setLimite] = React.useState(30)
+  /** El que va a hacer ESTA búsqueda, no el que está por defecto. */
+  const provider = proveedorPorRed[red] ?? { name: 'sin configurar', configured: false, unitCostUsd: 0 }
   const [openRun, setOpenRun] = React.useState<string | null>(null)
   const [results, setResults] = React.useState<ScoutingResultDto[]>([])
   const [selected, setSelected] = React.useState<Set<string>>(new Set())
@@ -167,7 +178,20 @@ export function ScoutingConsole({
     router.push(`/influencers/buscar?${query.toString()}`)
   }
 
-  function runPreview(event: React.FormEvent<HTMLFormElement>) {
+  /**
+   * Buscar, de una.
+   *
+   * Antes esto eran dos pasos: calcular el costo y después confirmar. La idea
+   * era no gastar sin querer, y en la práctica el primer paso no protegía de
+   * nada --el costo ya se ve en el botón antes de tocarlo, y el tope del mes es
+   * un corte duro que se vuelve a comprobar del lado del servidor justo antes
+   * de gastar--. Sólo agregaba un viaje y un clic.
+   *
+   * Lo que se conserva es lo que sí protege: el costo dicho de antemano y el
+   * tope que corta. Si el preflight encuentra un bloqueo --sin proveedor, sin
+   * presupuesto-- no se ejecuta y se dice cuál es.
+   */
+  function buscar(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
     setError(null)
@@ -225,14 +249,29 @@ export function ScoutingConsole({
         toast.error(result.message)
         return
       }
+
+      /*
+       * El preflight sigue existiendo del lado del servidor: calcula el costo,
+       * registra la corrida y comprueba el tope. Lo que cambió es que ya no se
+       * le pide a la persona que lo confirme, salvo que haya algo que la
+       * detenga de verdad.
+       */
+      if (!result.data.puedeEjecutar) {
+        setPreview(result.data)
+        const motivo = result.data.bloqueos[0] ?? 'No se puede ejecutar esta búsqueda.'
+        setError(motivo)
+        toast.error(motivo)
+        return
+      }
+
       setPreview(result.data)
+      await ejecutar(result.data.runId)
     })
   }
 
-  function execute() {
-    if (!preview) return
-    startTransition(async () => {
-      const result = await startScoutingAction({ runId: preview.runId })
+  async function ejecutar(runId: string) {
+    {
+      const result = await startScoutingAction({ runId })
       if (!result.ok) {
         toast.error(result.message)
         /*
@@ -248,7 +287,7 @@ export function ScoutingConsole({
       toast.success('Scouting en marcha. Te avisamos cuando termine.')
       setPreview(null)
       router.refresh()
-    })
+    }
   }
 
   function discard() {
@@ -352,7 +391,7 @@ export function ScoutingConsole({
             </p>
           </CardHeader>
           <CardBody>
-            <form onSubmit={runPreview} className="space-y-4">
+            <form onSubmit={buscar} className="space-y-4">
               {mode === 'DISCOVER' ? (
                 <Field
                   label="Tema o nicho"
@@ -407,8 +446,29 @@ export function ScoutingConsole({
                   </Field>
                 ) : null}
                 {mode === 'DISCOVER' ? (
-                  <Field label="Cuántos perfiles como máximo" htmlFor="limit" hint="Cada perfil tiene costo.">
-                    <Input id="limit" name="limit" type="number" min={1} max={500} defaultValue={30} />
+                  <Field
+                    label="Cuántos perfiles como máximo"
+                    htmlFor="limit"
+                    /*
+                     * El costo se dice mientras se escribe, no después de un
+                     * viaje al servidor. Es lo que hacía falta del paso que
+                     * había antes; el paso en sí no aportaba nada más.
+                     */
+                    hint={
+                      provider.unitCostUsd > 0
+                        ? `${provider.name} · ${formatMoneyFino(provider.unitCostUsd)} perfiles · esta búsqueda cuesta hasta ${formatMoneyFino(provider.unitCostUsd * limite)}`
+                        : 'Cada perfil tiene costo.'
+                    }
+                  >
+                    <Input
+                      id="limit"
+                      name="limit"
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={limite}
+                      onChange={(event) => setLimite(Math.max(1, Math.min(500, Number(event.target.value) || 1)))}
+                    />
                   </Field>
                 ) : null}
               </div>
@@ -433,7 +493,11 @@ export function ScoutingConsole({
               </Field>
 
               <Button type="submit" disabled={pending}>
-                {pending ? 'Calculando…' : 'Ver cuánto cuesta'}
+                {pending
+                  ? 'Buscando…'
+                  : mode === 'DISCOVER' && provider.unitCostUsd > 0
+                    ? `Buscar · hasta ${formatMoneyFino(provider.unitCostUsd * limite)}`
+                    : 'Buscar'}
               </Button>
             </form>
 
@@ -460,7 +524,7 @@ export function ScoutingConsole({
                       */}
                     <dd className="font-semibold tabular-nums text-ink-900">
                       {preview.unitCostUsd > 0 ? (
-                        formatMoney(preview.estimatedCostUsd, 'USD')
+                        formatMoneyFino(preview.estimatedCostUsd)
                       ) : (
                         <span className="text-ink-400">sin calcular</span>
                       )}
@@ -490,19 +554,13 @@ export function ScoutingConsole({
                     {warning}
                   </p>
                 ))}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <ConfirmButton
-                    title="Ejecutar el scouting"
-                    description={`Se van a consultar ${preview.requestedRecords} perfiles a un costo estimado de ${formatMoney(preview.estimatedCostUsd, 'USD')}. Este gasto se factura aunque después descartes los resultados.`}
-                    confirmLabel="Sí, ejecutar"
-                    tone="primary"
-                    onConfirm={execute}
-                    pending={pending}
-                  >
-                    <Button disabled={pending || !preview.puedeEjecutar}>Ejecutar</Button>
-                  </ConfirmButton>
+                {/*
+                  * Este cuadro sólo aparece cuando algo frenó la búsqueda. Si
+                  * se pudo ejecutar, no hay nada que confirmar: ya salió.
+                  */}
+                <div className="mt-3">
                   <Button variant="secondary" onClick={discard} disabled={pending}>
-                    Descartar
+                    Entendido
                   </Button>
                 </div>
               </div>
@@ -602,7 +660,7 @@ export function ScoutingConsole({
                     <Td className="text-right tabular-nums">{run.requestedRecords}</Td>
                     <Td className="text-right tabular-nums">{run.deliveredRecords}</Td>
                     <Td className="text-right tabular-nums">
-                      {formatMoney(run.actualCostUsd ?? run.estimatedCostUsd, 'USD')}
+                      {formatMoneyFino(run.actualCostUsd ?? run.estimatedCostUsd)}
                       {run.actualCostUsd === null && run.status !== 'PREVIEW' ? (
                         <span className="block text-[11px] text-ink-400">estimado</span>
                       ) : null}
@@ -639,9 +697,52 @@ export function ScoutingConsole({
         <Card id="resultados-scouting">
           <CardHeader>
             <CardTitle>Resultados</CardTitle>
+            {/*
+              * Antes decía "los que no importes no se guardan". Era verdad para
+              * el padrón y falso para todo lo demás: cada búsqueda ya guarda lo
+              * que encontró en Descubiertos. Alguien que leía eso creía que
+              * perdía el trabajo si no importaba en el momento, y volvía a
+              * pagar la misma búsqueda.
+              */}
             <p className="text-xs text-ink-500">
-              Elegí los que valgan la pena. Los que no importes no se guardan en la base de influencers.
+              Todos estos <strong className="text-ink-700">ya quedaron guardados en Descubiertos</strong>, con las
+              palabras que usaste y sus métricas: podés buscarlos ahí cuando quieras, gratis. Importar es otra cosa:
+              pasarlos al padrón para poder sumarlos a una campaña.
             </p>
+            {/*
+              * Qué se buscó, arriba de lo que se encontró.
+              *
+              * Los resultados se miran un rato después de pedirlos --a veces al
+              * día siguiente, desde la tabla de búsquedas-- y sin esto no hay
+              * forma de saber con qué filtros salió esta lista.
+              */}
+            {(() => {
+              const run = runs.find((r) => r.id === openRun)
+              if (!run) return null
+              const partes = describirBusqueda(run)
+              if (partes.length === 0) return null
+              return (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {partes.map((parte) => (
+                    <span
+                      key={parte.texto}
+                      className={
+                        parte.enOrigen
+                          ? 'rounded-md bg-emerald-50 px-2 py-0.5 text-xs text-emerald-900'
+                          : 'rounded-md bg-ink-100 px-2 py-0.5 text-xs text-ink-700'
+                      }
+                      title={
+                        parte.enOrigen
+                          ? 'El proveedor filtró por esto antes de devolver, así que todos lo cumplen.'
+                          : 'Se comprueba sobre lo que devolvió la red.'
+                      }
+                    >
+                      {parte.texto}
+                    </span>
+                  ))}
+                </div>
+              )
+            })()}
             {results.length === 0 ? null : (() => {
               const cumplen = results.filter((r) => r.veredicto === 'CUMPLE').length
               const sinDato = results.filter((r) => r.veredicto === 'SIN_DATO').length
@@ -719,9 +820,11 @@ export function ScoutingConsole({
                     />
                   </Th>
                   <Th>Perfil</Th>
+                  <Th>Red</Th>
                   <Th className="text-right">Seguidores</Th>
                   <Th className="text-right">ER</Th>
                   <Th>País</Th>
+                  <Th>Lo trajo</Th>
                   <Th>Contra tus filtros</Th>
                   <Th>Estado</Th>
                 </tr>
@@ -751,15 +854,19 @@ export function ScoutingConsole({
                       </ExternalLink>
                       {result.bio ? <p className="mt-0.5 max-w-96 text-xs text-ink-500">{result.bio}</p> : null}
                     </Td>
+                    <Td className="text-xs">{platformLabel(result.platform)}</Td>
                     <Td className="text-right tabular-nums">{formatFollowers(result.followers)}</Td>
                     <Td className="text-right tabular-nums">{formatPercent(result.engagementRate)}</Td>
-                    <Td className="text-xs">{result.country ?? '—'}</Td>
+                    <Td className="text-xs">
+                      {result.country ?? <span className="text-ink-500">no lo informa</span>}
+                    </Td>
+                    <Td className="text-xs text-ink-600">{result.provider}</Td>
                     <Td className="text-xs">
                       {result.veredicto === 'CUMPLE' ? (
                         <Badge tone="emerald">Cumple</Badge>
                       ) : result.veredicto === 'SIN_DATO' ? (
                         <>
-                          <Badge tone="amber">Sin dato</Badge>
+                          <Badge tone="amber">Falta un dato</Badge>
                           <p className="mt-0.5 text-ink-500">{result.motivos.join(' · ')}</p>
                         </>
                       ) : (
@@ -820,4 +927,73 @@ function leerAudiencia(form: FormData): {
   }
 
   return Object.values(audiencia).some((v) => v !== null) ? audiencia : null
+}
+
+/**
+ * Cuenta qué se buscó, en palabras.
+ *
+ * Distingue lo que el proveedor filtró **antes de devolver** de lo que se
+ * comprueba después: no es lo mismo "el proveedor sólo trajo argentinos" que
+ * "de estos, miramos cuáles dicen ser argentinos". La diferencia es lo que
+ * hacía que una búsqueda perfecta se leyera como "0 cumplen".
+ */
+function describirBusqueda(run: {
+  query: unknown
+}): Array<{ texto: string; enOrigen: boolean }> {
+  const query = (run.query ?? {}) as {
+    keywords?: string[]
+    limit?: number
+    filtros?: Record<string, unknown> | null
+    audiencia?: Record<string, unknown> | null
+    filtrosEnOrigen?: string[]
+  }
+  const f = query.filtros ?? {}
+  const enOrigen = new Set(query.filtrosEnOrigen ?? [])
+  const partes: Array<{ texto: string; enOrigen: boolean }> = []
+
+  for (const palabra of query.keywords ?? []) partes.push({ texto: palabra, enOrigen: false })
+
+  if (f.pais) partes.push({ texto: `país: ${String(f.pais)}`, enOrigen: enOrigen.has('pais') })
+  if (f.zona) partes.push({ texto: `zona: ${String(f.zona)}`, enOrigen: enOrigen.has('zona') })
+  if (f.bioMenciona) {
+    partes.push({ texto: `bio: ${String(f.bioMenciona)}`, enOrigen: enOrigen.has('bioMenciona') })
+  }
+
+  const desde = f.seguidoresDesde as number | null | undefined
+  const hasta = f.seguidoresHasta as number | null | undefined
+  if (desde != null || hasta != null) {
+    const rango =
+      desde != null && hasta != null
+        ? `${formatFollowers(desde)} a ${formatFollowers(hasta)}`
+        : desde != null
+          ? `desde ${formatFollowers(desde)}`
+          : `hasta ${formatFollowers(hasta ?? null)}`
+    partes.push({ texto: `seguidores ${rango}`, enOrigen: enOrigen.has('seguidores') })
+  }
+
+  const er = f.engagementMinimo as number | null | undefined
+  if (er != null) partes.push({ texto: `ER ≥ ${er}%`, enOrigen: enOrigen.has('engagement') })
+
+  const a = query.audiencia
+  if (a?.paisDelPublico) {
+    const dato = a.paisDelPublico as { pais?: string; porcentajeMinimo?: number }
+    // La audiencia siempre la aplica el proveedor: no hay forma de comprobarla después.
+    partes.push({ texto: `público de ${dato.pais} ≥ ${dato.porcentajeMinimo}%`, enOrigen: true })
+  }
+  if (a?.generoDelPublico) {
+    const dato = a.generoDelPublico as { genero?: string; porcentajeMinimo?: number }
+    partes.push({
+      texto: `público ${dato.genero === 'female' ? 'mujeres' : 'varones'} ≥ ${dato.porcentajeMinimo}%`,
+      enOrigen: true,
+    })
+  }
+  if (a?.edadDelPublico) {
+    const dato = a.edadDelPublico as { tramos?: string[]; porcentajeMinimo?: number }
+    partes.push({ texto: `público ${(dato.tramos ?? []).join(', ')} ≥ ${dato.porcentajeMinimo}%`, enOrigen: true })
+  }
+  if (a?.calidadMinima != null) {
+    partes.push({ texto: `audiencia real ≥ ${String(a.calidadMinima)}`, enOrigen: true })
+  }
+
+  return partes
 }

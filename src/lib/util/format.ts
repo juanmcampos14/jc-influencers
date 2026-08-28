@@ -25,6 +25,43 @@ export function formatMoney(amount: number | null | undefined, currency = 'USD',
   }
 }
 
+/**
+ * Un importe chico, sin redondearlo a cero.
+ *
+ * `formatMoney` no lleva decimales porque los presupuestos de campaña son de
+ * miles y los centavos sólo ensucian. Pero el scouting cuesta fracciones de
+ * centavo por perfil, y ahí ese redondeo escribía "US$ 0": exactamente la
+ * mentira que el producto no puede decir --que buscar es gratis--.
+ *
+ * Por debajo de un centavo se pasa a "cada 1.000", que es como se lee un precio
+ * así sin llenar la pantalla de ceros.
+ */
+export function formatMoneyFino(
+  amount: number | null | undefined,
+  currency = 'USD',
+  locale = 'es-AR',
+): string {
+  if (amount === null || amount === undefined) return '—'
+  if (amount === 0) return formatMoney(0, currency, locale)
+
+  const simbolo = (valor: number, decimales: number): string => {
+    try {
+      return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency,
+        minimumFractionDigits: decimales,
+        maximumFractionDigits: decimales,
+      }).format(valor)
+    } catch {
+      return `${CURRENCY_LABELS[currency] ?? currency} ${valor.toFixed(decimales)}`
+    }
+  }
+
+  if (amount < 0.01) return `${simbolo(amount * 1000, 2)} cada mil`
+  if (amount < 1) return simbolo(amount, 2)
+  return formatMoney(amount, currency, locale)
+}
+
 export function formatNumber(value: number | null | undefined, locale = 'es-AR'): string {
   if (value === null || value === undefined) return '—'
   return new Intl.NumberFormat(locale).format(value)
