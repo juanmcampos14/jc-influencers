@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { withSystemScope } from '@/lib/db/scope'
-import { updateMemberships } from '@/lib/repos/users'
+import { inviteUser, updateMemberships } from '@/lib/repos/users'
 import { can } from '@/lib/authz/context'
 import { AGENCY_ROLE_CAPABILITIES, CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE } from '@/lib/authz/capabilities'
 import { contextFor, createClientTenant, createUser, resetDatabase, seedCatalogs } from '../helpers/fixtures'
@@ -115,5 +115,39 @@ describe('permisos quitados a una persona', () => {
       tx.agencyMembership.findUnique({ where: { userId: persona.id } }),
     )
     expect(guardado?.deniedCapabilities).toEqual(['budget.view'])
+  })
+})
+
+/**
+ * La invitación tiene que llegar entera.
+ *
+ * Los clientes elegidos al invitar viajaban escondidos dentro de las
+ * capacidades como `__client:<id>` y **nadie los leía de vuelta**: quien
+ * invitaba elegía dos clientes y la persona entraba sin ninguno, viendo una
+ * pantalla vacía sin entender por qué. Además esos marcadores se copiaban a la
+ * membresía y la pantalla de usuarios los imprimía como si fueran permisos.
+ */
+describe('lo que se elige al invitar llega al aceptar', () => {
+  it('guarda los clientes en su propia columna, no entre los permisos', async () => {
+    await resetDatabase()
+    await seedCatalogs()
+    const cliente = await createClientTenant('Marca')
+    const admin2 = await contextFor((await createUser({ agencyRole: 'AGENCY_ADMIN' })).id)
+
+    const { id } = await inviteUser(admin2, {
+      email: `am-${Date.now()}@test.local`,
+      name: 'Account manager',
+      kind: 'AGENCY',
+      agencyRole: 'ACCOUNT_MANAGER',
+      agencyClientIds: [cliente.id],
+      concedidas: [...AGENCY_ROLE_CAPABILITIES.ACCOUNT_MANAGER.filter((c) => c !== 'budget.view')],
+    })
+
+    const invitacion = await withSystemScope((tx) => tx.invitation.findUnique({ where: { id } }))
+    expect(invitacion?.agencyClientIds).toEqual([cliente.id])
+    // Y ningún marcador se cuela entre las capacidades.
+    expect(invitacion?.extraCapabilities.some((c) => c.startsWith('__client:'))).toBe(false)
+    // Lo desmarcado viaja con la invitación: entra ya ajustado.
+    expect(invitacion?.deniedCapabilities).toEqual(['budget.view'])
   })
 })

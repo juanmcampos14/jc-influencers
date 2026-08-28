@@ -108,6 +108,7 @@ export type CreateInvitationInput = {
   clientId?: string | null
   clientRole?: ClientRole | null
   extraCapabilities?: string[]
+  deniedCapabilities?: string[]
   createdById: string
   actor: { userId: string; email: string; role: string | null; ip: string | null; userAgent: string | null }
 }
@@ -179,6 +180,7 @@ export async function createInvitation(input: CreateInvitationInput): Promise<Cr
         clientId: input.clientId ?? null,
         clientRole: input.clientRole ?? null,
         extraCapabilities: input.extraCapabilities ?? [],
+        deniedCapabilities: input.deniedCapabilities ?? [],
         expiresAt,
         createdById: input.createdById,
       },
@@ -319,10 +321,35 @@ export async function acceptInvitation(input: {
           userId: user.id,
           role: invitation.agencyRole,
           extraCapabilities: invitation.extraCapabilities,
+          deniedCapabilities: invitation.deniedCapabilities,
           createdById: invitation.createdById,
         },
-        update: { role: invitation.agencyRole, extraCapabilities: invitation.extraCapabilities },
+        update: {
+          role: invitation.agencyRole,
+          extraCapabilities: invitation.extraCapabilities,
+          deniedCapabilities: invitation.deniedCapabilities,
+        },
       })
+
+      /*
+       * Los clientes elegidos al invitar. Antes viajaban escondidos dentro de
+       * las capacidades y nadie los leía: quien invitaba elegía dos clientes y
+       * la persona entraba sin ninguno, viendo una pantalla vacía sin entender
+       * por qué.
+       */
+      if (invitation.agencyClientIds.length > 0) {
+        const existentes = await tx.client.findMany({
+          where: { id: { in: invitation.agencyClientIds } },
+          select: { id: true },
+        })
+        for (const cliente of existentes) {
+          await tx.agencyClientAssignment.upsert({
+            where: { userId_clientId: { userId: user.id, clientId: cliente.id } },
+            create: { userId: user.id, clientId: cliente.id, createdById: invitation.createdById },
+            update: {},
+          })
+        }
+      }
     } else if (invitation.clientId && invitation.clientRole) {
       await tx.clientMembership.upsert({
         where: { userId_clientId: { userId: user.id, clientId: invitation.clientId } },
@@ -331,9 +358,14 @@ export async function acceptInvitation(input: {
           clientId: invitation.clientId,
           role: invitation.clientRole,
           extraCapabilities: invitation.extraCapabilities,
+          deniedCapabilities: invitation.deniedCapabilities,
           createdById: invitation.createdById,
         },
-        update: { role: invitation.clientRole, extraCapabilities: invitation.extraCapabilities },
+        update: {
+          role: invitation.clientRole,
+          extraCapabilities: invitation.extraCapabilities,
+          deniedCapabilities: invitation.deniedCapabilities,
+        },
       })
     }
 

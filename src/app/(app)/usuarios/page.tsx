@@ -8,7 +8,7 @@ import { columnaFija, Table, TableWrap, Td, Th, Tr } from '@/components/ui/table
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
 import { can } from '@/lib/authz/context'
-import { AGENCY_ROLE_LABELS, CLIENT_ROLE_LABELS, capabilityLabel } from '@/lib/authz/capabilities'
+import { AGENCY_ROLE_LABELS, CLIENT_ROLE_LABELS } from '@/lib/authz/capabilities'
 import { listInvitations, listUsers, resumenDeAccesos } from '@/lib/repos/users'
 import { formatDate, formatDateTime } from '@/lib/util/format'
 import { InviteDialog } from './invite-dialog'
@@ -113,14 +113,26 @@ export default async function UsersPage() {
                       </Td>
                       <Td className="text-sm">
                         {user.agencyRole ? AGENCY_ROLE_LABELS[user.agencyRole] : <span className="text-ink-400">—</span>}
-                        {user.agencyExtras.length > 0 ? (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {user.agencyExtras.map((extra) => (
-                              <Badge key={extra} tone="violet">
-                                {capabilityLabel(extra)}
-                              </Badge>
-                            ))}
-                          </div>
+                        {/*
+                          * Un resumen, no la lista entera.
+                          *
+                          * Antes se imprimía un chip por cada permiso extra:
+                          * nueve chips violetas en una fila hacían que la
+                          * tabla dejara de escanearse, y encima se colaba una
+                          * clave interna --"__client:cmt99g..."-- que no era
+                          * un permiso. El detalle vive en Accesos, que es
+                          * donde se decide; acá alcanza con saber que esta
+                          * persona no tiene el rol tal cual viene.
+                          */}
+                        {user.agencyExtras.length + user.agencyQuitadas.length > 0 ? (
+                          <p className="mt-1 text-xs text-ink-500">
+                            {[
+                              user.agencyExtras.length > 0 ? `+${user.agencyExtras.length} sumado${user.agencyExtras.length === 1 ? '' : 's'}` : null,
+                              user.agencyQuitadas.length > 0 ? `−${user.agencyQuitadas.length} quitado${user.agencyQuitadas.length === 1 ? '' : 's'}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
                         ) : null}
                       </Td>
                       <Td className="text-xs">

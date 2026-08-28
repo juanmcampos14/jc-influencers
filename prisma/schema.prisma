@@ -123,6 +123,8 @@ model Invitation {
   extraCapabilities String[]         @default([])
   /// Capacidades quitadas, aunque el rol las dé.
   deniedCapabilities String[]        @default([])
+  /// Clientes que se le asignan a un empleado de agencia al aceptar.
+  agencyClientIds   String[]         @default([])
   expiresAt         DateTime
   acceptedAt        DateTime?
   acceptedByUserId  String?

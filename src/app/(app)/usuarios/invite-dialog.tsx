@@ -5,9 +5,19 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/dialog'
-import { Checkbox, Field, Input, Select } from '@/components/ui/field'
-import { AGENCY_ROLE_LABELS, CLIENT_ROLE_LABELS, GRANTABLE_AGENCY_EXTRAS, GRANTABLE_CLIENT_EXTRAS } from '@/lib/authz/capabilities'
-import { CAPABILITY_LABELS } from '@/lib/authz/capabilities'
+import { Field, Input, Select } from '@/components/ui/field'
+import {
+  AGENCY_ROLE_CAPABILITIES,
+  AGENCY_ROLE_LABELS,
+  CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE,
+  CLIENT_ROLE_CAPABILITIES,
+  CLIENT_ROLE_LABELS,
+  GRANTABLE_CLIENT_EXTRAS,
+  type Capability,
+} from '@/lib/authz/capabilities'
+import { ArbolDePermisos } from '@/components/permisos/arbol-de-permisos'
+import { capacidadesDelArbol } from '@/lib/authz/arbol'
+import type { AgencyRole, ClientRole } from '@/generated/prisma/enums'
 import { inviteUserAction } from '../actions/users'
 
 type ShellClient = { id: string; name: string; allowClientUserInvites: boolean }
@@ -26,6 +36,42 @@ export function InviteDialog({
   const [kind, setKind] = React.useState<'AGENCY' | 'CLIENT'>(canInviteAgency ? 'AGENCY' : 'CLIENT')
   const [errors, setErrors] = React.useState<Record<string, string[]>>({})
   const [pending, startTransition] = React.useTransition()
+  const [rolDeAgencia, setRolDeAgencia] = React.useState<AgencyRole>('ACCOUNT_MANAGER')
+  const [rolDeCliente, setRolDeCliente] = React.useState<ClientRole>('CLIENT_REVIEWER')
+
+  /*
+   * Lo que da el rol elegido. Se recalcula al cambiarlo, y los permisos
+   * vuelven a ese piso: el rol nuevo es una decisión, no una capa encima del
+   * anterior.
+   */
+  const delRol = React.useMemo(
+    () =>
+      new Set<Capability>(
+        kind === 'AGENCY'
+          ? (AGENCY_ROLE_CAPABILITIES[rolDeAgencia] ?? [])
+          : (CLIENT_ROLE_CAPABILITIES[rolDeCliente] ?? []),
+      ),
+    [kind, rolDeAgencia, rolDeCliente],
+  )
+  const [concedidas, setConcedidas] = React.useState<Set<Capability>>(() => new Set())
+  React.useEffect(() => setConcedidas(new Set(delRol)), [delRol])
+
+  /**
+   * Lo que no se le puede dar a un usuario de cliente: no se muestra.
+   *
+   * Un casillero que la base va a descartar igual no es una opción, es una
+   * promesa que no se cumple. Del lado cliente sólo queda lo que da su rol más
+   * la lista corta de lo que se le puede sumar.
+   */
+  const prohibidasDeCliente = React.useMemo(() => {
+    if (kind === 'AGENCY') return undefined
+    const permitido = new Set<Capability>([...delRol, ...GRANTABLE_CLIENT_EXTRAS])
+    return new Set<Capability>(
+      capacidadesDelArbol().filter(
+        (cap) => CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE.has(cap) || !permitido.has(cap),
+      ),
+    )
+  }, [kind, delRol])
 
   const agencyRoles = Object.entries(AGENCY_ROLE_LABELS).filter(
     ([key]) => isSuperadmin || key !== 'PLATFORM_SUPERADMIN',
@@ -43,7 +89,7 @@ export function InviteDialog({
         agencyRole: kind === 'AGENCY' ? (String(form.get('agencyRole') ?? '') as never) : undefined,
         clientId: kind === 'CLIENT' ? String(form.get('clientId') ?? '') : undefined,
         clientRole: kind === 'CLIENT' ? (String(form.get('clientRole') ?? '') as never) : undefined,
-        extraCapabilities: form.getAll('extras').map(String),
+        concedidas: [...concedidas],
         agencyClientIds: kind === 'AGENCY' ? form.getAll('agencyClientIds').map(String) : undefined,
       })
       if (!result.ok) {
@@ -56,8 +102,6 @@ export function InviteDialog({
       router.refresh()
     })
   }
-
-  const extras = kind === 'AGENCY' ? GRANTABLE_AGENCY_EXTRAS : GRANTABLE_CLIENT_EXTRAS
   const invitableClients = kind === 'CLIENT' ? clients : clients
 
   return (
@@ -91,7 +135,13 @@ export function InviteDialog({
           {kind === 'AGENCY' ? (
             <>
               <Field label="Rol de agencia" htmlFor="agencyRole" required>
-                <Select id="agencyRole" name="agencyRole" defaultValue="ACCOUNT_MANAGER" required>
+                <Select
+                  id="agencyRole"
+                  name="agencyRole"
+                  value={rolDeAgencia}
+                  onChange={(event) => setRolDeAgencia(event.target.value as AgencyRole)}
+                  required
+                >
                   {agencyRoles.map(([key, label]) => (
                     <option key={key} value={key}>
                       {label}
@@ -125,7 +175,13 @@ export function InviteDialog({
                 </Select>
               </Field>
               <Field label="Rol dentro del cliente" htmlFor="clientRole" required>
-                <Select id="clientRole" name="clientRole" defaultValue="CLIENT_REVIEWER" required>
+                <Select
+                  id="clientRole"
+                  name="clientRole"
+                  value={rolDeCliente}
+                  onChange={(event) => setRolDeCliente(event.target.value as ClientRole)}
+                  required
+                >
                   {Object.entries(CLIENT_ROLE_LABELS).map(([key, label]) => (
                     <option key={key} value={key}>
                       {label}
@@ -136,20 +192,20 @@ export function InviteDialog({
             </>
           )}
 
-          <fieldset className="space-y-1.5 rounded-lg border border-ink-200 p-3">
-            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-500">
-              Permisos extra (opcional)
-            </legend>
-            {extras.map((capability) => (
-              <label key={capability} className="flex items-center gap-2 text-sm text-ink-700">
-                <Checkbox name="extras" value={capability} />
-                {CAPABILITY_LABELS[capability]}
-              </label>
-            ))}
-            <p className="px-1 pt-1 text-xs text-ink-500">
-              Un usuario de cliente nunca puede recibir permisos internos de la agencia, aunque se los marque.
+          <div>
+            <p className="mb-1 text-sm font-medium text-ink-800">Qué va a poder ver y qué va a poder editar</p>
+            <p className="mb-2 text-xs text-ink-500">
+              El rol deja marcado un punto de partida. Ajustá lo que haga falta: entra con esto, sin tener que
+              volver después a corregirlo.
             </p>
-          </fieldset>
+            <ArbolDePermisos
+              concedidas={concedidas}
+              onChange={setConcedidas}
+              delRol={delRol}
+              prohibidas={prohibidasDeCliente}
+              disabled={pending}
+            />
+          </div>
 
           <div className="flex justify-end gap-2">
             <DialogClose asChild>

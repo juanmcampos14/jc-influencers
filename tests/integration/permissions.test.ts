@@ -236,7 +236,7 @@ describe('Roles y campos sensibles', () => {
       kind: 'CLIENT',
       clientId,
       clientRole: 'CLIENT_REVIEWER',
-      extraCapabilities: ['user.invite', 'export.create'],
+      concedidas: ['user.invite', 'export.create'],
     }).catch((error: unknown) => error)
     // El account manager de este test no tiene `user.invite`, así que ni siquiera puede invitar.
     expect(invitation).toBeInstanceOf(ForbiddenError)

@@ -17,7 +17,7 @@ export const inviteUserAction = defineAction(
     agencyRole: AGENCY_ROLE.optional(),
     clientId: id.optional(),
     clientRole: CLIENT_ROLE.optional(),
-    extraCapabilities: z.array(z.string().trim().max(60)).max(20).optional(),
+    concedidas: z.array(z.string().trim().max(60)).max(60).optional(),
     agencyClientIds: z.array(id).max(100).optional(),
   }),
   async (input, ctx) => {

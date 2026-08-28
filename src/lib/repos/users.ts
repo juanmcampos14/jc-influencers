@@ -10,8 +10,6 @@ import { normalizeEmail } from '@/lib/auth/tokens'
 import {
   AGENCY_ROLE_CAPABILITIES,
   CLIENT_ROLE_CAPABILITIES,
-  CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE,
-  GRANTABLE_AGENCY_EXTRAS,
   GRANTABLE_CLIENT_EXTRAS,
   isCapability,
   repartirPermisos,
@@ -122,7 +120,8 @@ export type InviteInput = {
   agencyRole?: AgencyRole
   clientId?: string
   clientRole?: ClientRole
-  extraCapabilities?: string[]
+  /** Todo lo que va a poder hacer, tal como quedó el árbol. */
+  concedidas?: string[]
   agencyClientIds?: string[]
 }
 
@@ -154,7 +153,15 @@ export async function inviteUser(ctx: AuthContext, input: InviteInput): Promise<
     }
   }
 
-  const extras = sanitizeExtras(input.extraCapabilities ?? [], input.kind, ctx)
+  /*
+   * Los permisos llegan como el conjunto entero que quedó marcado en el árbol,
+   * igual que al editar accesos: la pantalla no piensa en "extra".
+   */
+  const delRol =
+    input.kind === 'AGENCY'
+      ? (AGENCY_ROLE_CAPABILITIES[input.agencyRole ?? 'SCOUT'] ?? [])
+      : (CLIENT_ROLE_CAPABILITIES[input.clientRole ?? 'CLIENT_VIEWER'] ?? [])
+  const { extras, quitadas } = repartir(input.concedidas, delRol, input.kind, ctx)
 
   const invitation = await createInvitation({
     email,
@@ -163,17 +170,29 @@ export async function inviteUser(ctx: AuthContext, input: InviteInput): Promise<
     clientId: input.kind === 'CLIENT' ? (input.clientId ?? null) : null,
     clientRole: input.kind === 'CLIENT' ? (input.clientRole ?? null) : null,
     extraCapabilities: extras,
+    deniedCapabilities: quitadas,
     createdById: ctx.user.id,
     actor: actorOf(ctx),
   })
 
-  // Alcance por cliente de un empleado de agencia (account manager, scout, finanzas).
+  /*
+   * Alcance por cliente de un empleado de agencia. Va en su propia columna.
+   *
+   * Antes viajaba escondido dentro de `extraCapabilities` como `__client:<id>`,
+   * y eso hacía dos cosas: la pantalla de usuarios lo imprimía como si fuera un
+   * permiso --se veía "__client:cmt99g2h..."-- y, peor, **nadie lo leía de
+   * vuelta**: el account manager invitado para dos clientes entraba sin
+   * ninguno asignado.
+   */
   if (input.kind === 'AGENCY' && input.agencyClientIds?.length) {
     await scoped(ctx, async (tx) => {
-      const valid = await tx.client.findMany({ where: { id: { in: input.agencyClientIds ?? [] } }, select: { id: true } })
+      const valid = await tx.client.findMany({
+        where: { id: { in: input.agencyClientIds ?? [] } },
+        select: { id: true },
+      })
       await tx.invitation.update({
         where: { id: invitation.id },
-        data: { extraCapabilities: [...extras, ...valid.map((c) => `__client:${c.id}`)] },
+        data: { agencyClientIds: valid.map((c) => c.id) },
       })
     })
   }
@@ -203,18 +222,6 @@ function repartir(
   })
 }
 
-function sanitizeExtras(raw: string[], kind: 'AGENCY' | 'CLIENT', ctx: AuthContext): string[] {
-  const allowed = kind === 'AGENCY' ? GRANTABLE_AGENCY_EXTRAS : GRANTABLE_CLIENT_EXTRAS
-  const grantable = new Set<string>(allowed)
-  const own = ctx.side === 'AGENCY' ? ctx.agencyCapabilities : capabilitiesFor(ctx, ctx.activeClientId)
-  return raw.filter((cap) => {
-    if (!isCapability(cap)) return false
-    if (!grantable.has(cap)) return false
-    if (kind === 'CLIENT' && CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE.has(cap)) return false
-    // Nadie puede otorgar una capacidad que no tiene.
-    return own.has(cap)
-  })
-}
 
 export async function revokeUserInvitation(ctx: AuthContext, invitationId: string): Promise<void> {
   await scoped(ctx, async (tx) => {
