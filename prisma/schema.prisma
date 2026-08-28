@@ -119,7 +119,10 @@ model Invitation {
   agencyRole        AgencyRole?
   clientId          String?
   clientRole        ClientRole?
+  /// Capacidades sumadas por encima de lo que da el rol.
   extraCapabilities String[]         @default([])
+  /// Capacidades quitadas, aunque el rol las dé.
+  deniedCapabilities String[]        @default([])
   expiresAt         DateTime
   acceptedAt        DateTime?
   acceptedByUserId  String?
@@ -141,7 +144,10 @@ model AgencyMembership {
   id                String     @id @default(cuid())
   userId            String     @unique
   role              AgencyRole
+  /// Capacidades sumadas por encima de lo que da el rol.
   extraCapabilities String[]   @default([])
+  /// Capacidades quitadas, aunque el rol las dé. Se restan al final.
+  deniedCapabilities String[]  @default([])
   createdAt         DateTime   @default(now())
   createdById       String?
 
@@ -172,7 +178,10 @@ model ClientMembership {
   userId            String
   clientId          String
   role              ClientRole
+  /// Capacidades sumadas por encima de lo que da el rol.
   extraCapabilities String[]   @default([])
+  /// Capacidades quitadas, aunque el rol las dé. Se restan al final.
+  deniedCapabilities String[]  @default([])
   createdAt         DateTime   @default(now())
   createdById       String?
 

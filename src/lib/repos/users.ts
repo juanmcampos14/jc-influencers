@@ -8,10 +8,14 @@ import { createInvitation, revokeInvitation } from '@/lib/auth/flows'
 import { revokeAllSessionsForUser } from '@/lib/auth/session'
 import { normalizeEmail } from '@/lib/auth/tokens'
 import {
+  AGENCY_ROLE_CAPABILITIES,
+  CLIENT_ROLE_CAPABILITIES,
   CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE,
   GRANTABLE_AGENCY_EXTRAS,
   GRANTABLE_CLIENT_EXTRAS,
   isCapability,
+  repartirPermisos,
+  type Capability,
 } from '@/lib/authz/capabilities'
 import { actorOf, scoped } from './base'
 
@@ -23,7 +27,15 @@ export type UserRow = {
   lastLoginAt: string | null
   agencyRole: AgencyRole | null
   agencyExtras: string[]
-  clients: Array<{ clientId: string; clientName: string; role: ClientRole; extras: string[] }>
+  /** Lo que se le quitó a mano, aunque el rol lo dé. */
+  agencyQuitadas: string[]
+  clients: Array<{
+    clientId: string
+    clientName: string
+    role: ClientRole
+    extras: string[]
+    quitadas: string[]
+  }>
   agencyClients: Array<{ clientId: string; clientName: string }>
 }
 
@@ -64,11 +76,13 @@ export async function listUsers(ctx: AuthContext, clientId?: string | null): Pro
       lastLoginAt: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
       agencyRole: row.agencyMembership?.role ?? null,
       agencyExtras: row.agencyMembership?.extraCapabilities ?? [],
+      agencyQuitadas: row.agencyMembership?.deniedCapabilities ?? [],
       clients: row.clientMemberships.map((m) => ({
         clientId: m.client.id,
         clientName: m.client.name,
         role: m.role,
         extras: m.extraCapabilities,
+        quitadas: m.deniedCapabilities,
       })),
       agencyClients: row.agencyClientAssignments.map((a) => ({ clientId: a.client.id, clientName: a.client.name })),
     }))
@@ -167,6 +181,28 @@ export async function inviteUser(ctx: AuthContext, input: InviteInput): Promise<
   return { id: invitation.id }
 }
 
+/**
+ * De lo que llegó de la pantalla a las dos listas que guarda la base.
+ *
+ * `undefined` significa "no lo toques": la pantalla de invitación no manda
+ * permisos, y no por eso hay que borrarle los que ya tenía a alguien.
+ */
+function repartir(
+  concedidas: string[] | undefined,
+  delRol: readonly Capability[],
+  lado: 'AGENCY' | 'CLIENT',
+  ctx: AuthContext,
+): { extras: Capability[]; quitadas: Capability[] } {
+  if (concedidas === undefined) return { extras: [], quitadas: [] }
+  const propias = ctx.side === 'AGENCY' ? ctx.agencyCapabilities : capabilitiesFor(ctx, ctx.activeClientId)
+  const validas = new Set<Capability>(concedidas.filter(isCapability))
+  return repartirPermisos(validas, delRol, {
+    lado,
+    propias,
+    otorgablesDeCliente: GRANTABLE_CLIENT_EXTRAS,
+  })
+}
+
 function sanitizeExtras(raw: string[], kind: 'AGENCY' | 'CLIENT', ctx: AuthContext): string[] {
   const allowed = kind === 'AGENCY' ? GRANTABLE_AGENCY_EXTRAS : GRANTABLE_CLIENT_EXTRAS
   const grantable = new Set<string>(allowed)
@@ -230,16 +266,25 @@ export async function setUserStatus(ctx: AuthContext, userId: string, active: bo
 export type MembershipChange = {
   userId: string
   agencyRole?: AgencyRole | null
-  agencyExtras?: string[]
+  /**
+   * TODO lo que la persona va a poder hacer, tal como quedó el árbol.
+   *
+   * Llega el conjunto entero y no "los extra" porque es lo que la pantalla
+   * sabe: quien reparte marca casilleros, no piensa en diferencias contra un
+   * rol. La diferencia la calcula `repartirPermisos`, que además guarda las dos
+   * listas por separado --sumadas y quitadas-- para que un cambio futuro en lo
+   * que da un rol siga llegando a quien lo tenga.
+   */
+  agencyConcedidas?: string[]
   agencyClientIds?: string[]
-  clientMemberships?: Array<{ clientId: string; role: ClientRole; extras?: string[] }>
+  clientMemberships?: Array<{ clientId: string; role: ClientRole; concedidas?: string[] }>
 }
 
 /** Cambia roles y alcances. Aplica el cerrojo contra escalada de privilegios. */
 export async function updateMemberships(ctx: AuthContext, change: MembershipChange): Promise<void> {
   const isAgencyAdmin = ctx.side === 'AGENCY' && ctx.allClients
 
-  if (change.agencyRole !== undefined || change.agencyClientIds !== undefined || change.agencyExtras !== undefined) {
+  if (change.agencyRole !== undefined || change.agencyClientIds !== undefined || change.agencyConcedidas !== undefined) {
     if (!isAgencyAdmin) throw new ForbiddenError('Sólo un administrador de agencia puede tocar roles internos.')
     assertCan(ctx, 'membership.manage', null)
     if (change.agencyRole === 'PLATFORM_SUPERADMIN' && ctx.agencyRole !== 'PLATFORM_SUPERADMIN') {
@@ -265,11 +310,17 @@ export async function updateMemberships(ctx: AuthContext, change: MembershipChan
       if (change.agencyRole === null) {
         await tx.agencyMembership.deleteMany({ where: { userId: change.userId } })
       } else {
-        const extras = sanitizeExtras(change.agencyExtras ?? [], 'AGENCY', ctx)
+        const { extras, quitadas } = repartir(change.agencyConcedidas, AGENCY_ROLE_CAPABILITIES[change.agencyRole] ?? [], 'AGENCY', ctx)
         await tx.agencyMembership.upsert({
           where: { userId: change.userId },
-          create: { userId: change.userId, role: change.agencyRole, extraCapabilities: extras, createdById: ctx.user.id },
-          update: { role: change.agencyRole, extraCapabilities: extras },
+          create: {
+            userId: change.userId,
+            role: change.agencyRole,
+            extraCapabilities: extras,
+            deniedCapabilities: quitadas,
+            createdById: ctx.user.id,
+          },
+          update: { role: change.agencyRole, extraCapabilities: extras, deniedCapabilities: quitadas },
         })
       }
     }
@@ -286,7 +337,12 @@ export async function updateMemberships(ctx: AuthContext, change: MembershipChan
 
     if (change.clientMemberships) {
       for (const membership of change.clientMemberships) {
-        const extras = sanitizeExtras(membership.extras ?? [], 'CLIENT', ctx)
+        const { extras, quitadas } = repartir(
+          membership.concedidas,
+          CLIENT_ROLE_CAPABILITIES[membership.role] ?? [],
+          'CLIENT',
+          ctx,
+        )
         await tx.clientMembership.upsert({
           where: { userId_clientId: { userId: change.userId, clientId: membership.clientId } },
           create: {
@@ -294,9 +350,10 @@ export async function updateMemberships(ctx: AuthContext, change: MembershipChan
             clientId: membership.clientId,
             role: membership.role,
             extraCapabilities: extras,
+            deniedCapabilities: quitadas,
             createdById: ctx.user.id,
           },
-          update: { role: membership.role, extraCapabilities: extras },
+          update: { role: membership.role, extraCapabilities: extras, deniedCapabilities: quitadas },
         })
       }
     }

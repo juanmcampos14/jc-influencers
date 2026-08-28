@@ -7,11 +7,13 @@ import { KeyRound, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 import { Checkbox, Field, Select } from '@/components/ui/field'
+import { ArbolDePermisos } from '@/components/permisos/arbol-de-permisos'
+import { AGENCY_ROLE_CAPABILITIES, isCapability, type Capability } from '@/lib/authz/capabilities'
+import type { AgencyRole } from '@/generated/prisma/enums'
 import {
   AGENCY_ROLE_LABELS,
   capabilityLabel,
   CLIENT_ROLE_LABELS,
-  GRANTABLE_AGENCY_EXTRAS,
 } from '@/lib/authz/capabilities'
 import { updateMembershipsAction, removeMembershipAction } from '../actions/users'
 
@@ -20,8 +22,16 @@ export type AccesoEditable = {
   name: string
   agencyRole: string | null
   agencyExtras: string[]
+  /** Lo que se le quitó a mano, aunque el rol lo dé. */
+  agencyQuitadas: string[]
   agencyClientIds: string[]
-  clientMemberships: Array<{ clientId: string; clientName: string; role: string; extras: string[] }>
+  clientMemberships: Array<{
+    clientId: string
+    clientName: string
+    role: string
+    extras: string[]
+    quitadas: string[]
+  }>
 }
 
 /**
@@ -46,7 +56,35 @@ export function EditarAccesos({
   const [clientesElegidos, setClientesElegidos] = React.useState<Set<string>>(
     () => new Set(acceso.agencyClientIds),
   )
-  const [extras, setExtras] = React.useState<Set<string>>(() => new Set(acceso.agencyExtras))
+  /*
+   * El estado es TODO lo que la persona va a poder hacer, no "los extra".
+   * Arranca en lo que da el rol, más lo sumado, menos lo quitado --que es
+   * exactamente lo que hoy puede hacer-- y de ahí se toca lo que haga falta.
+   */
+  const [concedidas, setConcedidas] = React.useState<Set<Capability>>(() => {
+    const base = new Set<Capability>(AGENCY_ROLE_CAPABILITIES[(acceso.agencyRole ?? '') as AgencyRole] ?? [])
+    for (const cap of acceso.agencyExtras) if (isCapability(cap)) base.add(cap)
+    for (const cap of acceso.agencyQuitadas) if (isCapability(cap)) base.delete(cap)
+    return base
+  })
+
+  /** Lo que da el rol elegido AHORA, para señalar qué se cambió a mano. */
+  const delRol = React.useMemo(
+    () => new Set<Capability>(AGENCY_ROLE_CAPABILITIES[rol as AgencyRole] ?? []),
+    [rol],
+  )
+
+  /*
+   * Al cambiar de rol se parte de lo que ese rol da. Conservar los casilleros
+   * del rol anterior dejaría a alguien con permisos que nadie eligió: el rol
+   * nuevo es una decisión, no una capa encima.
+   */
+  const rolAnterior = React.useRef(rol)
+  React.useEffect(() => {
+    if (rolAnterior.current === rol) return
+    rolAnterior.current = rol
+    setConcedidas(new Set(delRol))
+  }, [rol, delRol])
 
   const esDeAgencia = acceso.agencyRole !== null
   // Los administradores ven todos los clientes: elegirlos no significaría nada.
@@ -66,7 +104,7 @@ export function EditarAccesos({
         ...(esDeAgencia
           ? {
               agencyRole: rol as never,
-              agencyExtras: [...extras],
+              agencyConcedidas: [...concedidas],
               agencyClientIds: asignaClientes ? [...clientesElegidos] : [],
             }
           : {}),
@@ -147,20 +185,19 @@ export function EditarAccesos({
                 </p>
               )}
 
-              <Field label="Permisos extra" htmlFor="extras">
-                <div className="space-y-1.5 rounded-lg border border-ink-200 p-3">
-                  {GRANTABLE_AGENCY_EXTRAS.map((extra) => (
-                    <label key={extra} className="flex cursor-pointer items-start gap-2 text-sm text-ink-800">
-                      <Checkbox
-                        className="mt-0.5"
-                        checked={extras.has(extra)}
-                        onChange={() => alternar(extras, extra, setExtras)}
-                      />
-                      {capabilityLabel(extra)}
-                    </label>
-                  ))}
-                </div>
-              </Field>
+              <div>
+                <p className="mb-1 text-sm font-medium text-ink-800">Qué puede ver y qué puede editar</p>
+                <p className="mb-2 text-xs text-ink-500">
+                  El rol deja marcado un punto de partida. Desde acá se ajusta: lo que desmarques queda quitado,
+                  aunque el rol lo dé.
+                </p>
+                <ArbolDePermisos
+                  concedidas={concedidas}
+                  onChange={setConcedidas}
+                  delRol={delRol}
+                  disabled={pendiente}
+                />
+              </div>
             </>
           ) : (
             <div>

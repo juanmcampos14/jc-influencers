@@ -56,12 +56,34 @@ export type AuthContext = {
   preview: { clientId: string; nombreDelCliente: string } | null
 }
 
-function toCapabilitySet(base: readonly Capability[], extras: readonly string[], side: 'AGENCY' | 'CLIENT'): Set<Capability> {
+/**
+ * El permiso efectivo de alguien.
+ *
+ * El orden de las tres operaciones no es casual:
+ *
+ *   1. lo que da el rol, que es el piso
+ *   2. + lo que se le sumó a esa persona
+ *   3. - lo que se le quitó, aunque el rol lo diera
+ *   4. - lo que un usuario de cliente NUNCA puede tener
+ *
+ * El paso 4 va último a propósito: es el cerrojo contra la escalada de
+ * privilegios y no lo levanta ni un extra ni un rol. Y el 3 va antes del 4
+ * porque quitar de más nunca es un riesgo; quitar de menos sí.
+ */
+function toCapabilitySet(
+  base: readonly Capability[],
+  extras: readonly string[],
+  side: 'AGENCY' | 'CLIENT',
+  denied: readonly string[] = [],
+): Set<Capability> {
   const set = new Set<Capability>(base)
   for (const raw of extras) {
     if (!isCapability(raw)) continue
     if (side === 'CLIENT' && CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE.has(raw)) continue
     set.add(raw)
+  }
+  for (const raw of denied) {
+    if (isCapability(raw)) set.delete(raw)
   }
   if (side === 'CLIENT') {
     for (const forbidden of CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE) set.delete(forbidden)
@@ -133,7 +155,12 @@ export async function buildAuthContext(token: string | null, options: BuildOptio
   const previewPedido = agencyRole ? (options.previewClientId ?? null) : null
 
   const capacidadesDeAgencia: ReadonlySet<Capability> = agencyRole
-    ? toCapabilitySet(AGENCY_ROLE_CAPABILITIES[agencyRole] ?? [], user.agencyMembership?.extraCapabilities ?? [], 'AGENCY')
+    ? toCapabilitySet(
+        AGENCY_ROLE_CAPABILITIES[agencyRole] ?? [],
+        user.agencyMembership?.extraCapabilities ?? [],
+        'AGENCY',
+        user.agencyMembership?.deniedCapabilities ?? [],
+      )
     : new Set<Capability>()
 
   const clients: ClientAccess[] = []
@@ -159,6 +186,7 @@ export async function buildAuthContext(token: string | null, options: BuildOptio
         CLIENT_ROLE_CAPABILITIES[membership.role] ?? [],
         membership.extraCapabilities,
         'CLIENT',
+        membership.deniedCapabilities,
       )
       // `user.invite` sólo vale si la agencia habilitó esa capacidad para el cliente.
       if (!membership.client.allowClientUserInvites) caps.delete('user.invite')

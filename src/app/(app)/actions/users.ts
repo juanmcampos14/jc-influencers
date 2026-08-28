@@ -47,10 +47,21 @@ export const updateMembershipsAction = defineAction(
   z.object({
     userId: id,
     agencyRole: AGENCY_ROLE.nullish(),
-    agencyExtras: z.array(z.string().trim().max(60)).max(20).optional(),
+    /*
+     * Llega TODO lo que la persona va a poder hacer, no "los extra": es lo que
+     * la pantalla sabe. El servidor calcula la diferencia contra el rol y
+     * vuelve a comprobar los cerrojos --nadie otorga lo que no tiene--.
+     */
+    agencyConcedidas: z.array(z.string().trim().max(60)).max(60).optional(),
     agencyClientIds: z.array(id).max(200).optional(),
     clientMemberships: z
-      .array(z.object({ clientId: id, role: CLIENT_ROLE, extras: z.array(z.string().trim().max(60)).max(20).optional() }))
+      .array(
+        z.object({
+          clientId: id,
+          role: CLIENT_ROLE,
+          concedidas: z.array(z.string().trim().max(60)).max(60).optional(),
+        }),
+      )
       .max(100)
       .optional(),
   }),

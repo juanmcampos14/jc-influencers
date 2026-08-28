@@ -232,3 +232,53 @@ export const GRANTABLE_CLIENT_EXTRAS: readonly Capability[] = ['user.invite', 'e
  */
 export const capabilityLabel = (key: string): string =>
   (CAPABILITY_LABELS as Record<string, string>)[key] ?? key
+
+/**
+ * Traduce lo que se marcó en el árbol a lo que guarda la base.
+ *
+ * La pantalla piensa en "todo lo que esta persona va a poder hacer". La base
+ * guarda dos listas: lo sumado por encima del rol y lo quitado a pesar de él.
+ * Guardar el conjunto entero sería más simple y peor: si mañana cambia lo que
+ * da un rol, quien lo tenga no se entera nunca.
+ *
+ * Dos cerrojos que no dependen de la pantalla:
+ *
+ * - **Nadie otorga lo que no tiene.** Se comprueba contra las capacidades de
+ *   quien está repartiendo.
+ * - **Un usuario de cliente no recibe lo prohibido**, se marque lo que se
+ *   marque.
+ *
+ * Quitar, en cambio, no se restringe: sacar un permiso nunca es un riesgo.
+ */
+export function repartirPermisos(
+  concedidas: ReadonlySet<Capability>,
+  delRol: readonly Capability[],
+  opciones: {
+    lado: 'AGENCY' | 'CLIENT'
+    /** Lo que puede otorgar quien está repartiendo. */
+    propias: ReadonlySet<Capability>
+    /** Para el lado cliente, la lista corta de lo que se puede sumar. */
+    otorgablesDeCliente?: readonly Capability[]
+  },
+): { extras: Capability[]; quitadas: Capability[] } {
+  const base = new Set<Capability>(delRol)
+  const otorgablesCliente = new Set<Capability>(opciones.otorgablesDeCliente ?? [])
+
+  const extras: Capability[] = []
+  for (const cap of concedidas) {
+    if (base.has(cap)) continue
+    if (!opciones.propias.has(cap)) continue
+    if (opciones.lado === 'CLIENT') {
+      if (CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE.has(cap)) continue
+      if (!otorgablesCliente.has(cap)) continue
+    }
+    extras.push(cap)
+  }
+
+  const quitadas: Capability[] = []
+  for (const cap of base) {
+    if (!concedidas.has(cap)) quitadas.push(cap)
+  }
+
+  return { extras, quitadas }
+}

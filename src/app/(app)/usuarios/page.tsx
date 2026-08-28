@@ -166,12 +166,14 @@ export default async function UsersPage() {
                                   name: user.name,
                                   agencyRole: user.agencyRole ?? null,
                                   agencyExtras: user.agencyExtras,
+                                  agencyQuitadas: user.agencyQuitadas,
                                   agencyClientIds: user.agencyClients.map((entry) => entry.clientId),
                                   clientMemberships: user.clients.map((entry) => ({
                                     clientId: entry.clientId,
                                     clientName: entry.clientName,
                                     role: entry.role,
                                     extras: entry.extras ?? [],
+                                    quitadas: entry.quitadas ?? [],
                                   })),
                                 }}
                                 clients={ctx.clients.map((c) => ({ id: c.id, name: c.name }))}
