@@ -31,6 +31,7 @@ import {
  * para verificar que el tope de gasto realmente corta antes de gastar.
  */
 class FakeScoutingProvider implements ScoutingProvider {
+  readonly filtraPorAudiencia = false
   readonly name = 'fake'
   readonly configured = true
   startCalls = 0

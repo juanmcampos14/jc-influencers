@@ -38,6 +38,28 @@ export const previewScoutingAction = defineAction(
         engagementMinimo: z.number().min(0).max(100).nullish(),
       })
       .nullish(),
+    /*
+     * Los porcentajes se acotan a 0-100 y los tramos de edad a una lista
+     * cerrada: un valor inventado haría fallar el pedido entero al proveedor,
+     * y perder los filtros buenos por uno malo es peor que rechazarlo acá.
+     */
+    audiencia: z
+      .object({
+        paisDelPublico: z
+          .object({ pais: z.string().trim().min(2).max(4), porcentajeMinimo: z.number().min(0).max(100) })
+          .nullish(),
+        generoDelPublico: z
+          .object({ genero: z.enum(['male', 'female']), porcentajeMinimo: z.number().min(0).max(100) })
+          .nullish(),
+        edadDelPublico: z
+          .object({
+            tramos: z.array(z.enum(['13-17', '18-24', '25-34', '35-44', '45-64', '65+'])).max(7),
+            porcentajeMinimo: z.number().min(0).max(100),
+          })
+          .nullish(),
+        calidadMinima: z.number().min(0).max(100).nullish(),
+      })
+      .nullish(),
   }),
   async (input, ctx) =>
     previewScouting(ctx, {
@@ -47,6 +69,7 @@ export const previewScoutingAction = defineAction(
       platform: input.platform,
       keywords: input.keywords,
       filtros: input.filtros ?? null,
+      audiencia: input.audiencia ?? null,
       urls: input.urls,
       limit: input.limit,
     }),

@@ -4,6 +4,7 @@ import type { AuthContext } from '@/lib/authz/context'
 import {
   evaluarCreador,
   hayFiltros,
+  type FiltrosDeAudiencia,
   type FiltrosDeScouting,
   type Veredicto,
 } from '@/lib/domain/filtros-scouting'
@@ -136,6 +137,15 @@ export async function setBudget(
 export type PreviewInput = {
   /** Filtros que se van a aplicar a los resultados. Ver `filtros-scouting.ts`. */
   filtros?: FiltrosDeScouting | null
+  /**
+   * Filtros sobre el PÚBLICO del creador.
+   *
+   * Van aparte porque no se pueden comprobar después: o el proveedor los aplica
+   * en el origen, o no existen. Por eso tampoco se marcan como los otros --no
+   * hay dato contra el cual marcar-- y la pantalla sólo los ofrece cuando hay
+   * un proveedor conectado que sepa aplicarlos.
+   */
+  audiencia?: FiltrosDeAudiencia | null
   clientId: string
   campaignId?: string | null
   mode: ScoutingMode
@@ -230,6 +240,7 @@ export async function previewScouting(ctx: AuthContext, input: PreviewInput): Pr
           // Los filtros viajan con la corrida: así los resultados se pueden
           // volver a evaluar después sin depender de la pantalla que los pidió.
           filtros: input.filtros ?? null,
+          audiencia: input.audiencia ?? null,
         } as never,
         status: 'PREVIEW',
         requestedRecords: requested,
@@ -301,6 +312,7 @@ export async function startScouting(ctx: AuthContext, runId: string): Promise<{ 
     urls?: string[]
     limit?: number
     filtros?: FiltrosDeScouting | null
+    audiencia?: FiltrosDeAudiencia | null
   }
   try {
     const job =
@@ -317,6 +329,7 @@ export async function startScouting(ctx: AuthContext, runId: string): Promise<{ 
              * de `filtros-scouting.ts` sigue haciendo su trabajo igual.
              */
             filtros: query.filtros ?? null,
+            audiencia: query.audiencia ?? null,
           })
         : await provider.startEnrich({ platform: run.platform, urls: query.urls ?? [] })
 

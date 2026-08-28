@@ -67,6 +67,7 @@ export function ScoutingConsole({
   campaignId,
   provider,
   canManageBudget,
+  puedeFiltrarAudiencia,
 }: {
   clients: Array<{ id: string; name: string }>
   clientId: string
@@ -81,6 +82,14 @@ export function ScoutingConsole({
    */
   campaignId?: string | null
   provider: { name: string; configured: boolean }
+  /**
+   * Si hay un proveedor conectado que filtre por el público del creador.
+   *
+   * Lo decide el servidor mirando los proveedores configurados, no la pantalla:
+   * ofrecer un filtro que nadie va a aplicar hace que el resultado parezca
+   * verificado cuando no lo está.
+   */
+  puedeFiltrarAudiencia: boolean
   canManageBudget: boolean
 }) {
   const router = useRouter()
@@ -188,6 +197,13 @@ export function ScoutingConsole({
                 engagementMinimo: numero('fEngagement'),
               }
             : undefined,
+        /*
+         * La audiencia sólo viaja si hay quien la aplique. Mandarla a un
+         * scraper no rompería nada y sería peor: la corrida quedaría guardada
+         * con un filtro que nadie tuvo en cuenta, y al mirarla después
+         * parecería que los resultados lo cumplen.
+         */
+        audiencia: mode === 'DISCOVER' && puedeFiltrarAudiencia ? leerAudiencia(form) : undefined,
         keywords:
           mode === 'DISCOVER'
             ? String(form.get('keywords') ?? '')
@@ -398,7 +414,11 @@ export function ScoutingConsole({
               </div>
 
               {mode === 'DISCOVER' ? (
-                <FiltrosAvanzados abierto={filtrosAbiertos} onToggle={() => setFiltrosAbiertos((v) => !v)} />
+                <FiltrosAvanzados
+                  abierto={filtrosAbiertos}
+                  onToggle={() => setFiltrosAbiertos((v) => !v)}
+                  puedeFiltrarAudiencia={puedeFiltrarAudiencia}
+                />
               ) : null}
 
               <Field label="Agregar a una campaña (opcional)" htmlFor="campaignId">
@@ -768,4 +788,36 @@ export function ScoutingConsole({
       ) : null}
     </div>
   )
+}
+
+/**
+ * Junta los filtros de audiencia del formulario.
+ *
+ * Devuelve `null` si no se pidió ninguno: mandar un objeto con todo en null
+ * dejaría la corrida guardada como si se hubiera filtrado por audiencia.
+ */
+function leerAudiencia(form: FormData): {
+  paisDelPublico?: { pais: string; porcentajeMinimo: number } | null
+  generoDelPublico?: { genero: 'male' | 'female'; porcentajeMinimo: number } | null
+  edadDelPublico?: { tramos: string[]; porcentajeMinimo: number } | null
+  calidadMinima?: number | null
+} | null {
+  const valor = (campo: string): string => String(form.get(campo) ?? '').trim()
+  const porcentajeMinimo = Number(valor('aPorcentaje')) || 50
+
+  const pais = valor('aPais')
+  const genero = valor('aGenero')
+  const generoDelPublico: { genero: 'male' | 'female'; porcentajeMinimo: number } | null =
+    genero === 'male' || genero === 'female' ? { genero, porcentajeMinimo } : null
+  const edad = valor('aEdad')
+  const calidad = Number(valor('aCalidad'))
+
+  const audiencia = {
+    paisDelPublico: pais ? { pais, porcentajeMinimo } : null,
+    generoDelPublico,
+    edadDelPublico: edad ? { tramos: [edad], porcentajeMinimo } : null,
+    calidadMinima: Number.isFinite(calidad) && calidad > 0 ? calidad : null,
+  }
+
+  return Object.values(audiencia).some((v) => v !== null) ? audiencia : null
 }

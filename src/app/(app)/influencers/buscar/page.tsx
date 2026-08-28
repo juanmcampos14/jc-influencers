@@ -9,7 +9,7 @@ import { loadPage } from '@/lib/actions/page-guard'
 import { can } from '@/lib/authz/context'
 import { getBudgetState, listScoutingRuns } from '@/lib/repos/scouting'
 import { listCampaigns } from '@/lib/repos/campaigns'
-import { scoutingProvider } from '@/lib/ports/scouting'
+import { hayProveedorConAudiencia, scoutingProvider } from '@/lib/ports/scouting'
 import { ScoutingConsole } from './scouting-console'
 import { NavDeInfluencers } from '../sub-nav'
 
@@ -84,6 +84,7 @@ export default async function BuscarPage({
           campaignId={campaigns.items.find((campaign) => campaign.id === texto(params.campana))?.id ?? null}
           provider={{ name: provider.name, configured: provider.configured }}
           canManageBudget={can(ctx, 'scouting.budget.manage', clientId)}
+          puedeFiltrarAudiencia={hayProveedorConAudiencia()}
         />
       </div>
     </>

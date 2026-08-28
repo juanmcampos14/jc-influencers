@@ -99,6 +99,7 @@ function decodificar(jobId: string): PedidoCodificado {
 
 export class HypeAuditorScoutingProvider implements ScoutingProvider {
   readonly name = 'hypeauditor'
+  readonly filtraPorAudiencia = true
 
   /**
    * Reintentos en curso, por identificador de trabajo.

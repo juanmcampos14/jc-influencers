@@ -113,3 +113,34 @@ export function evaluarCreador(creador: CreadorFiltrable, filtros: FiltrosDeScou
 export function hayFiltros(filtros: FiltrosDeScouting): boolean {
   return Object.values(filtros).some((valor) => valor !== null && valor !== undefined && valor !== '')
 }
+
+/**
+ * Filtros sobre el PÚBLICO del creador, no sobre el creador.
+ *
+ * Viven acá y no en el adaptador de un proveedor porque ya los aplican dos, y
+ * porque son la razón de haber salido a buscar un proveedor de datos: es lo
+ * único que un scraper no puede contestar --leyendo una página se ve cuántos
+ * seguidores tiene alguien, no quiénes son--.
+ *
+ * No se mezclan con `FiltrosDeScouting` a propósito. Aquéllos se pueden
+ * comprobar sobre lo que devuelve cualquier proveedor, y por eso se marcan
+ * después; éstos sólo existen si el proveedor los aplica en el origen.
+ * Juntarlos haría creer que Apify también los tiene en cuenta.
+ */
+export type FiltrosDeAudiencia = {
+  /** País del PÚBLICO (AR, MX…) y qué porcentaje mínimo tiene que estar ahí. */
+  paisDelPublico?: { pais: string; porcentajeMinimo: number } | null
+  /** Género del público y su porcentaje mínimo. */
+  generoDelPublico?: { genero: 'male' | 'female'; porcentajeMinimo: number } | null
+  /** Tramos de edad ('18-24', '25-34'…) y el porcentaje mínimo sumado. */
+  edadDelPublico?: { tramos: string[]; porcentajeMinimo: number } | null
+  /** Intereses del público y su porcentaje mínimo. */
+  interesesDelPublico?: { intereses: string[]; porcentajeMinimo: number } | null
+  /** Cuánto de ese público es real, de 0 a 100. */
+  calidadMinima?: number | null
+}
+
+/** Si hay algún filtro de audiencia puesto. */
+export function hayFiltrosDeAudiencia(filtros: FiltrosDeAudiencia): boolean {
+  return Object.values(filtros).some((valor) => valor !== null && valor !== undefined)
+}

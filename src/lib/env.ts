@@ -42,7 +42,7 @@ const schema = z.object({
    * Qué proveedor usa el scouting. La aplicación depende de la interfaz, no de
    * ninguno de los dos: cambiar de uno a otro es cambiar esta variable.
    */
-  SCOUTING_PROVIDER: z.enum(['brightdata', 'apify', 'hypeauditor']).default('brightdata'),
+  SCOUTING_PROVIDER: z.enum(['brightdata', 'apify', 'hypeauditor', 'influencers-club']).default('brightdata'),
   /*
    * Se aceptan los dos nombres: Apify llama "API token" al suyo y es fácil
    * cargarlo como APIFY_API_TOKEN. Fallar por el nombre de la variable, con el
@@ -60,6 +60,25 @@ const schema = z.object({
   /** Costo por registro entregado. Se usa para el tope de gasto y el aviso previo. */
   BRIGHTDATA_COST_PER_RECORD_USD: z.coerce.number().nonnegative().default(0.0015),
   /** Tope mensual global de la agencia, en dólares. */
+  /*
+   * influencers.club: el motor principal de descubrimiento.
+   *
+   * Filtra en el origen por quién SIGUE al creador --país, edad, género e
+   * intereses del público, y cuánto de esa audiencia es real--, que es lo único
+   * que un scraper no puede contestar.
+   *
+   * La clave se saca sola desde su panel; no hace falta hablar con nadie.
+   */
+  INFLUENCERS_CLUB_API_KEY: z.string().optional(),
+  /*
+   * Qué sale un crédito, en dólares. Descubrir cuesta 0,01 créditos por creador
+   * devuelto, así que esto define el costo por perfil. Sin valor por defecto a
+   * propósito: su precio cambia según el plan --arranca en US$ 0,23-- y sin
+   * saberlo el tope mensual deja de ser un tope. Sin esto cargado el proveedor
+   * se declara no configurado.
+   */
+  INFLUENCERS_CLUB_COST_PER_CREDIT_USD: z.coerce.number().nonnegative().optional(),
+
   /*
    * HypeAuditor. A diferencia de los scrapers, filtra por AUDIENCIA --país,
    * edad y género de los seguidores-- y por calidad de esa audiencia.

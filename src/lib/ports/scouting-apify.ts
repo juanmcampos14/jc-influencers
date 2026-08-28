@@ -236,6 +236,7 @@ export function apifyInput(
 
 export class ApifyScoutingProvider implements ScoutingProvider {
   readonly name = 'apify'
+  readonly filtraPorAudiencia = false
   readonly configured = true
   /** Esquemas ya leídos, por actor. No cambian entre corridas. */
   private readonly esquemas = new Map<string, EsquemaDeActor | null>()

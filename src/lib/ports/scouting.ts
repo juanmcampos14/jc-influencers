@@ -4,8 +4,8 @@ import { env } from '@/lib/env'
 import { parseFollowers, parseProfileUrl } from '@/lib/domain/normalize'
 import { ApifyScoutingProvider } from './scouting-apify'
 import { HypeAuditorScoutingProvider } from './scouting-hypeauditor'
-import type { FiltrosDeScouting } from '@/lib/domain/filtros-scouting'
-import type { FiltrosDeAudiencia } from './hypeauditor-consulta'
+import { InfluencersClubScoutingProvider } from './scouting-influencers-club'
+import type { FiltrosDeAudiencia, FiltrosDeScouting } from '@/lib/domain/filtros-scouting'
 
 /**
  * Proveedor de scouting.
@@ -85,6 +85,14 @@ export interface ScoutingProvider {
   readonly name: string
   /** Si es false, el producto tiene que decirlo en pantalla en vez de simular. */
   readonly configured: boolean
+  /**
+   * Si filtra por la AUDIENCIA del creador --país, edad, género del público--.
+   *
+   * La pantalla lo pregunta antes de ofrecer esos campos. Un scraper no puede
+   * contestarlos, y ofrecer un filtro que no filtra es peor que no tenerlo:
+   * el resultado parece verificado cuando no lo está.
+   */
+  readonly filtraPorAudiencia: boolean
   /** Costo por registro entregado, en dólares. */
   unitCostUsd(platform: Platform): number
   supports(platform: Platform, mode: 'DISCOVER' | 'ENRICH'): boolean
@@ -104,6 +112,7 @@ const NOT_CONFIGURED =
 class UnconfiguredScoutingProvider implements ScoutingProvider {
   readonly name = 'sin configurar'
   readonly configured = false
+  readonly filtraPorAudiencia = false
   unitCostUsd(): number {
     return 0
   }
@@ -243,6 +252,7 @@ function unificarPorPerfil(registros: ScoutingRecord[]): ScoutingRecord[] {
 class BrightDataProvider implements ScoutingProvider {
   readonly name = 'brightdata'
   readonly configured = true
+  readonly filtraPorAudiencia = false
 
   constructor(
     private readonly token: string,
@@ -521,6 +531,11 @@ function armar(): ScoutingProvider[] {
       )
     : new UnconfiguredScoutingProvider()
 
+  const influencersClub: ScoutingProvider = new InfluencersClubScoutingProvider({
+    apiKey: config.INFLUENCERS_CLUB_API_KEY ?? '',
+    costoPorCreditoUsd: config.INFLUENCERS_CLUB_COST_PER_CREDIT_USD ?? null,
+  })
+
   const hypeauditor: ScoutingProvider = new HypeAuditorScoutingProvider({
     authId: config.HYPEAUDITOR_AUTH_ID ?? '',
     token: config.HYPEAUDITOR_API_TOKEN ?? '',
@@ -530,11 +545,17 @@ function armar(): ScoutingProvider[] {
 
   /*
    * El orden importa: es el que se recorre cuando el preferido no puede hacer
-   * el trabajo. HypeAuditor va primero porque es el único que filtra por
-   * audiencia --si está conectado y la búsqueda la pide, es el que corresponde--
-   * y los scrapers quedan detrás, que es donde estaban.
+   * el trabajo.
+   *
+   * Adelante van los proveedores de datos, que son los únicos que filtran por
+   * audiencia. influencers.club primero porque es el motor principal --cubre
+   * cinco redes, cobra por creador devuelto y su clave se saca sola--, y
+   * HypeAuditor detrás como opción premium si algún día hay acuerdo.
+   *
+   * Los scrapers quedan al final, que es donde estaban: siguen siendo lo único
+   * que sabe actualizar las métricas de un perfil que ya tenemos.
    */
-  armados = [hypeauditor, apify, brightdata]
+  armados = [influencersClub, hypeauditor, apify, brightdata]
   return armados
 }
 
@@ -572,6 +593,16 @@ export function scoutingProviderFor(platform: Platform, mode: 'DISCOVER' | 'ENRI
 }
 
 /** El proveedor con el que se disparó una corrida, para poder seguirla. */
+/**
+ * Si hay algún proveedor conectado que sepa filtrar por audiencia.
+ *
+ * La pantalla ofrece esos campos sólo si alguien los puede aplicar. Con los
+ * scrapers solos, el bloque sigue diciendo honestamente que no se puede.
+ */
+export function hayProveedorConAudiencia(): boolean {
+  return armar().some((p) => p.configured && p.filtraPorAudiencia)
+}
+
 export function scoutingProviderNamed(name: string): ScoutingProvider {
   return porNombre(name) ?? scoutingProvider()
 }

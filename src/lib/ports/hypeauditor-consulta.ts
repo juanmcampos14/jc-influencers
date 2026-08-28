@@ -15,7 +15,7 @@
  */
 
 import type { Platform } from '@/generated/prisma/enums'
-import type { FiltrosDeScouting } from '@/lib/domain/filtros-scouting'
+import type { FiltrosDeAudiencia, FiltrosDeScouting } from '@/lib/domain/filtros-scouting'
 
 /** Las redes que HypeAuditor sabe buscar, con el nombre que usa él. */
 const REDES: Partial<Record<Platform, string>> = {
@@ -44,24 +44,6 @@ export function paginasPara(pedidos: number): number {
   return Math.max(1, Math.ceil(pedidos / POR_PAGINA))
 }
 
-/**
- * Filtros de audiencia: de quién es el público, no quién publica.
- *
- * Es lo único que un scraper no puede saber, y la razón entera de mirar a
- * HypeAuditor. Se declaran aparte de `FiltrosDeScouting` porque ningún otro
- * proveedor los soporta: mezclarlos haría creer que Apify también los aplica.
- */
-export type FiltrosDeAudiencia = {
-  /** País del PÚBLICO (AR, MX…) y qué porcentaje mínimo tiene que estar ahí. */
-  paisDelPublico?: { pais: string; porcentajeMinimo: number } | null
-  /** Género del público y su porcentaje mínimo. */
-  generoDelPublico?: { genero: 'male' | 'female'; porcentajeMinimo: number } | null
-  /** Tramos de edad ('18-24', '25-34'…) y el porcentaje mínimo sumado. */
-  edadDelPublico?: { tramos: string[]; porcentajeMinimo: number } | null
-  /** Calidad de audiencia (AQS) de 0 a 100: cuánto de ese público es real. */
-  calidadMinima?: number | null
-}
-
 export type ConsultaDeDescubrimiento = {
   platform: Platform
   palabras: string[]
@@ -77,6 +59,8 @@ export type ConsultaDeDescubrimiento = {
  * `{"from": 0}` no es lo mismo que no filtrar, y en una API que cobra por
  * página la diferencia se paga.
  */
+export type { FiltrosDeAudiencia }
+
 export function cuerpoDeBusqueda(consulta: ConsultaDeDescubrimiento): Record<string, unknown> {
   const red = redDe(consulta.platform)
   if (!red) throw new Error(`HypeAuditor no busca en ${consulta.platform}.`)
