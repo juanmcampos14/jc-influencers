@@ -117,6 +117,24 @@ export function FiltrosAvanzados({
             bajada="De quién es el público, no quién publica. Es lo que decide si una campaña llega."
             className="lg:col-span-2"
           >
+            {/*
+              * Lo medido, no lo prometido.
+              *
+              * El proveedor ofrece estos filtros para todo el mundo, pero
+              * midiéndolo contra su API el 27/08/2026 el dato de audiencia
+              * existe casi sólo para Estados Unidos. Callarlo dejaría a alguien
+              * armando una búsqueda que devuelve nueve personas de ciento diez
+              * mil sin entender por qué, y creyendo que en Argentina no hay
+              * nadie que sirva.
+              */}
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <strong>Antes de usarlos:</strong> hoy el proveedor tiene demografía de audiencia casi sólo de
+              Estados Unidos. Medido el 27/08/2026: creadores argentinos de 10k a 100k hay{' '}
+              <strong className="tabular-nums">110.177</strong>, pero pidiendo además que su público sea argentino
+              quedan <strong className="tabular-nums">9</strong>. Para clientes de acá conviene dejarlos en “no
+              importa” y filtrar por el país del creador, arriba.
+            </p>
+
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="País del público" htmlFor="aPais">
                 <Select id="aPais" name="aPais" defaultValue="">

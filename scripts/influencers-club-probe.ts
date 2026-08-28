@@ -37,14 +37,18 @@ async function main(): Promise<void> {
     return
   }
 
-  console.log('→ saldo')
+  /*
+   * El saldo es opcional. Su documentación anuncia
+   * `GET /public/v1/account/credits` y en la API real devuelve 404 --probado el
+   * 27/08/2026--, así que no puede frenar la prueba: el saldo también viene en
+   * `credits_left` de cada búsqueda, que es de donde lo lee el producto.
+   */
+  console.log('→ saldo (opcional)')
   const saldo = await pedir('/public/v1/account/credits')
-  console.log(`← HTTP ${saldo.status}`)
-  console.log(saldo.json ? JSON.stringify(saldo.json, null, 2).slice(0, 800) : saldo.texto.slice(0, 400))
-  if (saldo.status !== 200) {
-    console.log('\nLa clave no funciona o el endpoint cambió. No sigo: una búsqueda con clave mala no aporta nada.')
-    process.exitCode = 1
-    return
+  if (saldo.status === 200) {
+    console.log(saldo.json ? JSON.stringify(saldo.json, null, 2).slice(0, 600) : saldo.texto.slice(0, 300))
+  } else {
+    console.log(`← HTTP ${saldo.status} — ese endpoint no existe hoy. El saldo se lee de la búsqueda.`)
   }
   if (soloSaldo) return
 

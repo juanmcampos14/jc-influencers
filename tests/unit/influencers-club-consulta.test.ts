@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   cuerpoDeBusqueda,
+  nombreDePais,
   leerCreador,
   leerSobre,
   MAXIMO_POR_PAGINA,
@@ -82,7 +83,9 @@ describe('el cuerpo del pedido', () => {
     expect(cuerpo.filters).toMatchObject({
       number_of_followers: { min: 10_000, max: 100_000 },
       engagement_percent: { min: 3 },
-      location: ['AR'],
+      // Su filtro toma el NOMBRE del país, no el código ISO: mandar "AR" hace
+      // fallar el pedido entero con `invalid_filters`. Probado contra la API.
+      location: ['Argentina'],
     })
   })
 
@@ -119,7 +122,7 @@ describe('el cuerpo del pedido', () => {
       },
     })
     expect((cuerpo.filters as Record<string, unknown>).audience).toEqual({
-      location: [{ name: 'AR', type: 'country', min_pct: 60 }],
+      location: [{ name: 'Argentina', type: 'country', min_pct: 60 }],
       gender: { type: 'female', min_pct: 55 },
       age: [
         { range: '25-34', min_pct: 40 },
@@ -250,5 +253,58 @@ describe('el sobre de la respuesta', () => {
     const sobre = leerSobre({ total: 0, accounts: [], credits_left: '10' })
     expect(sobre.ok).toBe(true)
     expect(sobre.ok && sobre.creadores).toEqual([])
+  })
+})
+
+describe('los países, que van por nombre y no por código', () => {
+  it('traduce los que ofrece la pantalla', () => {
+    expect(nombreDePais('AR')).toBe('Argentina')
+    expect(nombreDePais('ar')).toBe('Argentina')
+    expect(nombreDePais('US')).toBe('United States')
+    expect(nombreDePais('ES')).toBe('Spain')
+  })
+
+  /*
+   * Un país que no sabemos cómo llama se omite en vez de viajar: mandarlo hace
+   * fallar el pedido entero, y perder toda la búsqueda por un filtro es peor
+   * que hacerla sin ese filtro.
+   */
+  it('omite el país desconocido en vez de romper la búsqueda entera', () => {
+    expect(nombreDePais('ZZ')).toBeNull()
+    const cuerpo = cuerpoDeBusqueda({ ...base, filtros: { pais: 'ZZ', seguidoresDesde: 5_000 } })
+    expect(cuerpo.filters).toEqual({ number_of_followers: { min: 5_000 } })
+  })
+})
+
+describe('los errores que devuelve de verdad', () => {
+  /*
+   * Su error viene de dos formas. La primera versión sólo entendía el texto
+   * suelto, así que un pedido rechazado por un filtro caía en "no devolvió
+   * resultados" y escondía el motivo: el fallo mudo que estos mapeos tienen que
+   * evitar lo estaba cometiendo el mapeo. Esta respuesta es literal, copiada de
+   * la API el 27/08/2026.
+   */
+  it('lee el arreglo de errores por campo y dice cuál filtro falló', () => {
+    const sobre = leerSobre({
+      error: [
+        {
+          field: 'location',
+          error: "Invalid location: 'AR' is not a valid location, please check available locations",
+        },
+      ],
+      error_code: 'invalid_filters',
+    })
+    expect(sobre.ok).toBe(false)
+    expect(sobre.ok === false && sobre.mensaje).toContain('location')
+    expect(sobre.ok === false && sobre.mensaje).toContain("Invalid location: 'AR'")
+  })
+
+  it('junta varios errores de campo en un mensaje solo', () => {
+    const sobre = leerSobre({ error: [{ field: 'a', error: 'malo' }, { field: 'b', error: 'peor' }] })
+    expect(sobre.ok === false && sobre.mensaje).toBe('a: malo · b: peor')
+  })
+
+  it('un arreglo vacío no se confunde con un error', () => {
+    expect(leerSobre({ accounts: [], error: [] }).ok).toBe(true)
   })
 })

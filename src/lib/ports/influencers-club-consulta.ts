@@ -38,6 +38,36 @@ export const MAXIMO_POR_PAGINA = 100
  * descarta en vez de viajar: un valor inventado hace fallar el pedido entero,
  * y perder los filtros buenos por uno malo es peor que ignorar el malo.
  */
+/**
+ * Cómo llama a los países.
+ *
+ * No acepta códigos ISO: su filtro de ubicación toma el nombre tal cual está en
+ * su diccionario --"Argentina", no "AR"--, y un valor que no reconoce hace
+ * fallar el pedido entero con `invalid_filters`. Probado contra la API el
+ * 27/08/2026.
+ *
+ * Son los mismos ocho que ofrece la pantalla. Sumar un país acá es sumarlo
+ * también allá: si falta, el filtro se omite en vez de romper la búsqueda, con
+ * lo que la persona recibiría resultados sin el país que pidió --por eso
+ * `paisNoReconocido` lo devuelve, para poder avisarlo--.
+ */
+const PAISES: Record<string, string> = {
+  AR: 'Argentina',
+  MX: 'Mexico',
+  ES: 'Spain',
+  CL: 'Chile',
+  CO: 'Colombia',
+  UY: 'Uruguay',
+  PE: 'Peru',
+  US: 'United States',
+}
+
+/** El nombre que entiende, o null si no sabemos cómo lo llama. */
+export function nombreDePais(codigo: string): string | null {
+  const limpio = codigo.trim().toUpperCase()
+  return PAISES[limpio] ?? null
+}
+
 const TRAMOS_DE_EDAD = new Set(['13-17', '18-24', '25-34', '35-44', '45-64', '65-', '65+'])
 
 /**
@@ -85,7 +115,15 @@ export function cuerpoDeBusqueda(consulta: ConsultaDeDescubrimiento): Record<str
   if (Object.keys(seguidores).length > 0) filtros.number_of_followers = seguidores
 
   if (f.engagementMinimo != null) filtros.engagement_percent = { min: f.engagementMinimo }
-  if (f.pais) filtros.location = [f.pais]
+  /*
+   * Un país que no sabemos cómo llama se omite en vez de viajar: mandarlo hace
+   * fallar el pedido entero, y perder toda la búsqueda por un filtro es peor
+   * que hacerla sin ese filtro. Quien llama puede avisarlo con `nombreDePais`.
+   */
+  if (f.pais) {
+    const nombre = nombreDePais(f.pais)
+    if (nombre) filtros.location = [nombre]
+  }
 
   /*
    * La zona y la mención se buscan en la bio, igual que cuando las evalúa
@@ -102,13 +140,10 @@ export function cuerpoDeBusqueda(consulta: ConsultaDeDescubrimiento): Record<str
   const audiencia: Record<string, unknown> = {}
 
   if (a.paisDelPublico) {
-    audiencia.location = [
-      {
-        name: a.paisDelPublico.pais.toUpperCase(),
-        type: 'country',
-        min_pct: a.paisDelPublico.porcentajeMinimo,
-      },
-    ]
+    const nombre = nombreDePais(a.paisDelPublico.pais)
+    if (nombre) {
+      audiencia.location = [{ name: nombre, type: 'country', min_pct: a.paisDelPublico.porcentajeMinimo }]
+    }
   }
   if (a.generoDelPublico) {
     audiencia.gender = { type: a.generoDelPublico.genero, min_pct: a.generoDelPublico.porcentajeMinimo }
@@ -235,15 +270,45 @@ export type SobreLeido =
  * `credits_left` viene como texto en su contrato, así que se convierte con
  * cuidado: mostrar "NaN créditos" es peor que no mostrar nada.
  */
+function leerError(error: unknown): string | null {
+  if (typeof error === 'string' && error.trim().length > 0) return error.trim()
+  if (!Array.isArray(error) || error.length === 0) return null
+
+  const partes = error
+    .map((item) => {
+      if (typeof item === 'string') return item.trim()
+      if (typeof item !== 'object' || item === null) return null
+      const fila = item as { field?: unknown; error?: unknown }
+      const campo = typeof fila.field === 'string' ? fila.field : null
+      const detalle = typeof fila.error === 'string' ? fila.error : null
+      if (!detalle) return campo
+      return campo ? `${campo}: ${detalle}` : detalle
+    })
+    .filter((parte): parte is string => Boolean(parte && parte.length > 0))
+
+  return partes.length > 0 ? partes.join(' · ') : 'influencers.club rechazó los filtros y no dijo cuál.'
+}
+
 export function leerSobre(cuerpo: unknown): SobreLeido {
   if (typeof cuerpo !== 'object' || cuerpo === null) {
     return { ok: false, mensaje: 'influencers.club devolvió una respuesta que no se entiende.' }
   }
   const sobre = cuerpo as { accounts?: unknown; total?: unknown; credits_left?: unknown; error?: unknown }
 
-  if (typeof sobre.error === 'string' && sobre.error.trim().length > 0) {
-    return { ok: false, mensaje: sobre.error.trim() }
-  }
+  /*
+   * Su error viene de dos formas y hay que leer las dos. El tope de
+   * descubrimiento manda un texto suelto; un filtro inválido manda un ARREGLO
+   * de errores por campo:
+   *
+   *   {"error":[{"field":"location","error":"Invalid location: 'AR'..."}]}
+   *
+   * La primera versión de esta función sólo entendía el texto, así que un
+   * pedido rechazado por un filtro caía en "no devolvió resultados" y escondía
+   * el motivo. El fallo mudo que estos mapeos tienen que evitar lo estaba
+   * cometiendo el mapeo.
+   */
+  const mensajeDeError = leerError(sobre.error)
+  if (mensajeDeError) return { ok: false, mensaje: mensajeDeError }
   if (!Array.isArray(sobre.accounts)) {
     return { ok: false, mensaje: 'influencers.club no devolvió resultados.' }
   }
