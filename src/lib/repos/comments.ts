@@ -32,7 +32,7 @@ async function resolveScopeClient(ctx: AuthContext, scopeInput: CommentScope): P
     assertClientInScope(ctx, campaign.clientId)
     return { clientId: campaign.clientId, campaignId: scopeInput.campaignId, candidacyId: null }
   }
-  throw new ValidationError('Falta indicar la campaña o la candidatura.')
+  throw new ValidationError({ clave: 'faltaCampanaOCandidatura' })
 }
 
 export async function listComments(ctx: AuthContext, scopeInput: CommentScope): Promise<CommentDto[]> {
@@ -69,16 +69,18 @@ export async function createComment(
   const caps = capabilitiesFor(ctx, target.clientId)
   const clean = body.trim()
 
-  if (!clean) throw new ValidationError('El comentario no puede estar vacío.')
-  if (clean.length > MAX_BODY) throw new ValidationError(`El comentario no puede superar los ${MAX_BODY} caracteres.`)
+  if (!clean) throw new ValidationError({ clave: 'comentarioVacio' })
+  if (clean.length > MAX_BODY) {
+    throw new ValidationError({ clave: 'comentarioDemasiadoLargo', valores: { maximo: MAX_BODY } })
+  }
 
   const authorSide = ctx.side
   // Un usuario de cliente sólo puede escribir feedback propio: nunca notas internas.
   if (authorSide === 'CLIENT') {
-    if (visibility !== 'CLIENT_AUTHORED') throw new ForbiddenError('Sólo podés dejar feedback visible para la agencia.')
-    if (!caps.has('feedback.create')) throw new ForbiddenError('Tu rol es de sólo lectura.')
+    if (visibility !== 'CLIENT_AUTHORED') throw new ForbiddenError({ clave: 'soloFeedbackVisible' })
+    if (!caps.has('feedback.create')) throw new ForbiddenError({ clave: 'rolDeSoloLectura' })
   } else {
-    if (visibility === 'CLIENT_AUTHORED') throw new ValidationError('Ese tipo de comentario lo escribe el cliente.')
+    if (visibility === 'CLIENT_AUTHORED') throw new ValidationError({ clave: 'comentarioEsDelCliente' })
     if (visibility === 'INTERNAL' && !caps.has('feedback.internal.create')) throw new ForbiddenError()
     if (visibility === 'BUDGET_PRIVATE' && !caps.has('budget.view')) throw new ForbiddenError()
     if (visibility === 'CLIENT_VISIBLE' && !caps.has('feedback.create')) throw new ForbiddenError()

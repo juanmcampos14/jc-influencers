@@ -11,8 +11,8 @@ const id = z.string().min(1).max(60)
 
 export const inviteUserAction = defineAction(
   z.object({
-    email: z.string().trim().email('Ingresá un email válido.').max(200),
-    name: z.string().trim().min(2, 'Ingresá el nombre.').max(120),
+    email: z.string().trim().email('ingresaEmailValido').max(200),
+    name: z.string().trim().min(2, 'ingresaElNombre').max(120),
     kind: z.enum(['AGENCY', 'CLIENT']),
     agencyRole: AGENCY_ROLE.optional(),
     clientId: id.optional(),

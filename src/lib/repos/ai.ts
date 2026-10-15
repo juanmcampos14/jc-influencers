@@ -98,9 +98,7 @@ export async function aiSpendThisMonth(_ctx: AuthContext): Promise<{ spent: numb
 async function assertAiBudget(ctx: AuthContext): Promise<void> {
   const { spent, limit } = await aiSpendThisMonth(ctx)
   if (limit > 0 && spent >= limit) {
-    throw new ValidationError(
-      `Se alcanzó el tope mensual de gasto en IA (US$ ${limit.toFixed(2)}). Subilo en la configuración o esperá al mes que viene.`,
-    )
+    throw new ValidationError({ clave: 'topeDeIaAlcanzado', valores: { tope: limit.toFixed(2) } })
   }
 }
 
@@ -393,12 +391,12 @@ export async function listInsights(
 }
 
 export async function shareInsight(ctx: AuthContext, insightId: string, visible: boolean): Promise<void> {
-  if (ctx.side !== 'AGENCY') throw new ForbiddenError('Sólo la agencia decide qué análisis ve el cliente.')
+  if (ctx.side !== 'AGENCY') throw new ForbiddenError({ clave: 'soloAgenciaComparteAnalisis' })
   const row = await scoped(ctx, (tx) => tx.aiInsight.findUnique({ where: { id: insightId } }))
   if (!row) throw new NotFoundError()
   assertClientInScope(ctx, row.clientId)
   assertCan(ctx, 'ai.run', row.clientId)
-  if (visible && row.status !== 'READY') throw new ValidationError('Sólo se puede compartir un análisis terminado.')
+  if (visible && row.status !== 'READY') throw new ValidationError({ clave: 'soloAnalisisTerminado' })
 
   await scoped(ctx, async (tx) => {
     await tx.aiInsight.update({ where: { id: insightId }, data: { clientVisible: visible } })
@@ -429,7 +427,7 @@ export async function drawBrandMural(ctx: AuthContext, clientId: string): Promis
 
   const brand = await scoped(ctx, (tx) => tx.clientBrand.findUnique({ where: { clientId } }))
   if (!brand) {
-    throw new ValidationError('Primero definí la identidad visual: el mural se dibuja con la paleta de la marca.')
+    throw new ValidationError({ clave: 'muralSinIdentidad' })
   }
 
   const contexto = buildMuralContext(client.name, brand.sourceUrl, brand.rawExtraction)

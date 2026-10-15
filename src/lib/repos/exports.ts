@@ -73,7 +73,7 @@ export async function exportCampaignCandidacies(ctx: AuthContext, campaignId: st
 
   if (ctx.side === 'CLIENT') {
     const access = ctx.clients.find((c) => c.id === campaign.clientId)
-    if (!access?.allowClientExports) throw new ForbiddenError('La agencia no habilitó exportaciones para tu cuenta.')
+    if (!access?.allowClientExports) throw new ForbiddenError({ clave: 'exportacionesNoHabilitadas' })
   }
 
   await consumeRateLimit('exportCreate', ctx.user.id)

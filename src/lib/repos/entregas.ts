@@ -126,14 +126,14 @@ export async function guardarEntrega(
   const candidacy = await scoped(ctx, (tx) =>
     tx.candidacy.findFirst({ where: { id: input.candidacyId, campaignId }, select: { id: true } }),
   )
-  if (!candidacy) throw new ValidationError('Ese perfil no está en esta campaña.')
+  if (!candidacy) throw new ValidationError({ clave: 'perfilAjenoALaCampana' })
 
   if (input.url) {
     try {
       const url = new URL(input.url)
       if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error()
     } catch {
-      throw new ValidationError('El link de la publicación tiene que empezar con https://')
+      throw new ValidationError({ clave: 'linkDebeSerHttps' })
     }
   }
 
@@ -142,7 +142,7 @@ export async function guardarEntrega(
     // Un número sin procedencia no se puede defender: quien lo lea en tres
     // meses no va a saber si lo copió alguien de la app o si lo mandó el
     // influencer por captura.
-    throw new ValidationError('Decí de dónde salieron las métricas antes de guardarlas.')
+    throw new ValidationError({ clave: 'fuenteDeMetricas' })
   }
 
   const datos = {

@@ -251,7 +251,7 @@ function validateColors(colors: ThemeColors): ThemeColors {
   const clean = {} as ThemeColors
   for (const key of HEX_KEYS) {
     const normalized = normalizeHex(colors[key])
-    if (!normalized) throw new ValidationError(`El color "${key}" no es un hexadecimal válido.`)
+    if (!normalized) throw new ValidationError({ clave: 'colorInvalido', valores: { campo: key } })
     clean[key] = normalized
   }
   return clean
@@ -265,8 +265,8 @@ export async function saveBrand(ctx: AuthContext, clientId: string, input: Brand
   const colors = validateColors(input.colors)
   const fontHeading = sanitizeFontName(input.fontHeading)
   const fontBody = sanitizeFontName(input.fontBody)
-  if (input.fontHeading && !fontHeading) throw new ValidationError('El nombre de la tipografía de títulos no es válido.')
-  if (input.fontBody && !fontBody) throw new ValidationError('El nombre de la tipografía de texto no es válido.')
+  if (input.fontHeading && !fontHeading) throw new ValidationError({ clave: 'tipografiaTitulosInvalida' })
+  if (input.fontBody && !fontBody) throw new ValidationError({ clave: 'tipografiaTextoInvalida' })
 
   // Se calcula el contraste ANTES de guardar: si no llega al mínimo ni corrigiendo,
   // no se puede aprobar sin el modo seguro.
@@ -280,7 +280,7 @@ export async function saveBrand(ctx: AuthContext, clientId: string, input: Brand
   })
   if (input.status === 'APPROVED' && resolved.report.safeModeRecommended && !input.safeMode) {
     throw new ValidationError(
-      'Con esta paleta no se puede respetar la marca y que además se lea. Activá el modo seguro o elegí colores con más contraste.',
+      { clave: 'paletaSinContraste' },
       {
         colors: resolved.report.issues
           .filter((issue) => !issue.fixed)

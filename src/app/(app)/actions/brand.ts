@@ -23,7 +23,7 @@ import { drawBrandMural, removeBrandMural } from '@/lib/repos/ai'
 import { resetBrand, saveBrand } from '@/lib/repos/brand'
 import { actorOf, scoped } from '@/lib/repos/base'
 
-const HEX = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Usá un color en formato #rrggbb.')
+const HEX = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'colorFormato')
 
 const colorsSchema = z.object({
   primary: HEX,
@@ -76,18 +76,18 @@ export async function extractBrandAction(formData: FormData): Promise<ActionResu
     const extraction = await (async () => {
       if (kind === 'UPLOAD') {
         const file = formData.get('file')
-        if (!(file instanceof File)) throw new ValidationError('Elegí un archivo de imagen.')
+        if (!(file instanceof File)) throw new ValidationError({ clave: 'elegiImagen' })
         assertUploadAllowed(file.name, file.type || 'image/png', file.size)
-        if (!file.type.startsWith('image/')) throw new ValidationError('El archivo tiene que ser una imagen.')
+        if (!file.type.startsWith('image/')) throw new ValidationError({ clave: 'archivoNoEsImagen' })
         return extractFromUpload(Buffer.from(await file.arrayBuffer()), file.type, mode)
       }
       if (kind === 'INSTAGRAM') {
         const handle = String(formData.get('handle') ?? '').trim()
-        if (!handle) throw new ValidationError('Ingresá el usuario de Instagram.')
+        if (!handle) throw new ValidationError({ clave: 'ingresaHandle' })
         return extractFromInstagram(handle, (value) => scoutingProvider().fetchProfileImage(value), mode)
       }
       const website = String(formData.get('website') ?? '').trim()
-      if (!website) throw new ValidationError('Ingresá la dirección del sitio.')
+      if (!website) throw new ValidationError({ clave: 'ingresaSitio' })
       return extractFromWebsite(website, mode)
     })()
 
@@ -191,7 +191,7 @@ export async function saveBrandAction(
     let logo: { data: Buffer; contentType: string; isDark: boolean } | null = null
     if (file instanceof File && file.size > 0) {
       assertUploadAllowed(file.name, file.type || 'image/png', file.size)
-      if (!file.type.startsWith('image/')) throw new ValidationError('El logo tiene que ser una imagen.')
+      if (!file.type.startsWith('image/')) throw new ValidationError({ clave: 'logoNoEsImagen' })
       logo = {
         data: Buffer.from(await file.arrayBuffer()),
         contentType: file.type,

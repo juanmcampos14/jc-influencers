@@ -131,25 +131,25 @@ export type InviteInput = {
  */
 export async function inviteUser(ctx: AuthContext, input: InviteInput): Promise<{ id: string }> {
   const email = normalizeEmail(input.email)
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new ValidationError('El email no es válido.')
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new ValidationError({ clave: 'emailInvalido' })
 
   if (input.kind === 'AGENCY') {
     // Sólo la agencia con alcance total invita empleados de agencia.
-    if (ctx.side !== 'AGENCY') throw new ForbiddenError('No podés crear usuarios de agencia.')
+    if (ctx.side !== 'AGENCY') throw new ForbiddenError({ clave: 'noCreasUsuariosDeAgencia' })
     assertCan(ctx, 'user.invite', null)
     assertCan(ctx, 'membership.manage', null)
-    if (!ctx.allClients) throw new ForbiddenError('Sólo un administrador de agencia puede invitar empleados.')
-    if (!input.agencyRole) throw new ValidationError('Elegí el rol de agencia.')
+    if (!ctx.allClients) throw new ForbiddenError({ clave: 'soloAdminInvitaEmpleados' })
+    if (!input.agencyRole) throw new ValidationError({ clave: 'elegiRolDeAgencia' })
     if (input.agencyRole === 'PLATFORM_SUPERADMIN' && ctx.agencyRole !== 'PLATFORM_SUPERADMIN') {
-      throw new ForbiddenError('Sólo un superadministrador puede crear otro superadministrador.')
+      throw new ForbiddenError({ clave: 'soloSuperadminCreaSuperadmin' })
     }
   } else {
-    if (!input.clientId || !input.clientRole) throw new ValidationError('Elegí el cliente y el rol.')
+    if (!input.clientId || !input.clientRole) throw new ValidationError({ clave: 'elegiClienteYRol' })
     assertClientInScope(ctx, input.clientId)
     assertCan(ctx, 'user.invite', input.clientId)
     if (ctx.side === 'CLIENT') {
       const access = ctx.clients.find((c) => c.id === input.clientId)
-      if (!access?.allowClientUserInvites) throw new ForbiddenError('La agencia no habilitó invitaciones para este cliente.')
+      if (!access?.allowClientUserInvites) throw new ForbiddenError({ clave: 'invitacionesNoHabilitadas' })
     }
   }
 
@@ -240,15 +240,15 @@ export async function revokeUserInvitation(ctx: AuthContext, invitationId: strin
 
 /** Desactiva un usuario sin borrar su historial y le cierra todas las sesiones. */
 export async function setUserStatus(ctx: AuthContext, userId: string, active: boolean): Promise<void> {
-  if (ctx.side !== 'AGENCY' || !ctx.allClients) throw new ForbiddenError('Sólo la agencia puede activar o desactivar usuarios.')
+  if (ctx.side !== 'AGENCY' || !ctx.allClients) throw new ForbiddenError({ clave: 'soloAgenciaActivaUsuarios' })
   assertCan(ctx, 'membership.manage', null)
-  if (userId === ctx.user.id) throw new ValidationError('No podés desactivarte a vos mismo.')
+  if (userId === ctx.user.id) throw new ValidationError({ clave: 'noTeDesactivas' })
 
   await scoped(ctx, async (tx) => {
     const before = await tx.user.findUnique({ where: { id: userId }, include: { agencyMembership: true } })
     if (!before) throw new NotFoundError()
     if (before.agencyMembership?.role === 'PLATFORM_SUPERADMIN' && ctx.agencyRole !== 'PLATFORM_SUPERADMIN') {
-      throw new ForbiddenError('No podés desactivar a un superadministrador.')
+      throw new ForbiddenError({ clave: 'noDesactivasSuperadmin' })
     }
     await tx.user.update({
       where: { id: userId },
@@ -292,13 +292,13 @@ export async function updateMemberships(ctx: AuthContext, change: MembershipChan
   const isAgencyAdmin = ctx.side === 'AGENCY' && ctx.allClients
 
   if (change.agencyRole !== undefined || change.agencyClientIds !== undefined || change.agencyConcedidas !== undefined) {
-    if (!isAgencyAdmin) throw new ForbiddenError('Sólo un administrador de agencia puede tocar roles internos.')
+    if (!isAgencyAdmin) throw new ForbiddenError({ clave: 'soloAdminTocaRoles' })
     assertCan(ctx, 'membership.manage', null)
     if (change.agencyRole === 'PLATFORM_SUPERADMIN' && ctx.agencyRole !== 'PLATFORM_SUPERADMIN') {
-      throw new ForbiddenError('Sólo un superadministrador puede otorgar ese rol.')
+      throw new ForbiddenError({ clave: 'soloSuperadminOtorgaEseRol' })
     }
     if (change.userId === ctx.user.id && change.agencyRole !== undefined && change.agencyRole !== ctx.agencyRole) {
-      throw new ValidationError('No podés cambiarte tu propio rol.')
+      throw new ValidationError({ clave: 'noCambiasTuRol' })
     }
   }
 

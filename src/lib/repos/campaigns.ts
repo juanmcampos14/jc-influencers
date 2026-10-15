@@ -161,7 +161,7 @@ export type CampaignWriteInput = {
 
 function assertDateRange(start?: Date | null, end?: Date | null): void {
   if (start && end && end.getTime() < start.getTime()) {
-    throw new ValidationError('La fecha de fin no puede ser anterior a la de inicio.', {
+    throw new ValidationError({ clave: 'fechaFinAntesDeInicio' }, {
       endDate: ['Debe ser posterior a la fecha de inicio.'],
     })
   }
@@ -178,7 +178,7 @@ export async function createCampaign(
 
   const canBudget = capabilitiesFor(ctx, clientId).has('budget.manage')
   const baseSlug = slugify(input.name)
-  if (!baseSlug) throw new ValidationError('El nombre de la campaña no genera un identificador válido.')
+  if (!baseSlug) throw new ValidationError({ clave: 'campanaSinSlug' })
 
   return scoped(ctx, async (tx) => {
     let slug = baseSlug
@@ -186,7 +186,7 @@ export async function createCampaign(
     while (await tx.campaign.findUnique({ where: { clientId_slug: { clientId, slug } } })) {
       attempt += 1
       slug = `${baseSlug}-${attempt}`
-      if (attempt > 50) throw new ValidationError('No se pudo generar un identificador único.')
+      if (attempt > 50) throw new ValidationError({ clave: 'sinIdentificadorUnico' })
     }
     const created = await tx.campaign.create({
       data: {
@@ -404,12 +404,12 @@ export async function upsertBrief(ctx: AuthContext, campaignId: string, input: B
   assertCan(ctx, 'brief.manage', clientId)
 
   if (input.followersMin != null && input.followersMax != null && input.followersMax < input.followersMin) {
-    throw new ValidationError('El rango de seguidores está invertido.', { followersMax: ['Debe ser mayor al mínimo.'] })
+    throw new ValidationError({ clave: 'rangoInvertido' }, { followersMax: ['Debe ser mayor al mínimo.'] })
   }
   if (input.clusters) {
     const total = input.clusters.reduce((sum, c) => sum + c.targetPercent, 0)
     if (total > 100) {
-      throw new ValidationError('La distribución del squad supera el 100%.', {
+      throw new ValidationError({ clave: 'squadSupera100' }, {
         clusters: [`La suma de los clusters da ${total}%.`],
       })
     }
@@ -492,7 +492,7 @@ export async function upsertBrief(ctx: AuthContext, campaignId: string, input: B
       })
       const blocked = orphaned.filter((c) => c._count.candidacies > 0)
       if (blocked.length > 0) {
-        throw new ValidationError('Hay clusters con candidaturas asignadas.', {
+        throw new ValidationError({ clave: 'clustersConCandidaturas' }, {
           clusters: blocked.map((c) => `"${c.label}" tiene ${c._count.candidacies} candidatura(s). Reasignalas antes de borrarlo.`),
         })
       }

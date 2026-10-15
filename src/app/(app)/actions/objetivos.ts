@@ -21,7 +21,7 @@ export const guardarObjetivoAction = defineAction(
       'INVERSION_EN_TALENTO',
     ]),
     direction: z.enum(['AL_MENOS', 'COMO_MUCHO']),
-    target: z.coerce.number().positive('El objetivo tiene que ser mayor a cero.'),
+    target: z.coerce.number().positive('objetivoMayorACero'),
     rationale: z.string().trim().max(500).nullish(),
     clientVisible: z.boolean(),
   }),

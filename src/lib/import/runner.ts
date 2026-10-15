@@ -298,12 +298,12 @@ export async function confirmImport(ctx: AuthContext, importRunId: string): Prom
   if (!run) throw new NotFoundError()
   assertClientInScope(ctx, run.clientId)
   assertCan(ctx, 'import.run', run.clientId)
-  if (run.status !== 'PREVIEW') throw new ValidationError('Esta importación ya se resolvió.')
-  if (!run.storageKey) throw new ValidationError('No se encuentra el archivo original de esta importación.')
+  if (run.status !== 'PREVIEW') throw new ValidationError({ clave: 'importacionResuelta' })
+  if (!run.storageKey) throw new ValidationError({ clave: 'sinArchivoOriginal' })
 
   const data = await fileStorage().get(run.storageKey, { clientId: run.clientId })
   const fileHash = createHash('sha256').update(data).digest('hex')
-  if (fileHash !== run.fileHash) throw new ValidationError('El archivo cambió desde la previsualización. Volvé a subirlo.')
+  if (fileHash !== run.fileHash) throw new ValidationError({ clave: 'archivoCambio' })
 
   const parsed = await parseWorkbook(data)
   const clientId = run.clientId
@@ -671,7 +671,7 @@ export async function cancelImport(ctx: AuthContext, importRunId: string): Promi
   if (!run) throw new NotFoundError()
   assertClientInScope(ctx, run.clientId)
   assertCan(ctx, 'import.run', run.clientId)
-  if (run.status !== 'PREVIEW') throw new ValidationError('Esta importación ya se resolvió.')
+  if (run.status !== 'PREVIEW') throw new ValidationError({ clave: 'importacionResuelta' })
 
   await scoped(ctx, async (tx) => {
     await tx.importRun.update({ where: { id: importRunId }, data: { status: 'CANCELLED', finishedAt: new Date() } })

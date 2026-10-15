@@ -112,7 +112,7 @@ export async function setBudget(
   assertAgencyOnly(ctx)
   if (input.clientId) assertClientInScope(ctx, input.clientId)
   assertCan(ctx, 'scouting.budget.manage', input.clientId)
-  if (input.limitUsd < 0 || input.limitUsd > 100_000) throw new ValidationError('El tope tiene que estar entre 0 y 100.000.')
+  if (input.limitUsd < 0 || input.limitUsd > 100_000) throw new ValidationError({ clave: 'topeFueraDeRango' })
 
   const period = currentPeriod()
   await scoped(ctx, async (tx) => {
@@ -191,10 +191,10 @@ export async function previewScouting(ctx: AuthContext, input: PreviewInput): Pr
   const warnings: string[] = []
 
   if (input.mode === 'DISCOVER' && (input.keywords ?? []).length === 0) {
-    throw new ValidationError('Indicá al menos una palabra clave o hashtag para buscar.')
+    throw new ValidationError({ clave: 'indicaUnaPalabra' })
   }
   if (input.mode === 'ENRICH' && (input.urls ?? []).length === 0) {
-    throw new ValidationError('Indicá al menos un perfil para actualizar.')
+    throw new ValidationError({ clave: 'indicaUnPerfil' })
   }
 
   const requested = input.mode === 'ENRICH' ? (input.urls ?? []).length : Math.max(1, Math.min(500, input.limit))
@@ -289,11 +289,9 @@ export async function startScouting(ctx: AuthContext, runId: string): Promise<{ 
    * pantalla.
    */
   if (run.status !== 'PREVIEW') {
-    throw new ValidationError(
-      run.status === 'FAILED'
-        ? 'Esta búsqueda ya se intentó y falló. Calculá el costo de nuevo para volver a intentarlo.'
-        : 'Esta búsqueda ya se ejecutó. Calculá el costo de nuevo para hacer otra.',
-    )
+    throw new ValidationError({
+      clave: run.status === 'FAILED' ? 'busquedaYaFallo' : 'busquedaYaEjecutada',
+    })
   }
 
   await consumeRateLimit('scoutingRun', ctx.user.id)
@@ -305,9 +303,10 @@ export async function startScouting(ctx: AuthContext, runId: string): Promise<{ 
   const budget = await getBudgetState(ctx, run.clientId)
   const estimated = Number(run.estimatedCostUsd)
   if (estimated > budget.remainingUsd) {
-    throw new ValidationError(
-      `No hay presupuesto: la corrida cuesta US$ ${estimated.toFixed(2)} y quedan US$ ${budget.remainingUsd.toFixed(2)} este mes.`,
-    )
+    throw new ValidationError({
+      clave: 'sinPresupuestoScouting',
+      valores: { costo: estimated.toFixed(2), disponible: budget.remainingUsd.toFixed(2) },
+    })
   }
 
   const query = run.query as {
@@ -615,7 +614,7 @@ export async function importScoutingResults(
   assertClientInScope(ctx, run.clientId)
   assertCan(ctx, 'scouting.run', run.clientId)
   assertCan(ctx, 'influencer.manage', run.clientId)
-  if (resultIds.length === 0) throw new ValidationError('Elegí al menos un perfil.')
+  if (resultIds.length === 0) throw new ValidationError({ clave: 'elegiUnPerfil' })
 
   if (campaignId) {
     const campaign = await scoped(ctx, (tx) =>

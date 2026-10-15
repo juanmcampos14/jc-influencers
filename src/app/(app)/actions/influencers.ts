@@ -13,7 +13,7 @@ import {
 } from '@/lib/repos/influencers'
 
 const influencerFields = {
-  displayName: z.string().trim().min(2, 'El nombre es obligatorio.').max(160),
+  displayName: z.string().trim().min(2, 'nombreObligatorio').max(160),
   realName: z.string().trim().max(160).nullish(),
   primaryHandle: z.string().trim().max(80).nullish(),
   country: z.string().trim().max(60).nullish(),
@@ -24,7 +24,7 @@ const influencerFields = {
   adultStatus: z.enum(['CONFIRMED', 'NOT_CONFIRMED', 'NOT_APPLICABLE']).optional(),
   representative: z.string().trim().max(160).nullish(),
   internalNotes: z.string().trim().max(6000).nullish(),
-  contactEmail: z.string().trim().email('Email inválido.').max(200).nullish().or(z.literal('')),
+  contactEmail: z.string().trim().email('emailInvalido').max(200).nullish().or(z.literal('')),
   contactPhone: z.string().trim().max(60).nullish(),
   contactNotes: z.string().trim().max(2000).nullish(),
   contactLegalBasis: z.string().trim().max(400).nullish(),
@@ -59,7 +59,7 @@ export const addProfileAction = defineAction(
     avgViews: z.number().int().nonnegative().max(2_000_000_000).nullish(),
     audienceLocalPercent: z.number().min(0).max(100).nullish(),
     metricSource: z.string().trim().max(200).nullish(),
-    metricSourceUrl: z.string().trim().url('URL de fuente inválida.').max(500).nullish().or(z.literal('')),
+    metricSourceUrl: z.string().trim().url('urlDeFuenteInvalida').max(500).nullish().or(z.literal('')),
     isPrimary: z.boolean().optional(),
   }),
   async (input, ctx) => {

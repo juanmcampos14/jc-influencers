@@ -72,7 +72,7 @@ export const borrarEntregaAction = defineAction(
 export const crearLinkAction = defineAction(
   z.object({
     campaignId: id,
-    destination: z.string().trim().min(1, 'Escribí a dónde lleva el link.').max(600),
+    destination: z.string().trim().min(1, 'escribiDestinoDelLink').max(600),
     label: z.string().trim().max(120).nullish(),
     candidacyId: z.string().max(60).nullish(),
     source: z.string().trim().min(1).max(60),

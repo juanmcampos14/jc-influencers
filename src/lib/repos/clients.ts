@@ -87,7 +87,7 @@ export async function createClient(ctx: AuthContext, input: CreateClientInput): 
   assertCan(ctx, 'client.manage', null)
 
   const baseSlug = slugify(input.name)
-  if (!baseSlug) throw new ValidationError('El nombre del cliente no genera un identificador válido.')
+  if (!baseSlug) throw new ValidationError({ clave: 'clienteSinSlug' })
 
   return scoped(ctx, async (tx) => {
     let slug = baseSlug
@@ -95,7 +95,7 @@ export async function createClient(ctx: AuthContext, input: CreateClientInput): 
     while (await tx.client.findUnique({ where: { slug } })) {
       attempt += 1
       slug = `${baseSlug}-${attempt}`
-      if (attempt > 50) throw new ValidationError('No se pudo generar un identificador único.')
+      if (attempt > 50) throw new ValidationError({ clave: 'sinIdentificadorUnico' })
     }
     const created = await tx.client.create({
       data: {

@@ -26,7 +26,7 @@ const dateField = z
   .refine((value) => value === null || !Number.isNaN(value.getTime()), 'Fecha inválida.')
 
 const campaignFields = {
-  name: z.string().trim().min(2, 'El nombre es obligatorio.').max(160),
+  name: z.string().trim().min(2, 'nombreObligatorio').max(160),
   description: z.string().trim().max(4000).nullish(),
   objective: z.string().trim().max(2000).nullish(),
   status: CAMPAIGN_STATUS.optional(),

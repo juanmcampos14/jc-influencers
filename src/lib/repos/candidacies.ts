@@ -185,7 +185,7 @@ export async function createCandidacy(
     const existing = await tx.candidacy.findUnique({
       where: { campaignId_influencerId: { campaignId, influencerId } },
     })
-    if (existing) throw new ValidationError('Ese influencer ya está en la campaña.')
+    if (existing) throw new ValidationError({ clave: 'influencerYaEnCampana' })
 
     await assertClusterBelongsToCampaign(tx, campaignId, clientId, input.clusterId ?? null)
 
@@ -239,7 +239,7 @@ async function assertClusterBelongsToCampaign(
     select: { id: true },
   })
   // Un clusterId de otra campaña (o de otro tenant) se rechaza como inexistente.
-  if (!cluster) throw new ValidationError('El cluster indicado no pertenece a esta campaña.')
+  if (!cluster) throw new ValidationError({ clave: 'clusterAjeno' })
 }
 
 export async function updateCandidacy(
@@ -273,7 +273,7 @@ export async function updateCandidacy(
         select: { id: true },
       })
       if (!allowed && !isAgencyAdmin) {
-        throw new ValidationError('El responsable elegido no tiene acceso a este cliente.')
+        throw new ValidationError({ clave: 'responsableSinAcceso' })
       }
     }
 
@@ -358,7 +358,7 @@ export async function changeCandidacyStatus(
 
   await scoped(ctx, async (tx) => {
     const status = await tx.candidacyStatusDef.findUnique({ where: { key: toStatusKey } })
-    if (!status || !status.active) throw new ValidationError('Ese estado no existe o está desactivado.')
+    if (!status || !status.active) throw new ValidationError({ clave: 'estadoInexistente' })
     if (current.statusKey === toStatusKey) return
 
     const now = new Date()
@@ -418,7 +418,7 @@ export async function setClientApproval(
   assertCan(ctx, 'candidate.approve', current.clientId)
   if (ctx.side === 'CLIENT' && !current.clientVisible) throw new NotFoundError()
   if (approval === 'REJECTED' && !feedback?.trim()) {
-    throw new ValidationError('Contanos el motivo del rechazo.', { feedback: ['Es obligatorio al rechazar.'] })
+    throw new ValidationError({ clave: 'motivoDeRechazo' }, { feedback: ['Es obligatorio al rechazar.'] })
   }
 
   const authorSide = ctx.side === 'CLIENT' ? 'CLIENT' : 'AGENCY'
@@ -489,7 +489,7 @@ export async function setCandidacyVisibility(
   candidacyIds: string[],
   visible: boolean,
 ): Promise<number> {
-  if (ctx.side !== 'AGENCY') throw new ForbiddenError('Sólo la agencia decide qué ve el cliente.')
+  if (ctx.side !== 'AGENCY') throw new ForbiddenError({ clave: 'soloAgenciaDecideVisibilidad' })
   if (candidacyIds.length === 0) return 0
 
   return scoped(ctx, async (tx) => {
@@ -677,13 +677,14 @@ export async function addInfluencersToCampaign(
 
   const TOPE = 200
   const todos = [...new Set(influencerIds)]
-  if (todos.length === 0) throw new ValidationError('No elegiste ningún influencer.')
+  if (todos.length === 0) throw new ValidationError({ clave: 'sinInfluencersElegidos' })
   // Un lote que no entra se rechaza, no se recorta en silencio: decir "agregué
   // 200" cuando elegiste 230 esconde treinta que nadie va a volver a mirar.
   if (todos.length > TOPE) {
-    throw new ValidationError(
-      `Elegiste ${todos.length} influencers y el máximo por vez es ${TOPE}. Hacelo en tandas para poder revisar el resultado de cada una.`,
-    )
+    throw new ValidationError({
+      clave: 'demasiadosInfluencers',
+      valores: { cantidad: todos.length, maximo: TOPE },
+    })
   }
   const unicos = todos
 
@@ -724,9 +725,9 @@ export async function bulkChangeStatus(
   assertCan(ctx, 'candidate.manage', clientId)
 
   const unicos = [...new Set(candidacyIds)]
-  if (unicos.length === 0) throw new ValidationError('No elegiste ninguna candidatura.')
+  if (unicos.length === 0) throw new ValidationError({ clave: 'sinCandidaturasElegidas' })
   if (unicos.length > 200) {
-    throw new ValidationError(`Elegiste ${unicos.length} y el máximo por vez es 200. Hacelo en tandas.`)
+    throw new ValidationError({ clave: 'demasiadasCandidaturas', valores: { cantidad: unicos.length } })
   }
 
   let changed = 0
@@ -760,7 +761,7 @@ export async function bulkShortlist(
   const clientId = await resolveCampaignClient(ctx, campaignId)
   assertCan(ctx, 'candidate.manage', clientId)
   const unicos = [...new Set(candidacyIds)].slice(0, 200)
-  if (unicos.length === 0) throw new ValidationError('No elegiste ninguna candidatura.')
+  if (unicos.length === 0) throw new ValidationError({ clave: 'sinCandidaturasElegidas' })
 
   return scoped(ctx, async (tx) => {
     if (!inShortlist) {

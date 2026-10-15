@@ -5,7 +5,7 @@ import { env } from '@/lib/env'
 import { ForbiddenError } from '@/lib/authz/errors'
 import { requireContext } from '@/lib/auth/current'
 import type { AuthContext } from '@/lib/authz/context'
-import { fail, ok, type ActionResult } from './result'
+import { fail, ok, traducirFalla, type ActionResult } from './result'
 
 /**
  * Defensa en profundidad frente a CSRF. Next ya valida el origen de las server
@@ -22,7 +22,7 @@ async function assertSameOrigin(): Promise<void> {
     allowed.add(`${proto}://${forwardedHost}`)
     allowed.add(`http://${forwardedHost}`)
   }
-  if (!allowed.has(origin)) throw new ForbiddenError('Origen no permitido.')
+  if (!allowed.has(origin)) throw new ForbiddenError({ clave: 'origenNoPermitido' })
 }
 
 type Handler<TInput, TOutput> = (input: TInput, ctx: AuthContext) => Promise<TOutput>
@@ -47,9 +47,7 @@ type Opciones = {
  */
 function assertNoEsVistaPrevia(ctx: AuthContext, opciones: Opciones): void {
   if (!ctx.preview || opciones.permitidoEnVistaPrevia) return
-  throw new ForbiddenError(
-    'Estás mirando el espacio como lo ve el cliente, y eso es sólo lectura. Salí de la vista previa para hacer cambios.',
-  )
+  throw new ForbiddenError({ clave: 'vistaPreviaEsSoloLectura' })
 }
 
 /**
@@ -69,7 +67,7 @@ export function defineAction<TSchema extends z.ZodTypeAny, TOutput>(
       const input = schema.parse(raw) as z.infer<TSchema>
       return ok(await handler(input, ctx))
     } catch (error) {
-      return fail(error)
+      return traducirFalla(fail(error), error)
     }
   }
 }
@@ -85,7 +83,7 @@ export function definePublicAction<TSchema extends z.ZodTypeAny, TOutput>(
       const input = schema.parse(raw) as z.infer<TSchema>
       return ok(await handler(input))
     } catch (error) {
-      return fail(error)
+      return traducirFalla(fail(error), error)
     }
   }
 }

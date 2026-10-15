@@ -24,9 +24,12 @@ export async function previewImportAction(formData: FormData): Promise<ActionRes
     assertCan(ctx, 'import.run', clientId)
 
     const file = formData.get('file')
-    if (!(file instanceof File)) throw new ValidationError('Elegí un archivo .xlsx.')
+    if (!(file instanceof File)) throw new ValidationError({ clave: 'elegiXlsx' })
     if (file.size > MAX_UPLOAD_BYTES) {
-      throw new ValidationError(`El archivo supera el máximo de ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB.`)
+      throw new ValidationError({
+        clave: 'archivoDemasiadoGrande',
+        valores: { mb: Math.round(MAX_UPLOAD_BYTES / 1024 / 1024) },
+      })
     }
     const contentType = XLSX_TYPES.has(file.type)
       ? file.type

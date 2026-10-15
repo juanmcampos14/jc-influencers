@@ -28,10 +28,15 @@ export type LoginInput = { email: string; password: string; ip: string | null; u
 
 export type LoginResult =
   | { ok: true; session: CreatedSession; userId: string }
-  /** Mensaje genérico deliberado: no revela si el email existe. */
-  | { ok: false; message: string }
+  /**
+   * Clave genérica deliberada: no revela si el email existe.
+   *
+   * Viaja como clave y no como frase escrita porque el texto lo arma la acción,
+   * en el idioma de quien está intentando entrar.
+   */
+  | { ok: false; clave: string }
 
-const GENERIC_LOGIN_ERROR = 'Email o contraseña incorrectos.'
+const GENERIC_LOGIN_ERROR = 'loginGenerico'
 
 export async function login(input: LoginInput): Promise<LoginResult> {
   const email = normalizeEmail(input.email)
@@ -51,11 +56,11 @@ export async function login(input: LoginInput): Promise<LoginResult> {
         metadata: { reason: 'unknown_email' },
       }),
     )
-    return { ok: false, message: GENERIC_LOGIN_ERROR }
+    return { ok: false, clave: GENERIC_LOGIN_ERROR }
   }
 
   if (user.lockedUntil && user.lockedUntil > now) {
-    return { ok: false, message: GENERIC_LOGIN_ERROR }
+    return { ok: false, clave: GENERIC_LOGIN_ERROR }
   }
 
   const valid = await verifyPassword(input.password, user.passwordHash)
@@ -79,7 +84,7 @@ export async function login(input: LoginInput): Promise<LoginResult> {
         metadata: { reason: valid ? 'user_disabled' : 'bad_password' },
       })
     })
-    return { ok: false, message: GENERIC_LOGIN_ERROR }
+    return { ok: false, clave: GENERIC_LOGIN_ERROR }
   }
 
   const session = await withSystemScope(async (tx) => {
@@ -124,10 +129,10 @@ export async function createInvitation(input: CreateInvitationInput): Promise<Cr
   await consumeRateLimit('invitation', input.createdById)
 
   if (!input.agencyRole && !(input.clientId && input.clientRole)) {
-    throw new ValidationError('La invitación necesita un rol de agencia o un cliente con su rol.')
+    throw new ValidationError({ clave: 'invitacionSinRol' })
   }
   if (input.agencyRole && input.clientId) {
-    throw new ValidationError('Una invitación no puede ser de agencia y de cliente a la vez.')
+    throw new ValidationError({ clave: 'invitacionDobleLado' })
   }
 
   const token = generateToken(32)
@@ -140,10 +145,10 @@ export async function createInvitation(input: CreateInvitationInput): Promise<Cr
     })
     if (existingUser) {
       if (input.agencyRole && existingUser.agencyMembership) {
-        throw new ValidationError('Ese email ya es usuario de la agencia. Cambiale el rol desde «Accesos».')
+        throw new ValidationError({ clave: 'emailYaEsDeAgencia' })
       }
       if (input.clientId && existingUser.clientMemberships.some((m) => m.clientId === input.clientId)) {
-        throw new ValidationError('Ese email ya tiene acceso a este cliente.')
+        throw new ValidationError({ clave: 'emailYaTieneAcceso' })
       }
       /*
        * Una persona no puede estar de los dos lados del aislamiento.
@@ -155,12 +160,12 @@ export async function createInvitation(input: CreateInvitationInput): Promise<Cr
        */
       if (input.clientId && existingUser.agencyMembership) {
         throw new ValidationError(
-          'Ese email es de un empleado de la agencia, que ya ve todos los clientes a los que tiene alcance. Para probar el portal como cliente hace falta otra dirección.',
+          { clave: 'emailEsDeAgencia' },
         )
       }
       if (input.agencyRole && existingUser.clientMemberships.length > 0) {
         throw new ValidationError(
-          'Ese email pertenece a un usuario de cliente. Quitale primero sus accesos de cliente desde «Accesos».',
+          { clave: 'emailEsDeCliente' },
         )
       }
     }
@@ -243,7 +248,7 @@ export async function inspectInvitation(token: string): Promise<InvitationPrevie
 
 export type AcceptInvitationResult =
   | { ok: true; session: CreatedSession; userId: string }
-  | { ok: false; message: string }
+  | { ok: false; clave: string }
 
 /**
  * Acepta una invitación: verifica el email invitado (probar el token ES la
@@ -260,7 +265,7 @@ export async function acceptInvitation(input: {
   await consumeRateLimit('invitationAccept', input.ip ?? 'sin-ip')
 
   const problems = passwordProblems(input.password)
-  if (problems.length > 0) throw new ValidationError('La contraseña no cumple la política.', { password: problems })
+  if (problems.length > 0) throw new ValidationError({ clave: 'claveNoCumple' }, { password: problems })
 
   const passwordHash = await hashPassword(input.password)
   const tokenHash = hashToken(input.token)
@@ -268,7 +273,7 @@ export async function acceptInvitation(input: {
 
   return withSystemScope(async (tx) => {
     const invitation = await tx.invitation.findUnique({ where: { tokenHash } })
-    const invalid = { ok: false as const, message: 'La invitación no es válida, ya se usó o venció.' }
+    const invalid = { ok: false as const, clave: 'invitacionNoValida' }
     if (!invitation) return invalid
     if (invitation.status !== 'PENDING') return invalid
     if (invitation.expiresAt <= now) {
@@ -295,11 +300,7 @@ export async function acceptInvitation(input: {
     })
 
     if (existente && invitation.clientId && existente.agencyMembership) {
-      return {
-        ok: false as const,
-        message:
-          'Ese email ya es de un empleado de la agencia. Entrá con tu contraseña de siempre: como agencia ya ves los clientes que te correspondan.',
-      }
+      return { ok: false as const, clave: 'invitacionEmailEsDeAgencia' }
     }
 
     const user = existente
@@ -458,9 +459,9 @@ export async function completePasswordReset(input: {
   password: string
   ip: string | null
   userAgent: string | null
-}): Promise<{ ok: boolean; message?: string }> {
+}): Promise<{ ok: boolean; clave?: string }> {
   const problems = passwordProblems(input.password)
-  if (problems.length > 0) throw new ValidationError('La contraseña no cumple la política.', { password: problems })
+  if (problems.length > 0) throw new ValidationError({ clave: 'claveNoCumple' }, { password: problems })
 
   const passwordHash = await hashPassword(input.password)
   const now = new Date()
@@ -468,7 +469,7 @@ export async function completePasswordReset(input: {
   const result = await withSystemScope(async (tx) => {
     const reset = await tx.passwordReset.findUnique({ where: { tokenHash: hashToken(input.token) } })
     if (!reset || reset.usedAt || reset.expiresAt <= now) {
-      return { ok: false, message: 'El enlace no es válido, ya se usó o venció.' }
+      return { ok: false, clave: 'enlaceNoValido' }
     }
     await tx.passwordReset.update({ where: { id: reset.id }, data: { usedAt: now } })
     await tx.user.update({
@@ -506,22 +507,22 @@ export async function changeOwnPassword(input: {
   newPassword: string
   ip: string | null
   userAgent: string | null
-}): Promise<{ ok: boolean; message?: string; otrasSesionesCerradas?: number }> {
+}): Promise<{ ok: boolean; clave?: string; otrasSesionesCerradas?: number }> {
   await consumeRateLimit('passwordChange', input.userId)
 
   const user = await withSystemScope((tx) => tx.user.findUnique({ where: { id: input.userId } }))
-  if (!user) return { ok: false, message: 'No encontramos tu cuenta.' }
+  if (!user) return { ok: false, clave: 'cuentaNoEncontrada' }
 
   if (!(await verifyPassword(input.currentPassword, user.passwordHash))) {
-    return { ok: false, message: 'La contraseña actual no es correcta.' }
+    return { ok: false, clave: 'claveActualIncorrecta' }
   }
 
   const problems = passwordProblems(input.newPassword)
   if (problems.length > 0) {
-    throw new ValidationError('La contraseña nueva no cumple la política.', { newPassword: problems })
+    throw new ValidationError({ clave: 'claveNuevaNoCumple' }, { newPassword: problems })
   }
   if (await verifyPassword(input.newPassword, user.passwordHash)) {
-    return { ok: false, message: 'La contraseña nueva tiene que ser distinta de la actual.' }
+    return { ok: false, clave: 'claveNuevaIgual' }
   }
 
   const now = new Date()

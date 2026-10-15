@@ -159,8 +159,8 @@ describe('Acceso, invitaciones y recuperación', () => {
     })
     expect(result.ok).toBe(false)
     if (!result.ok) {
-      // Mismo mensaje que para un token vencido o usado: no distingue casos.
-      expect(result.message).toBe('La invitación no es válida, ya se usó o venció.')
+      // Misma clave que para un token vencido o usado: no distingue casos.
+      expect(result.clave).toBe('invitacionNoValida')
     }
   })
 
@@ -186,7 +186,7 @@ describe('Acceso, invitaciones y recuperación', () => {
     expect(wrongPassword.ok).toBe(false)
     expect(unknownEmail.ok).toBe(false)
     if (!wrongPassword.ok && !unknownEmail.ok) {
-      expect(wrongPassword.message).toBe(unknownEmail.message)
+      expect(wrongPassword.clave).toBe(unknownEmail.clave)
     }
   })
 

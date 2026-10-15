@@ -6,11 +6,11 @@ import { defineAction } from '@/lib/actions/define'
 import { createClient, updateClient } from '@/lib/repos/clients'
 
 const baseSchema = {
-  name: z.string().trim().min(2, 'El nombre es obligatorio.').max(120),
+  name: z.string().trim().min(2, 'nombreObligatorio').max(120),
   legalName: z.string().trim().max(200).nullish(),
   country: z.string().trim().max(40).nullish(),
   markets: z.array(z.string().trim().max(40)).max(30).optional(),
-  website: z.string().trim().url('Ingresá una URL válida.').max(300).nullish().or(z.literal('')),
+  website: z.string().trim().url('urlInvalida').max(300).nullish().or(z.literal('')),
   description: z.string().trim().max(2000).nullish(),
   defaultCurrency: z.string().trim().length(3).toUpperCase().optional(),
   timezone: z.string().trim().max(60).optional(),

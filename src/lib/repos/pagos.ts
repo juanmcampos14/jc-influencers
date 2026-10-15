@@ -202,7 +202,7 @@ export async function guardarTerminos(
   assertCan(ctx, 'budget.manage', campaign.clientId)
 
   if (input.feeMode === 'PERCENT' && input.feePercent !== null && (input.feePercent < 0 || input.feePercent > 100)) {
-    throw new ValidationError('El porcentaje tiene que estar entre 0 y 100.')
+    throw new ValidationError({ clave: 'porcentajeFueraDeRango' })
   }
 
   await scoped(ctx, async (tx) => {
@@ -258,7 +258,7 @@ export async function crearMovimiento(
   assertClientInScope(ctx, campaign.clientId)
   assertCan(ctx, 'budget.manage', campaign.clientId)
 
-  if (!(input.amount > 0)) throw new ValidationError('El monto tiene que ser mayor a cero.')
+  if (!(input.amount > 0)) throw new ValidationError({ clave: 'montoMayorACero' })
   /*
    * Marcar algo como pagado sin decir cuándo deja un cobro que nadie puede
    * ubicar en el tiempo. Se completa con hoy antes que dejarlo vacío.
@@ -269,7 +269,7 @@ export async function crearMovimiento(
     const pertenece = await scoped(ctx, (tx) =>
       tx.candidacy.findFirst({ where: { id: input.candidacyId!, campaignId }, select: { id: true } }),
     )
-    if (!pertenece) throw new ValidationError('Ese perfil no está en esta campaña.')
+    if (!pertenece) throw new ValidationError({ clave: 'perfilAjenoALaCampana' })
   }
 
   const guardado = input.documento
@@ -326,7 +326,7 @@ export async function marcarPagado(
   if (!pago) throw new NotFoundError()
   assertClientInScope(ctx, pago.clientId)
   assertCan(ctx, 'budget.manage', pago.clientId)
-  if (pago.status === 'CANCELLED') throw new ValidationError('Ese movimiento está cancelado.')
+  if (pago.status === 'CANCELLED') throw new ValidationError({ clave: 'movimientoCancelado' })
 
   await scoped(ctx, async (tx) => {
     await tx.payment.update({

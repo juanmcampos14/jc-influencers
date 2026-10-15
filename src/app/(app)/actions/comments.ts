@@ -9,7 +9,7 @@ export const createCommentAction = defineAction(
   z.object({
     campaignId: z.string().min(1).max(60).nullish(),
     candidacyId: z.string().min(1).max(60).nullish(),
-    body: z.string().trim().min(1, 'Escribí algo.').max(5000),
+    body: z.string().trim().min(1, 'escribiAlgo').max(5000),
     visibility: z.enum(['INTERNAL', 'CLIENT_VISIBLE', 'CLIENT_AUTHORED', 'BUDGET_PRIVATE']),
   }),
   async (input, ctx) => {

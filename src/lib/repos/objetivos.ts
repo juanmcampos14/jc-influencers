@@ -214,7 +214,7 @@ export async function guardarObjetivo(
   assertClientInScope(ctx, campaign.clientId)
   assertCan(ctx, 'brief.manage', campaign.clientId)
 
-  if (!(input.target > 0)) throw new ValidationError('El objetivo tiene que ser mayor a cero.')
+  if (!(input.target > 0)) throw new ValidationError({ clave: 'objetivoMayorACero' })
   if (input.metric === 'INVERSION_EN_TALENTO') {
     // Un tope de plata sólo lo pone quien maneja plata.
     assertCan(ctx, 'budget.manage', campaign.clientId)

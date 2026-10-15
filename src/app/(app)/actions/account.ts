@@ -13,14 +13,14 @@ import { ValidationError } from '@/lib/authz/errors'
  */
 export const changePasswordAction = defineAction(
   z.object({
-    currentPassword: z.string().min(1, 'Escribí tu contraseña actual.').max(200),
-    newPassword: z.string().min(1, 'Escribí la contraseña nueva.').max(200),
+    currentPassword: z.string().min(1, 'escribiClaveActual').max(200),
+    newPassword: z.string().min(1, 'escribiClaveNueva').max(200),
     confirmPassword: z.string().min(1).max(200),
   }),
   async (input, ctx) => {
     if (input.newPassword !== input.confirmPassword) {
-      throw new ValidationError('Las dos contraseñas nuevas no coinciden.', {
-        confirmPassword: ['No coincide con la contraseña nueva.'],
+      throw new ValidationError({ clave: 'clavesNoCoinciden' }, {
+        confirmPassword: ['noCoincideConLaNueva'],
       })
     }
 
@@ -33,7 +33,7 @@ export const changePasswordAction = defineAction(
       userAgent: ctx.userAgent,
     })
 
-    if (!result.ok) throw new ValidationError(result.message ?? 'No se pudo cambiar la contraseña.')
+    if (!result.ok) throw new ValidationError({ clave: result.clave ?? 'noSeCambioLaClave' })
     return { otrasSesionesCerradas: result.otrasSesionesCerradas ?? 0 }
   },
 )

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   looksLikeMultiplePeople,
@@ -14,7 +15,7 @@ import {
   tierForFollowers,
 } from '@/lib/domain/normalize'
 import { escapeCsvCell, toCsv } from '@/lib/export/csv'
-import { passwordProblems, hashPassword, verifyPassword } from '@/lib/auth/password'
+import { MIN_LENGTH, passwordProblems, hashPassword, verifyPassword } from '@/lib/auth/password'
 
 describe('parseFollowers', () => {
   it('normaliza los formatos reales del Excel', () => {
@@ -185,7 +186,7 @@ describe('CSV', () => {
 describe('contraseñas', () => {
   it('exige una política mínima', () => {
     expect(passwordProblems('corta')).not.toHaveLength(0)
-    expect(passwordProblems('sinmayusculas123')).toContain('Debe incluir una mayúscula.')
+    expect(passwordProblems('sinmayusculas123')).toContain('claveSinMayuscula')
     expect(passwordProblems('Prueba.Segura.2026')).toHaveLength(0)
   })
 
@@ -197,4 +198,20 @@ describe('contraseñas', () => {
     await expect(verifyPassword('x', null)).resolves.toBe(false)
     await expect(verifyPassword('x', 'basura')).resolves.toBe(false)
   })
+})
+
+/**
+ * El texto de `claveCorta` nombra el número, así que no puede quedarse atrás
+ * del código. Un mínimo de 14 con un cartel que sigue diciendo 12 manda a la
+ * gente a probar contraseñas que el servidor rechaza.
+ */
+describe('el mínimo de la contraseña y su cartel dicen lo mismo', () => {
+  for (const idioma of ['es', 'en'] as const) {
+    it(`el texto en ${idioma} nombra el mínimo real`, () => {
+      const mensajes = JSON.parse(
+        readFileSync(new URL(`../../messages/${idioma}.json`, import.meta.url), 'utf8'),
+      ) as { errores: Record<string, string> }
+      expect(mensajes.errores.claveCorta).toContain(String(MIN_LENGTH))
+    })
+  }
 })

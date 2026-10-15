@@ -45,15 +45,26 @@ export async function verifyPassword(plain: string, stored: string | null | unde
   }
 }
 
-const MIN_LENGTH = 12
+/**
+ * El largo mínimo. Se exporta porque el texto de `claveCorta` lo nombra: hay
+ * un test que falla si uno cambia sin el otro.
+ */
+export const MIN_LENGTH = 12
 
 /** Política de contraseñas. Devuelve la lista de problemas encontrados. */
+/**
+ * Qué le falta a una contraseña, como claves de traducción.
+ *
+ * Las frases viajan como clave porque terminan en `fieldErrors`, debajo del
+ * campo, y eso lo lee una persona en su idioma. El valor del mínimo va adentro
+ * de la clave que lo necesita.
+ */
 export function passwordProblems(plain: string): string[] {
   const problems: string[] = []
-  if (plain.length < MIN_LENGTH) problems.push(`Debe tener al menos ${MIN_LENGTH} caracteres.`)
-  if (!/[a-z]/.test(plain)) problems.push('Debe incluir una minúscula.')
-  if (!/[A-Z]/.test(plain)) problems.push('Debe incluir una mayúscula.')
-  if (!/[0-9]/.test(plain)) problems.push('Debe incluir un número.')
-  if (/^(.)\1+$/.test(plain)) problems.push('No puede ser un único carácter repetido.')
+  if (plain.length < MIN_LENGTH) problems.push('claveCorta')
+  if (!/[a-z]/.test(plain)) problems.push('claveSinMinuscula')
+  if (!/[A-Z]/.test(plain)) problems.push('claveSinMayuscula')
+  if (!/[0-9]/.test(plain)) problems.push('claveSinNumero')
+  if (/^(.)\1+$/.test(plain)) problems.push('claveRepetida')
   return problems
 }

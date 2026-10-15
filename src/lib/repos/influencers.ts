@@ -232,9 +232,9 @@ export async function createInfluencer(ctx: AuthContext, input: InfluencerWriteI
   assertCan(ctx, 'influencer.manage', null)
   const caps = capabilitiesFor(ctx, null)
 
-  if (!input.displayName.trim()) throw new ValidationError('El nombre es obligatorio.')
+  if (!input.displayName.trim()) throw new ValidationError({ clave: 'nombreObligatorio' })
   if ((input.contactEmail || input.contactPhone) && !caps.has('influencer.contact.view')) {
-    throw new ForbiddenError('No tenés permiso para cargar datos de contacto.')
+    throw new ForbiddenError({ clave: 'sinPermisoContacto' })
   }
 
   return scoped(ctx, async (tx) => {
@@ -365,7 +365,7 @@ export async function upsertSocialProfile(
   assertCan(ctx, 'influencer.manage', null)
 
   const parsed = parseProfileUrl(input.url)
-  if (parsed.kind !== 'value') throw new ValidationError('La URL del perfil no es válida.', { url: [parsed.reason] })
+  if (parsed.kind !== 'value') throw new ValidationError({ clave: 'urlDePerfilInvalida' }, { url: [parsed.reason] })
   const { platform, url, urlNormalized, handle } = parsed.value
 
   return scoped(ctx, async (tx) => {
@@ -595,7 +595,7 @@ export async function mergeInfluencers(
 ): Promise<MergeResult> {
   assertAgency(ctx)
   assertCan(ctx, 'influencer.manage', null)
-  if (input.keepId === input.mergeId) throw new ValidationError('No se puede fusionar un influencer consigo mismo.')
+  if (input.keepId === input.mergeId) throw new ValidationError({ clave: 'fusionConsigoMismo' })
 
   return scoped(ctx, async (tx) => {
     const [sobrevive, absorbido] = await Promise.all([
@@ -729,11 +729,10 @@ export async function deleteInfluencer(ctx: AuthContext, influencerId: string): 
     if (!influencer) throw new NotFoundError()
 
     if (influencer._count.candidacies > 0) {
-      throw new ValidationError(
-        `${influencer.displayName} participó de ${influencer._count.candidacies} ${
-          influencer._count.candidacies === 1 ? 'campaña' : 'campañas'
-        }. Borrarlo dejaría esas campañas sin parte de su historia. Si es un duplicado, fusionalo; si ya no trabajás con él, archivalo.`,
-      )
+      throw new ValidationError({
+        clave: 'influencerConCampanas',
+        valores: { nombre: influencer.displayName, cantidad: influencer._count.candidacies },
+      })
     }
 
     await recordAudit(tx, actorOf(ctx), {

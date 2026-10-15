@@ -143,7 +143,7 @@ export async function crearLink(
     term: input.utm.term ? normalizarUtm(input.utm.term) : null,
   }
   if (!utm.source || !utm.medium || !utm.campaign) {
-    throw new ValidationError('Fuente, medio y campaña no pueden quedar vacíos.')
+    throw new ValidationError({ clave: 'utmIncompletos' })
   }
 
   const destination = construirDestino(input.destination, utm)
@@ -152,7 +152,7 @@ export async function crearLink(
     const pertenece = await scoped(ctx, (tx) =>
       tx.candidacy.findFirst({ where: { id: input.candidacyId!, campaignId }, select: { id: true } }),
     )
-    if (!pertenece) throw new ValidationError('Ese perfil no está en esta campaña.')
+    if (!pertenece) throw new ValidationError({ clave: 'perfilAjenoALaCampana' })
   }
 
   return scoped(ctx, async (tx) => {
@@ -188,7 +188,7 @@ export async function crearLink(
       })
       return { id: creado.id, url: urlPublica(slug) }
     }
-    throw new ValidationError('No se pudo generar un link. Probá de nuevo.')
+    throw new ValidationError({ clave: 'sinLinkGenerado' })
   })
 }
 

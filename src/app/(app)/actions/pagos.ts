@@ -19,7 +19,7 @@ const monto = z
     const texto = String(valor).trim().replace(',', '.')
     if (!texto) return null
     const numero = Number(texto)
-    if (!Number.isFinite(numero)) throw new ValidationError('Escribí un número válido.')
+    if (!Number.isFinite(numero)) throw new ValidationError({ clave: 'numeroInvalido' })
     return numero
   })
 
@@ -62,8 +62,8 @@ export async function crearMovimientoAction(formData: FormData): Promise<ActionR
       .object({
         direction: z.enum(['AGENCY_IN', 'TALENT_OUT', 'EXPENSE_OUT']),
         status: z.enum(['PENDING', 'PAID']),
-        amount: z.coerce.number().positive('El monto tiene que ser mayor a cero.'),
-        concept: z.string().trim().min(1, 'Escribí de qué se trata.').max(200),
+        amount: z.coerce.number().positive('montoMayorACero'),
+        concept: z.string().trim().min(1, 'escribiDeQueSeTrata').max(200),
         candidacyId: z.string().max(60).nullish(),
         dueDate: z.string().max(30).nullish(),
         paidAt: z.string().max(30).nullish(),
