@@ -12,9 +12,9 @@ import { ArbolDePermisos } from '@/components/permisos/arbol-de-permisos'
 import { AGENCY_ROLE_CAPABILITIES, isCapability, type Capability } from '@/lib/authz/capabilities'
 import type { AgencyRole } from '@/generated/prisma/enums'
 import {
-  AGENCY_ROLE_LABELS,
+  AGENCY_ROLES,
   capabilityLabel,
-  CLIENT_ROLE_LABELS,
+  nombreDeRol,
 } from '@/lib/authz/capabilities'
 import { updateMembershipsAction, removeMembershipAction } from '../actions/users'
 
@@ -51,6 +51,7 @@ export function EditarAccesos({
   clients: Array<{ id: string; name: string }>
 }) {
   const t = useTranslations('usuarios')
+  const tPermiso = useTranslations('permisos')
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [pendiente, startTransition] = React.useTransition()
@@ -150,9 +151,9 @@ export function EditarAccesos({
             <>
               <Field label={t('rolDeAgencia')} htmlFor="rol">
                 <Select id="rol" value={rol} onChange={(event) => setRol(event.target.value)}>
-                  {Object.entries(AGENCY_ROLE_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
+                  {AGENCY_ROLES.map((rol) => (
+                    <option key={rol} value={rol}>
+                      {nombreDeRol(tPermiso, rol)}
                     </option>
                   ))}
                 </Select>
@@ -212,7 +213,7 @@ export function EditarAccesos({
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium text-ink-900">{membership.clientName}</span>
                       <span className="block text-xs text-ink-500">
-                        {(CLIENT_ROLE_LABELS as Record<string, string>)[membership.role] ?? membership.role}
+                        {nombreDeRol(tPermiso, membership.role)}
                         {membership.extras.length > 0
                           ? ` · ${membership.extras.map((e) => capabilityLabel(e)).join(', ')}`
                           : ''}

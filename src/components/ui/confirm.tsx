@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { Dialog, DialogContent, DialogTrigger, DialogClose } from './dialog'
 import { Button } from './button'
 
@@ -8,7 +9,7 @@ import { Button } from './button'
 export function ConfirmButton({
   title,
   description,
-  confirmLabel = 'Confirmar',
+  confirmLabel,
   tone = 'danger',
   onConfirm,
   children,
@@ -22,6 +23,7 @@ export function ConfirmButton({
   children: React.ReactNode
   pending?: boolean
 }) {
+  const t = useTranslations('general')
   const [open, setOpen] = React.useState(false)
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -42,7 +44,7 @@ export function ConfirmButton({
               setOpen(false)
             }}
           >
-            {confirmLabel}
+            {confirmLabel ?? t('confirmar')}
           </Button>
         </div>
       </DialogContent>

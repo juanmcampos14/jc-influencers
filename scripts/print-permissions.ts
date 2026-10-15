@@ -5,15 +5,25 @@
  */
 import {
   AGENCY_ROLE_CAPABILITIES,
-  AGENCY_ROLE_LABELS,
   CAPABILITIES,
   CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE,
   CAPABILITY_LABELS,
+  claveDeRol,
   CLIENT_ROLE_CAPABILITIES,
-  CLIENT_ROLE_LABELS,
   GRANTABLE_AGENCY_EXTRAS,
   GRANTABLE_CLIENT_EXTRAS,
 } from '../src/lib/authz/capabilities'
+import castellano from '../messages/es.json'
+
+/* El documento es interno y se escribe en castellano, igual que el resto. */
+const nombre = (rol: string): string =>
+  (castellano.permisos as Record<string, string>)[claveDeRol(rol)] ?? rol
+const AGENCY_ROLE_LABELS: Record<string, string> = Object.fromEntries(
+  Object.keys(AGENCY_ROLE_CAPABILITIES).map((rol) => [rol, nombre(rol)]),
+)
+const CLIENT_ROLE_LABELS: Record<string, string> = Object.fromEntries(
+  Object.keys(CLIENT_ROLE_CAPABILITIES).map((rol) => [rol, nombre(rol)]),
+)
 
 const agencyRoles = Object.keys(AGENCY_ROLE_CAPABILITIES) as Array<keyof typeof AGENCY_ROLE_CAPABILITIES>
 const clientRoles = Object.keys(CLIENT_ROLE_CAPABILITIES) as Array<keyof typeof CLIENT_ROLE_CAPABILITIES>

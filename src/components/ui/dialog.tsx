@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/util/format'
@@ -16,6 +17,7 @@ export function DialogContent({
   description,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & { title: string; description?: string }) {
+  const t = useTranslations('general')
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[color:color-mix(in_srgb,var(--jc-text)_45%,transparent)] backdrop-blur-[1px]" />
@@ -40,7 +42,7 @@ export function DialogContent({
           </div>
           <DialogPrimitive.Close
             className="-m-2 grid size-11 place-items-center rounded-lg text-ink-500 hover:bg-ink-100"
-            aria-label="Cerrar"
+            aria-label={t('cerrar')}
           >
             <X className="size-4" />
           </DialogPrimitive.Close>

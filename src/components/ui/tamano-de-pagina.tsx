@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/util/format'
 
 /**
@@ -27,6 +28,7 @@ export function TamanoDePagina({
   /** Cuántos hay en total, para no ofrecer tamaños que no hacen nada. */
   total: number
 }) {
+  const t = useTranslations('general')
   const utiles = OPCIONES.filter((opcion, indice) => opcion <= total || OPCIONES[indice - 1] === undefined || OPCIONES[indice - 1]! < total)
   if (utiles.length <= 1) return null
 
@@ -47,7 +49,7 @@ export function TamanoDePagina({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-xs text-ink-600">
-      <span>Mostrar</span>
+      <span>{t('mostrar')}</span>
       {utiles.map((opcion) => (
         <Link
           key={opcion}
@@ -63,7 +65,7 @@ export function TamanoDePagina({
           {opcion}
         </Link>
       ))}
-      <span>por página</span>
+      <span>{t('porPagina')}</span>
     </div>
   )
 }

@@ -4,13 +4,14 @@ import { AppShell, type NavItem } from '@/components/app-shell'
 import { ThemeScope } from '@/components/theme-scope'
 import { BarraDeVistaPrevia } from '@/components/barra-vista-previa'
 import { getAuthContext } from '@/lib/auth/current'
-import { CLIENT_ROLE_LABELS } from '@/lib/authz/capabilities'
+import { nombreDeRol } from '@/lib/authz/capabilities'
 import { getActiveTheme } from '@/lib/repos/brand'
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getAuthContext()
   if (!ctx) redirect('/login')
   const t = await getTranslations('portal')
+  const tPermiso = await getTranslations('permisos')
 
   const activeClient = ctx.clients.find((client) => client.id === ctx.activeClientId)
   const nav: NavItem[] = [{ href: '/portal', labelKey: 'misCampanas', icon: 'campanas' }]
@@ -32,7 +33,9 @@ export default async function PortalLayout({ children }: { children: React.React
         clients={ctx.clients.map((client) => ({ id: client.id, name: client.name }))}
         activeClientId={ctx.activeClientId}
         user={{ name: ctx.user.name, email: ctx.user.email }}
-        roleLabel={activeClient?.role ? CLIENT_ROLE_LABELS[activeClient.role] : ctx.side === 'AGENCY' ? t('agencia') : ''}
+        roleLabel={
+          activeClient?.role ? nombreDeRol(tPermiso, activeClient.role) : ctx.side === 'AGENCY' ? t('agencia') : ''
+        }
         sideLabel={t('portalDelCliente')}
         accountHref="/portal/cuenta"
         muralUrl={theme.muralUrl}

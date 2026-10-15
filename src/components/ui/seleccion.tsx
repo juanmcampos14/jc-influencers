@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/field'
@@ -44,6 +45,7 @@ export function Seleccion({
   /** Qué se puede hacer con lo elegido. Recibe los ids y una forma de limpiar. */
   acciones: (elegidos: string[], limpiar: () => void) => React.ReactNode
 }) {
+  const t = useTranslations('general')
   const [elegidos, setElegidos] = React.useState<ReadonlySet<string>>(new Set())
 
   const firma = idsDeLaPagina.join(',')
@@ -74,7 +76,7 @@ export function Seleccion({
               checked={todos}
               onChange={(event) => setElegidos(event.target.checked ? new Set(idsDeLaPagina) : new Set())}
             />
-            Elegir {idsDeLaPagina.length === 1 ? 'el de esta página' : `los ${idsDeLaPagina.length} de esta página`}
+            {t('elegirDeLaPagina', { cantidad: idsDeLaPagina.length })}
           </label>
         </div>
       ) : null}
@@ -93,7 +95,7 @@ export function Seleccion({
           {acciones([...elegidos], limpiar)}
           <Button size="sm" variant="ghost" onClick={limpiar}>
             <X className="size-4" aria-hidden="true" />
-            Quitar selección
+            {t('quitarSeleccion')}
           </Button>
         </div>
       ) : null}
@@ -116,11 +118,12 @@ export function CasillaDeFila({
    */
   deshabilitada?: boolean
 }) {
+  const tFila = useTranslations('general')
   const contexto = React.useContext(Ctx)
   if (!contexto) return null
   return (
     <Checkbox
-      aria-label={`Elegir ${nombre}`}
+      aria-label={tFila('elegirFila', { nombre })}
       disabled={deshabilitada}
       checked={!deshabilitada && contexto.elegidos.has(id)}
       onChange={() => contexto.alternar(id)}

@@ -9,10 +9,11 @@ import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/
 import { Field, Input, Select } from '@/components/ui/field'
 import {
   AGENCY_ROLE_CAPABILITIES,
-  AGENCY_ROLE_LABELS,
+  AGENCY_ROLES,
   CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE,
   CLIENT_ROLE_CAPABILITIES,
-  CLIENT_ROLE_LABELS,
+  CLIENT_ROLES,
+  nombreDeRol,
   GRANTABLE_CLIENT_EXTRAS,
   type Capability,
 } from '@/lib/authz/capabilities'
@@ -33,6 +34,7 @@ export function InviteDialog({
   isSuperadmin: boolean
 }) {
   const t = useTranslations('usuarios')
+  const tPermiso = useTranslations('permisos')
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [kind, setKind] = React.useState<'AGENCY' | 'CLIENT'>(canInviteAgency ? 'AGENCY' : 'CLIENT')
@@ -75,9 +77,7 @@ export function InviteDialog({
     )
   }, [kind, delRol])
 
-  const agencyRoles = Object.entries(AGENCY_ROLE_LABELS).filter(
-    ([key]) => isSuperadmin || key !== 'PLATFORM_SUPERADMIN',
-  )
+  const agencyRoles = AGENCY_ROLES.filter((rol) => isSuperadmin || rol !== 'PLATFORM_SUPERADMIN')
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -144,9 +144,9 @@ export function InviteDialog({
                   onChange={(event) => setRolDeAgencia(event.target.value as AgencyRole)}
                   required
                 >
-                  {agencyRoles.map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
+                  {agencyRoles.map((rol) => (
+                    <option key={rol} value={rol}>
+                      {nombreDeRol(tPermiso, rol)}
                     </option>
                   ))}
                 </Select>
@@ -184,9 +184,9 @@ export function InviteDialog({
                   onChange={(event) => setRolDeCliente(event.target.value as ClientRole)}
                   required
                 >
-                  {Object.entries(CLIENT_ROLE_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
+                  {CLIENT_ROLES.map((rol) => (
+                    <option key={rol} value={rol}>
+                      {nombreDeRol(tPermiso, rol)}
                     </option>
                   ))}
                 </Select>

@@ -1,12 +1,14 @@
 import { redirect } from 'next/navigation'
 import { AppShell, type NavItem } from '@/components/app-shell'
 import { getAuthContext } from '@/lib/auth/current'
-import { AGENCY_ROLE_LABELS } from '@/lib/authz/capabilities'
+import { getTranslations } from 'next-intl/server'
+import { nombreDeRol } from '@/lib/authz/capabilities'
 import { can } from '@/lib/authz/context'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getAuthContext()
   if (!ctx) redirect('/login')
+  const [t, tPermiso] = await Promise.all([getTranslations('navegacion'), getTranslations('permisos')])
   /*
    * El panel interno es sólo para la agencia. Un usuario de cliente va al
    * portal -- y en vista previa el contexto ES de cliente, así que quien esté
@@ -41,8 +43,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       activeClientId={ctx.activeClientId}
       verTodos={ctx.allClients}
       user={{ name: ctx.user.name, email: ctx.user.email }}
-      roleLabel={ctx.agencyRole ? AGENCY_ROLE_LABELS[ctx.agencyRole] : ''}
-      sideLabel="Panel de agencia"
+      roleLabel={ctx.agencyRole ? nombreDeRol(tPermiso, ctx.agencyRole) : ''}
+      sideLabel={t('panelDeAgencia')}
       accountHref="/cuenta"
     >
       {children}

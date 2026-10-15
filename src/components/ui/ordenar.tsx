@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import { Th } from '@/components/ui/table'
 import { cn } from '@/lib/util/format'
@@ -34,6 +35,7 @@ export function ThOrdenable<Clave extends string>({
   className?: string
   alineado?: 'izquierda' | 'derecha'
 }) {
+  const t = useTranslations('general')
   const activa = orden.clave === columna.clave
   const proxima = proximaDireccion(columna, orden)
   const href = hrefCon(base, params, { orden: columna.clave, dir: proxima, page: null })
@@ -49,9 +51,12 @@ export function ThOrdenable<Clave extends string>({
           alineado === 'derecha' && 'flex-row-reverse',
           activa && 'text-ink-800',
         )}
-        title={`Ordenar por ${typeof children === 'string' ? children.toLowerCase() : 'esta columna'}${
-          proxima === 'asc' ? ', de menor a mayor' : ', de mayor a menor'
-        }`}
+        title={
+          (typeof children === 'string'
+            ? t('ordenarPor', { columna: children.toLowerCase() })
+            : t('ordenarPorEsta')) +
+          (proxima === 'asc' ? t('ordenAscendente') : t('ordenDescendente'))
+        }
       >
         {children}
         <Icono className={cn('size-3', activa ? 'opacity-100' : 'opacity-35')} aria-hidden="true" />

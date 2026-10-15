@@ -191,19 +191,29 @@ export const CLIENT_ROLE_CAPABILITIES: Record<ClientRole, readonly Capability[]>
   CLIENT_VIEWER: ['client.view', 'campaign.view', 'brief.view', 'candidate.view', 'export.create', 'ai.view'],
 }
 
-export const AGENCY_ROLE_LABELS: Record<AgencyRole, string> = {
-  PLATFORM_SUPERADMIN: 'Superadministrador de plataforma',
-  AGENCY_ADMIN: 'Administrador de agencia',
-  ACCOUNT_MANAGER: 'Account manager',
-  SCOUT: 'Scouting / colaborador',
-  FINANCE: 'Finanzas',
-}
+/*
+ * Los roles, en el orden en que conviene leerlos. El nombre de cada uno vive en
+ * `messages/*.json` bajo `permisos.rol<ROL>`: tenerlo escrito acá dejaba la
+ * pantalla de accesos en castellano cuando el resto estaba en inglés.
+ */
+export const AGENCY_ROLES: readonly AgencyRole[] = [
+  'PLATFORM_SUPERADMIN',
+  'AGENCY_ADMIN',
+  'ACCOUNT_MANAGER',
+  'SCOUT',
+  'FINANCE',
+]
 
-export const CLIENT_ROLE_LABELS: Record<ClientRole, string> = {
-  CLIENT_ADMIN: 'Administrador del cliente',
-  CLIENT_REVIEWER: 'Revisor del cliente',
-  CLIENT_VIEWER: 'Lector del cliente',
-}
+export const CLIENT_ROLES: readonly ClientRole[] = ['CLIENT_ADMIN', 'CLIENT_REVIEWER', 'CLIENT_VIEWER']
+
+const ROLES_CONOCIDOS = new Set<string>([...AGENCY_ROLES, ...CLIENT_ROLES])
+
+/** La clave de traducción de un rol. */
+export const claveDeRol = (rol: string): string => `rol${rol}`
+
+/** El nombre de un rol. Uno desconocido se muestra crudo en vez de romper. */
+export const nombreDeRol = (t: (clave: string) => string, rol: string): string =>
+  ROLES_CONOCIDOS.has(rol) ? t(claveDeRol(rol)) : rol
 
 /** Capacidades que un rol de agencia puede recibir como permiso extra puntual. */
 export const GRANTABLE_AGENCY_EXTRAS: readonly Capability[] = [

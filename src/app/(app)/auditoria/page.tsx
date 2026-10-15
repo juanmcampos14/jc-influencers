@@ -9,22 +9,13 @@ import { columnaFija, Table, TableWrap, Td, Th, Tr } from '@/components/ui/table
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
 import { listAudit } from '@/lib/repos/audit'
-import { AGENCY_ROLE_LABELS, CLIENT_ROLE_LABELS } from '@/lib/authz/capabilities'
+import { nombreDeRol } from '@/lib/authz/capabilities'
 import { auditActionLabel, entityTypeLabel } from '@/lib/domain/labels'
 import { formatDateTime } from '@/lib/util/format'
 import { AuditFilters } from './filters'
 
 export const metadata: Metadata = { title: 'Auditoría' }
 export const dynamic = 'force-dynamic'
-
-/**
- * El rol de quien hizo la acción, legible. Se guarda la clave del enum porque
- * es lo que hay que conservar; mostrarla cruda es otra cosa.
- */
-const rolLegible = (rol: string): string =>
-  (AGENCY_ROLE_LABELS as Record<string, string>)[rol] ??
-  (CLIENT_ROLE_LABELS as Record<string, string>)[rol] ??
-  rol
 
 export default async function AuditPage({
   searchParams,
@@ -35,6 +26,7 @@ export default async function AuditPage({
   const ctx = await requireContext()
   const t = await getTranslations('auditoria')
   const tEtiqueta = await getTranslations('etiquetas')
+  const tPermiso = await getTranslations('permisos')
   const idioma = await getLocale()
   const clientFilter = params.cliente && ctx.clients.some((c) => c.id === params.cliente) ? params.cliente : null
 
@@ -87,7 +79,7 @@ export default async function AuditPage({
                         </Td>
                         <Td className="text-xs">
                           <p className="text-ink-800">{row.actorEmail ?? 'sistema'}</p>
-                          {row.actorRole ? <p className="text-ink-500">{rolLegible(row.actorRole)}</p> : null}
+                          {row.actorRole ? <p className="text-ink-500">{nombreDeRol(tPermiso, row.actorRole)}</p> : null}
                         </Td>
                         <Td>
                           {/* La clave técnica queda en el title: sirve para buscar, no para leer. */}

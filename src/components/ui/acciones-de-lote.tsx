@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -20,6 +21,7 @@ export type ResultadoDeLote = {
  * deja al usuario creyendo que terminó una tarea que no terminó.
  */
 export function useAccionDeLote() {
+  const t = useTranslations('general')
   const router = useRouter()
   const [pendiente, startTransition] = React.useTransition()
 
@@ -32,7 +34,7 @@ export function useAccionDeLote() {
       startTransition(async () => {
         const resultado = await correr().catch(() => null)
         if (!resultado) {
-          toast.error('No se pudo completar. Reintentá en un momento.')
+          toast.error(t('noSePudoCompletar'))
           return
         }
         if (!resultado.ok) {
@@ -48,7 +50,7 @@ export function useAccionDeLote() {
           toast.error(
             omitidos.length === 1 && detalle
               ? `${detalle.nombre}: ${detalle.motivo}`
-              : `${textos.ninguno} ${omitidos.length} quedaron afuera.`,
+              : `${textos.ninguno} ${t('quedaronAfuera', { cantidad: omitidos.length })}`,
             { description: omitidos.length > 1 ? listar(omitidos) : undefined, duration: 8000 },
           )
           return
@@ -57,19 +59,21 @@ export function useAccionDeLote() {
         if (omitidos.length > 0) {
           // Éxito parcial: se cuenta como aviso, no como éxito. Un tilde verde
           // sobre "12 de 20" hace que nadie lea el resto de la frase.
-          toast.warning(`${hechos} ${cosa}. ${omitidos.length} quedaron afuera.`, {
+          toast.warning(
+            `${t('loteHechos', { cantidad: hechos, cosa })} ${t('quedaronAfuera', { cantidad: omitidos.length })}`,
+            {
             description: listar(omitidos),
             duration: 10000,
           })
         } else {
-          toast.success(`${hechos} ${cosa}.`)
+          toast.success(t('loteHechos', { cantidad: hechos, cosa }))
         }
 
         alTerminar?.()
         router.refresh()
       })
     },
-    [router],
+    [router, t],
   )
 
   return { ejecutar, pendiente }

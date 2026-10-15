@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { hrefCon } from '@/lib/util/query'
@@ -27,6 +28,7 @@ export function Pagination({
   /** Cómo se llama lo que se lista: "campañas", "influencers". */
   unidad: string
 }) {
+  const t = useTranslations('general')
   if (pageCount <= 1) return null
 
   const boton =
@@ -34,22 +36,22 @@ export function Pagination({
 
   return (
     <nav
-      aria-label={`Paginación de ${unidad}`}
+      aria-label={t('paginacionDe', { unidad })}
       className="flex flex-wrap items-center justify-between gap-3 border-t border-ink-200 px-5 py-3 text-sm"
     >
       <p className="text-ink-500">
-        Página {page} de {pageCount} · {total} {unidad}
+        {t('paginaDe', { pagina: page, total: pageCount, cantidad: total, unidad })}
       </p>
       <div className="flex gap-2">
         {page > 1 ? (
           <Link rel="prev" href={hrefCon(base, params, { pagina: page - 1 })} className={boton}>
             <ChevronLeft className="size-4" aria-hidden="true" />
-            Anterior
+            {t('anterior')}
           </Link>
         ) : null}
         {page < pageCount ? (
           <Link rel="next" href={hrefCon(base, params, { pagina: page + 1 })} className={boton}>
-            Siguiente
+            {t('siguiente')}
             <ChevronRight className="size-4" aria-hidden="true" />
           </Link>
         ) : null}

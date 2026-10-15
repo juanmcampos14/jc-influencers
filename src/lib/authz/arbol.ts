@@ -22,25 +22,36 @@ import type { Capability } from './capabilities'
  */
 
 export type NodoDePermiso = {
+  /** Identifica el nodo y arma su clave de traducción: `nodo_<clave>`. */
   clave: string
-  etiqueta: string
-  /** Qué significa en la práctica, para el que no conoce el producto. */
-  ayuda?: string
+  /** Si además tiene texto de ayuda, en `nodo_<clave>Ayuda`. */
+  conAyuda?: boolean
   /** La capacidad de mirar. Sin ella, la sección no aparece. */
   ver?: Capability
   /** La capacidad de cambiar cosas. Implica poder verlas. */
   editar?: Capability
   /** Capacidades sueltas que no son ni ver ni editar, con nombre propio. */
-  acciones?: Array<{ clave: Capability; etiqueta: string; ayuda?: string }>
+  acciones?: Array<{ clave: Capability; conAyuda?: boolean }>
   hijos?: NodoDePermiso[]
 }
 
 export type SeccionDePermisos = {
   clave: string
-  etiqueta: string
-  ayuda?: string
+  conAyuda?: boolean
   nodos: NodoDePermiso[]
 }
+
+/*
+ * Las claves de traducción del árbol.
+ *
+ * El texto vivía escrito en este archivo --"Presupuesto y pagos", "Lo acordado,
+ * lo pagado y lo que falta"-- y en inglés la pantalla de permisos seguía
+ * enteramente en castellano. Acá queda la estructura; el texto, en
+ * `messages/*.json` bajo `permisos`.
+ */
+export const claveDeSeccion = (clave: string): string => `seccion_${clave}`
+export const claveDeNodo = (clave: string): string => `nodo_${clave}`
+export const claveDeAccion = (capacidad: string): string => `accion_${capacidad.replace(/[.-]/g, '_')}`
 
 /**
  * El árbol.
@@ -51,79 +62,67 @@ export type SeccionDePermisos = {
 export const ARBOL_DE_PERMISOS: readonly SeccionDePermisos[] = [
   {
     clave: 'clientes',
-    etiqueta: 'Clientes',
-    ayuda: 'Las marcas para las que trabaja la agencia.',
+    conAyuda: true,
     nodos: [
       {
         clave: 'clientes',
-        etiqueta: 'Clientes',
         ver: 'client.view',
         editar: 'client.manage',
       },
       {
         clave: 'marca',
-        etiqueta: 'Identidad visual',
-        ayuda: 'Logo, colores y fondo del espacio de cada cliente.',
+        conAyuda: true,
         editar: 'brand.manage',
       },
     ],
   },
   {
     clave: 'campanas',
-    etiqueta: 'Campañas',
     nodos: [
       {
         clave: 'campanas',
-        etiqueta: 'Campañas',
         ver: 'campaign.view',
         editar: 'campaign.update',
         acciones: [
-          { clave: 'campaign.create', etiqueta: 'Crear campañas' },
-          { clave: 'campaign.delete', etiqueta: 'Archivar o eliminar campañas' },
+          { clave: 'campaign.create' },
+          { clave: 'campaign.delete' },
         ],
       },
       {
         clave: 'brief',
-        etiqueta: 'Brief',
-        ayuda: 'Objetivo, público y criterios de la campaña.',
+        conAyuda: true,
         ver: 'brief.view',
         editar: 'brief.manage',
       },
       {
         clave: 'candidatos',
-        etiqueta: 'Influencers de la campaña',
-        ayuda: 'Las propuestas y su estado: contactado, confirmado, publicado.',
+        conAyuda: true,
         ver: 'candidate.view',
         editar: 'candidate.manage',
         acciones: [
           {
             clave: 'candidate.approve',
-            etiqueta: 'Aprobar o rechazar',
-            ayuda: 'Es lo que hace el cliente con lo que le proponemos.',
+            conAyuda: true,
           },
         ],
       },
       {
         clave: 'plata',
-        etiqueta: 'Presupuesto y pagos',
-        ayuda: 'Lo acordado, lo pagado y lo que falta.',
+        conAyuda: true,
         ver: 'budget.view',
         editar: 'budget.manage',
       },
       {
         clave: 'comentarios',
-        etiqueta: 'Comentarios',
         acciones: [
-          { clave: 'feedback.create', etiqueta: 'Comentar', ayuda: 'Lo ve el cliente.' },
+          { clave: 'feedback.create', conAyuda: true },
           {
             clave: 'feedback.internal.create',
-            etiqueta: 'Comentar en interno',
-            ayuda: 'Sólo entre gente de la agencia.',
+            conAyuda: true,
           },
           {
             clave: 'internal_notes.view',
-            etiqueta: 'Ver notas internas',
-            ayuda: 'Nunca llegan a un usuario de cliente, se dé el permiso que se dé.',
+            conAyuda: true,
           },
         ],
       },
@@ -131,87 +130,73 @@ export const ARBOL_DE_PERMISOS: readonly SeccionDePermisos[] = [
   },
   {
     clave: 'influencers',
-    etiqueta: 'Influencers',
     nodos: [
       {
         clave: 'padron',
-        etiqueta: 'Padrón',
-        ayuda: 'La gente que ya incorporamos.',
+        conAyuda: true,
         ver: 'influencer.view',
         editar: 'influencer.manage',
       },
       {
         clave: 'contacto',
-        etiqueta: 'Datos de contacto',
-        ayuda: 'Mail y teléfono de los influencers.',
+        conAyuda: true,
         ver: 'influencer.contact.view',
       },
       {
         clave: 'buscar',
-        etiqueta: 'Buscar y Descubiertos',
-        ayuda: 'Salir a buscar gente nueva con un proveedor. Cuesta plata por búsqueda.',
+        conAyuda: true,
         acciones: [
-          { clave: 'scouting.run', etiqueta: 'Ejecutar búsquedas' },
+          { clave: 'scouting.run' },
           {
             clave: 'scouting.budget.manage',
-            etiqueta: 'Cambiar el tope de gasto',
-            ayuda: 'Quien lo tenga puede subir el límite mensual.',
+            conAyuda: true,
           },
         ],
       },
       {
         clave: 'importacion',
-        etiqueta: 'Importación',
-        ayuda: 'Cargar influencers desde una planilla.',
-        acciones: [{ clave: 'import.run', etiqueta: 'Importar planillas' }],
+        conAyuda: true,
+        acciones: [{ clave: 'import.run' }],
       },
     ],
   },
   {
     clave: 'ia',
-    etiqueta: 'Inteligencia artificial',
-    ayuda: 'Análisis y sugerencias. Generarlas cuesta plata; verlas no.',
+    conAyuda: true,
     nodos: [
       {
         clave: 'ia',
-        etiqueta: 'Análisis con IA',
         ver: 'ai.view',
-        acciones: [{ clave: 'ai.run', etiqueta: 'Generar análisis nuevos' }],
+        acciones: [{ clave: 'ai.run' }],
       },
     ],
   },
   {
     clave: 'administracion',
-    etiqueta: 'Administración',
     nodos: [
       {
         clave: 'usuarios',
-        etiqueta: 'Usuarios',
         acciones: [
-          { clave: 'user.invite', etiqueta: 'Invitar gente' },
+          { clave: 'user.invite' },
           {
             clave: 'membership.manage',
-            etiqueta: 'Cambiar accesos',
-            ayuda: 'Quien lo tenga puede repartir permisos, incluidos los suyos.',
+            conAyuda: true,
           },
         ],
       },
       {
         clave: 'auditoria',
-        etiqueta: 'Auditoría',
-        ayuda: 'El registro de quién hizo qué.',
+        conAyuda: true,
         ver: 'audit.view',
       },
       {
         clave: 'exportar',
-        etiqueta: 'Exportar',
-        ayuda: 'Bajar a planilla lo que ya se puede ver en pantalla.',
-        acciones: [{ clave: 'export.create', etiqueta: 'Exportar' }],
+        conAyuda: true,
+        acciones: [{ clave: 'export.create' }],
       },
       {
         clave: 'catalogos',
-        etiqueta: 'Catálogos',
-        ayuda: 'Nichos, etiquetas y estados configurables.',
+        conAyuda: true,
         editar: 'catalog.manage',
       },
     ],

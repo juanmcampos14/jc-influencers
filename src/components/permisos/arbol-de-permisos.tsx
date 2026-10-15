@@ -1,8 +1,16 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { Checkbox } from '@/components/ui/field'
-import { ARBOL_DE_PERMISOS, conDependencias, type NodoDePermiso } from '@/lib/authz/arbol'
+import {
+  ARBOL_DE_PERMISOS,
+  claveDeAccion,
+  claveDeNodo,
+  claveDeSeccion,
+  conDependencias,
+  type NodoDePermiso,
+} from '@/lib/authz/arbol'
 import type { Capability } from '@/lib/authz/capabilities'
 import { cn } from '@/lib/util/format'
 
@@ -43,6 +51,7 @@ export function ArbolDePermisos({
   prohibidas?: ReadonlySet<Capability>
   disabled?: boolean
 }) {
+  const t = useTranslations('permisos')
   const bloqueada = (cap: Capability | undefined): boolean => Boolean(cap && prohibidas?.has(cap))
 
   /**
@@ -75,22 +84,26 @@ export function ArbolDePermisos({
         return (
           <fieldset key={seccion.clave} className="rounded-xl border border-ink-200 bg-surface">
             <legend className="px-3 text-xs font-semibold uppercase tracking-wide text-ink-600">
-              {seccion.etiqueta}
+              {t(claveDeSeccion(seccion.clave))}
             </legend>
-            {seccion.ayuda ? <p className="px-4 pb-1 text-xs text-ink-500">{seccion.ayuda}</p> : null}
+            {seccion.conAyuda ? (
+              <p className="px-4 pb-1 text-xs text-ink-500">{t(`${claveDeSeccion(seccion.clave)}Ayuda`)}</p>
+            ) : null}
 
             <div className="divide-y divide-ink-100">
               {nodos.map((nodo) => (
                 <div key={nodo.clave} className="flex flex-wrap items-start gap-x-6 gap-y-2 px-4 py-3">
                   <div className="min-w-44 flex-1">
-                    <p className="text-sm font-medium text-ink-900">{nodo.etiqueta}</p>
-                    {nodo.ayuda ? <p className="mt-0.5 text-xs text-ink-500">{nodo.ayuda}</p> : null}
+                    <p className="text-sm font-medium text-ink-900">{t(claveDeNodo(nodo.clave))}</p>
+                    {nodo.conAyuda ? (
+                      <p className="mt-0.5 text-xs text-ink-500">{t(`${claveDeNodo(nodo.clave)}Ayuda`)}</p>
+                    ) : null}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                     {nodo.ver && !bloqueada(nodo.ver) ? (
                       <Casilla
-                        etiqueta="Ver"
+                        etiqueta={t('ver')}
                         marcada={concedidas.has(nodo.ver)}
                         delRol={delRol.has(nodo.ver)}
                         disabled={disabled}
@@ -100,7 +113,7 @@ export function ArbolDePermisos({
 
                     {nodo.editar && !bloqueada(nodo.editar) ? (
                       <Casilla
-                        etiqueta="Editar"
+                        etiqueta={t('editar')}
                         marcada={concedidas.has(nodo.editar)}
                         delRol={delRol.has(nodo.editar)}
                         disabled={disabled}
@@ -113,8 +126,8 @@ export function ArbolDePermisos({
                       .map((accion) => (
                         <Casilla
                           key={accion.clave}
-                          etiqueta={accion.etiqueta}
-                          ayuda={accion.ayuda}
+                          etiqueta={t(claveDeAccion(accion.clave))}
+                          ayuda={accion.conAyuda ? t(`${claveDeAccion(accion.clave)}Ayuda`) : undefined}
                           marcada={concedidas.has(accion.clave)}
                           delRol={delRol.has(accion.clave)}
                           disabled={disabled}
@@ -147,6 +160,7 @@ function Casilla({
   disabled: boolean
   onChange: (valor: boolean) => void
 }) {
+  const t = useTranslations('permisos')
   const cambiado = marcada !== delRol
   return (
     <label
@@ -166,9 +180,9 @@ function Casilla({
       {cambiado ? (
         <span
           className="rounded-full bg-amber-100 px-1.5 text-[10px] font-medium text-amber-900"
-          title={marcada ? 'Sumado a mano, no viene del rol' : 'Quitado a mano, el rol sí lo da'}
+          title={marcada ? t('sumadoAyuda') : t('quitadoAyuda')}
         >
-          {marcada ? 'sumado' : 'quitado'}
+          {marcada ? t('sumado') : t('quitado')}
         </span>
       ) : null}
     </label>

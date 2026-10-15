@@ -1,7 +1,18 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { ARBOL_DE_PERMISOS, capacidadesDelArbol, conDependencias } from '@/lib/authz/arbol'
+import {
+  ARBOL_DE_PERMISOS,
+  capacidadesDelArbol,
+  claveDeAccion,
+  claveDeNodo,
+  claveDeSeccion,
+  conDependencias,
+} from '@/lib/authz/arbol'
 import {
   AGENCY_ROLE_CAPABILITIES,
+  AGENCY_ROLES,
+  claveDeRol,
+  CLIENT_ROLES,
   CAPABILITIES,
   CAPABILITIES_FORBIDDEN_FOR_CLIENT_SIDE,
   GRANTABLE_CLIENT_EXTRAS,
@@ -135,4 +146,43 @@ describe('repartir en sumadas y quitadas', () => {
     })
     expect(quitadas).toEqual(['audit.view'])
   })
+})
+
+/**
+ * El árbol es una vista para una persona, y desde que el producto habla dos
+ * idiomas "tiene nombre" significa que lo tiene en los dos. Faltando uno, la
+ * pantalla de accesos muestra `nodo_plata` donde debería decir qué permiso es.
+ */
+describe('el árbol tiene texto en los dos idiomas', () => {
+  const mensajes = (idioma: string): Record<string, string> =>
+    JSON.parse(readFileSync(new URL(`../../messages/${idioma}.json`, import.meta.url), 'utf8')).permisos
+
+  for (const idioma of ['es', 'en'] as const) {
+    it(`cada sección, nodo y acción tiene su nombre en ${idioma}`, () => {
+      const textos = mensajes(idioma)
+      const faltan: string[] = []
+      const exigir = (clave: string): void => {
+        if (!(clave in textos)) faltan.push(clave)
+      }
+      for (const seccion of ARBOL_DE_PERMISOS) {
+        exigir(claveDeSeccion(seccion.clave))
+        if (seccion.conAyuda) exigir(`${claveDeSeccion(seccion.clave)}Ayuda`)
+        for (const nodo of seccion.nodos) {
+          exigir(claveDeNodo(nodo.clave))
+          if (nodo.conAyuda) exigir(`${claveDeNodo(nodo.clave)}Ayuda`)
+          for (const accion of nodo.acciones ?? []) {
+            exigir(claveDeAccion(accion.clave))
+            if (accion.conAyuda) exigir(`${claveDeAccion(accion.clave)}Ayuda`)
+          }
+        }
+      }
+      expect(faltan, `faltan textos en ${idioma}: ${faltan.join(', ')}`).toEqual([])
+    })
+
+    it(`cada rol tiene su nombre en ${idioma}`, () => {
+      const textos = mensajes(idioma)
+      const sinNombre = [...AGENCY_ROLES, ...CLIENT_ROLES].filter((rol) => !(claveDeRol(rol) in textos))
+      expect(sinNombre, `faltan textos en ${idioma}: ${sinNombre.join(', ')}`).toEqual([])
+    })
+  }
 })

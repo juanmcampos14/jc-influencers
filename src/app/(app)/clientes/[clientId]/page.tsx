@@ -20,7 +20,7 @@ import { listUsers } from '@/lib/repos/users'
 import { dashboard } from '@/lib/repos/dashboard'
 import { getBrand } from '@/lib/repos/brand'
 import { Button } from '@/components/ui/button'
-import { CLIENT_ROLE_LABELS } from '@/lib/authz/capabilities'
+import { nombreDeRol } from '@/lib/authz/capabilities'
 import { formatDate } from '@/lib/util/format'
 import { ClientSettingsForm } from './settings-form'
 
@@ -31,6 +31,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
   const { clientId } = await params
   const ctx = await requireContext()
   const t = await getTranslations('clientes')
+  const tPermiso = await getTranslations('permisos')
   const idioma = await getLocale()
 
   let client
@@ -182,7 +183,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                             <p className="font-medium text-ink-900">{user.name}</p>
                             <p className="text-xs text-ink-500">{user.email}</p>
                           </Td>
-                          <Td>{membership ? CLIENT_ROLE_LABELS[membership.role] : '—'}</Td>
+                          <Td>{membership ? nombreDeRol(tPermiso, membership.role) : '—'}</Td>
                           <Td>
                             {user.status === 'ACTIVE' ? (
                               <Badge tone="emerald" dot>{t('activo')}</Badge>

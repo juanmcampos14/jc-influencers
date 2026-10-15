@@ -9,7 +9,7 @@ import { columnaFija, Table, TableWrap, Td, Th, Tr } from '@/components/ui/table
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
 import { can } from '@/lib/authz/context'
-import { AGENCY_ROLE_LABELS, CLIENT_ROLE_LABELS } from '@/lib/authz/capabilities'
+import { nombreDeRol } from '@/lib/authz/capabilities'
 import { listInvitations, listUsers, resumenDeAccesos } from '@/lib/repos/users'
 import { formatDate, formatDateTime } from '@/lib/util/format'
 import { InviteDialog } from './invite-dialog'
@@ -30,6 +30,7 @@ const INVITATION_STATUS: Record<string, { label: string; tone: string }> = {
 export default async function UsersPage() {
   const ctx = await requireContext()
   const t = await getTranslations('usuarios')
+  const tPermiso = await getTranslations('permisos')
   const idioma = await getLocale()
   const canInvite = can(ctx, 'user.invite', null) || ctx.clients.some((client) => can(ctx, 'user.invite', client.id))
   const canManageMemberships = ctx.allClients && can(ctx, 'membership.manage', null)
@@ -115,7 +116,7 @@ export default async function UsersPage() {
                         <p className="text-xs text-ink-500">{user.email}</p>
                       </Td>
                       <Td className="text-sm">
-                        {user.agencyRole ? AGENCY_ROLE_LABELS[user.agencyRole] : <span className="text-ink-400">—</span>}
+                        {user.agencyRole ? nombreDeRol(tPermiso, user.agencyRole) : <span className="text-ink-400">—</span>}
                         {/*
                           * Un resumen, no la lista entera.
                           *
@@ -153,7 +154,7 @@ export default async function UsersPage() {
                           <ul className="space-y-0.5">
                             {user.clients.map((entry) => (
                               <li key={entry.clientId}>
-                                {entry.clientName} · <span className="text-ink-500">{CLIENT_ROLE_LABELS[entry.role]}</span>
+                                {entry.clientName} · <span className="text-ink-500">{nombreDeRol(tPermiso, entry.role)}</span>
                               </li>
                             ))}
                           </ul>
@@ -241,8 +242,10 @@ export default async function UsersPage() {
                           </Td>
                           <Td className="text-xs">
                             {invitation.agencyRole
-                              ? `Agencia · ${AGENCY_ROLE_LABELS[invitation.agencyRole]}`
-                              : `${invitation.clientName ?? '—'} · ${invitation.clientRole ? CLIENT_ROLE_LABELS[invitation.clientRole] : ''}`}
+                              ? t('destinoAgencia', { rol: nombreDeRol(tPermiso, invitation.agencyRole) })
+                              : `${invitation.clientName ?? '—'} · ${
+                                  invitation.clientRole ? nombreDeRol(tPermiso, invitation.clientRole) : ''
+                                }`}
                           </Td>
                           <Td>
                             <Badge tone={status.tone}>{status.label}</Badge>
