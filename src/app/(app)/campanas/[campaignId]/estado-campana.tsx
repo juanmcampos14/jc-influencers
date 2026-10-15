@@ -32,6 +32,7 @@ export function EstadoDeCampana({
   version: number
   puedeEditar: boolean
 }) {
+  const t = useTranslations('campanas')
   const tEtiqueta = useTranslations('etiquetas')
   const router = useRouter()
   const [optimista, setOptimista] = React.useState<string | null>(null)
@@ -57,8 +58,8 @@ export function EstadoDeCampana({
         toast.error(resultado.message)
         return
       }
-      toast.success(`Campaña en ${campaignStatusLabel(tEtiqueta, nuevo)}.`, {
-        action: { label: 'Deshacer', onClick: () => cambiar(anterior, nuevo) },
+      toast.success(t('campanaEn', { estado: campaignStatusLabel(tEtiqueta, nuevo) }), {
+        action: { label: t('deshacer'), onClick: () => cambiar(anterior, nuevo) },
       })
       router.refresh()
     })
@@ -68,7 +69,7 @@ export function EstadoDeCampana({
     <span className="inline-flex items-center gap-2">
       <CampaignStatusBadge status={actual} />
       <Select
-        aria-label="Estado de la campaña"
+        aria-label={t('estadoDeLaCampana')}
         value={actual}
         onChange={(event) => cambiar(event.target.value, actual)}
         disabled={guardando}

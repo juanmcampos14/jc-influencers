@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { cn } from '@/lib/util/format'
 
@@ -19,6 +20,7 @@ export type Pestana = { key: string; label: string; href: string }
  * da el cliente: la pestaña tocada se marca antes de que vuelva el servidor.
  */
 export function PestanasDeCampana({ tabs, activa }: { tabs: Pestana[]; activa: string }) {
+  const t = useTranslations('campanas')
   const [pendiente, setPendiente] = React.useState<string | null>(null)
   const [, startTransition] = React.useTransition()
 
@@ -30,7 +32,7 @@ export function PestanasDeCampana({ tabs, activa }: { tabs: Pestana[]; activa: s
   const marcada = pendiente ?? activa
 
   return (
-    <nav className="border-b border-ink-200 bg-surface px-5 sm:px-8" aria-label="Secciones de la campaña">
+    <nav className="border-b border-ink-200 bg-surface px-5 sm:px-8" aria-label={t('seccionesDeLaCampana')}>
       <ul className="flex gap-1 overflow-x-auto">
         {tabs.map((tab) => {
           const esActiva = marcada === tab.key
@@ -50,7 +52,7 @@ export function PestanasDeCampana({ tabs, activa }: { tabs: Pestana[]; activa: s
               >
                 {tab.label}
                 {pendiente === tab.key && activa !== tab.key ? (
-                  <span className="sr-only"> (cargando)</span>
+                  <span className="sr-only">{t('cargandoPestana')}</span>
                 ) : null}
               </Link>
             </li>

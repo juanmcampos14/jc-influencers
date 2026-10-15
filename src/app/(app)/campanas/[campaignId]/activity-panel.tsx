@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -12,11 +13,12 @@ import { formatDateTime } from '@/lib/util/format'
 import type { CommentDto } from '@/lib/domain/dto'
 import { createCommentAction } from '../../actions/comments'
 
-const VISIBILITY_LABELS: Record<string, { label: string; tone: string; hint: string }> = {
-  INTERNAL: { label: 'Nota interna', tone: 'slate', hint: 'Sólo la agencia. Nunca sale al cliente.' },
-  CLIENT_VISIBLE: { label: 'Visible para el cliente', tone: 'blue', hint: 'El cliente lo ve en su portal.' },
-  CLIENT_AUTHORED: { label: 'Escrito por el cliente', tone: 'emerald', hint: 'Feedback del cliente.' },
-  BUDGET_PRIVATE: { label: 'Privado de presupuesto', tone: 'violet', hint: 'Sólo con permiso de presupuesto.' },
+/* Tono acá; el nombre y la ayuda, en `visibilidad<CLAVE>` de las traducciones. */
+const VISIBILITY_TONES: Record<string, string> = {
+  INTERNAL: 'slate',
+  CLIENT_VISIBLE: 'blue',
+  CLIENT_AUTHORED: 'emerald',
+  BUDGET_PRIVATE: 'violet',
 }
 
 export function ActivityPanel({
@@ -38,6 +40,8 @@ export function ActivityPanel({
   side: 'AGENCY' | 'CLIENT'
   timezone: string
 }) {
+  const t = useTranslations('campanas')
+  const idioma = useLocale()
   const router = useRouter()
   const [body, setBody] = React.useState('')
   const [visibility, setVisibility] = React.useState(
@@ -46,13 +50,13 @@ export function ActivityPanel({
   const [pending, startTransition] = React.useTransition()
 
   const options = React.useMemo(() => {
-    if (side === 'CLIENT') return [{ value: 'CLIENT_AUTHORED', label: 'Feedback para la agencia' }]
+    if (side === 'CLIENT') return [{ value: 'CLIENT_AUTHORED', label: t('opcionCliente') }]
     const list: Array<{ value: string; label: string }> = []
-    if (canWriteInternal) list.push({ value: 'INTERNAL', label: 'Nota interna (no la ve el cliente)' })
-    if (canWriteClientVisible) list.push({ value: 'CLIENT_VISIBLE', label: 'Comentario visible para el cliente' })
-    if (canWriteBudget) list.push({ value: 'BUDGET_PRIVATE', label: 'Observación privada de presupuesto' })
+    if (canWriteInternal) list.push({ value: 'INTERNAL', label: t('opcionInterna') })
+    if (canWriteClientVisible) list.push({ value: 'CLIENT_VISIBLE', label: t('opcionVisible') })
+    if (canWriteBudget) list.push({ value: 'BUDGET_PRIVATE', label: t('opcionPresupuesto') })
     return list
-  }, [side, canWriteInternal, canWriteClientVisible, canWriteBudget])
+  }, [side, canWriteInternal, canWriteClientVisible, canWriteBudget, t])
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -69,29 +73,34 @@ export function ActivityPanel({
         return
       }
       setBody('')
-      toast.success('Comentario publicado.')
+      toast.success(t('comentarioPublicado'))
       router.refresh()
     })
   }
+
+  const ayudaDeVisibilidad =
+    visibility in VISIBILITY_TONES ? t(`visibilidad${visibility}Ayuda`) : undefined
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>Conversación</CardTitle>
+          <CardTitle>{t('conversacion')}</CardTitle>
         </CardHeader>
         {comments.length === 0 ? (
-          <EmptyState title="Todavía no hay comentarios" description="Escribí el primero desde el panel de la derecha." />
+          <EmptyState title={t('sinComentariosTitulo')} description={t('sinComentariosBajada')} />
         ) : (
           <ul className="divide-y divide-ink-100">
             {comments.map((comment) => {
-              const meta = VISIBILITY_LABELS[comment.visibility] ?? { label: comment.visibility, tone: 'slate', hint: '' }
+              const tone = VISIBILITY_TONES[comment.visibility]
               return (
                 <li key={comment.id} className="px-5 py-3.5">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-ink-900">{comment.authorName ?? 'Sistema'}</span>
-                    <Badge tone={meta.tone}>{meta.label}</Badge>
-                    <span className="text-xs text-ink-500">{formatDateTime(comment.createdAt, timezone)}</span>
+                    <span className="text-sm font-medium text-ink-900">{comment.authorName ?? t('sistema')}</span>
+                    <Badge tone={tone ?? 'slate'}>
+                      {tone ? t(`visibilidad${comment.visibility}`) : comment.visibility}
+                    </Badge>
+                    <span className="text-xs text-ink-500">{formatDateTime(comment.createdAt, timezone, idioma)}</span>
                   </div>
                   <p className="whitespace-pre-wrap text-sm text-ink-700">{comment.body}</p>
                 </li>
@@ -103,15 +112,15 @@ export function ActivityPanel({
 
       <Card>
         <CardHeader>
-          <CardTitle>Escribir</CardTitle>
+          <CardTitle>{t('escribir')}</CardTitle>
         </CardHeader>
         <CardBody>
           {options.length === 0 ? (
-            <p className="text-sm text-ink-500">Tu rol es de sólo lectura.</p>
+            <p className="text-sm text-ink-500">{t('soloLectura')}</p>
           ) : (
             <form onSubmit={submit} className="space-y-3">
               {options.length > 1 ? (
-                <Field label="Tipo" htmlFor="visibility" hint={VISIBILITY_LABELS[visibility]?.hint}>
+                <Field label={t('campoTipo')} htmlFor="visibility" hint={ayudaDeVisibilidad}>
                   <Select id="visibility" value={visibility} onChange={(event) => setVisibility(event.target.value)}>
                     {options.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -121,9 +130,9 @@ export function ActivityPanel({
                   </Select>
                 </Field>
               ) : (
-                <p className="text-xs text-ink-500">{VISIBILITY_LABELS[visibility]?.hint}</p>
+                <p className="text-xs text-ink-500">{ayudaDeVisibilidad}</p>
               )}
-              <Field label="Comentario" htmlFor="body" required>
+              <Field label={t('campoComentario')} htmlFor="body" required>
                 <Textarea
                   id="body"
                   value={body}
@@ -134,7 +143,7 @@ export function ActivityPanel({
                 />
               </Field>
               <Button type="submit" disabled={pending || !body.trim()}>
-                {pending ? 'Publicando…' : 'Publicar'}
+                {pending ? t('publicando') : t('publicar')}
               </Button>
             </form>
           )}

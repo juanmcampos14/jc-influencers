@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,8 @@ export function ShortlistPanel({
   items: CandidacyDto[]
   canManage: boolean
 }) {
+  const t = useTranslations('campanas')
+  const idioma = useLocale()
   const router = useRouter()
   const [orders, setOrders] = React.useState<Record<string, number>>(() =>
     Object.fromEntries(items.map((item, index) => [item.id, item.shortlistOrder ?? index + 1])),
@@ -39,7 +42,7 @@ export function ShortlistPanel({
         toast.error(result.message)
         return
       }
-      toast.success('Shortlist actualizada.')
+      toast.success(t('shortlistActualizada'))
       router.refresh()
     })
   }
@@ -56,7 +59,7 @@ export function ShortlistPanel({
         toast.error(result.message)
         return
       }
-      toast.success('Perfil quitado de la shortlist.')
+      toast.success(t('perfilQuitado'))
       router.refresh()
     })
   }
@@ -66,15 +69,13 @@ export function ShortlistPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Shortlist para el cliente</CardTitle>
-        <p className="text-xs text-ink-500">
-          Este es el orden en el que el cliente ve los perfiles en su portal.
-        </p>
+        <CardTitle>{t('shortlistTitulo')}</CardTitle>
+        <p className="text-xs text-ink-500">{t('shortlistBajada')}</p>
       </CardHeader>
       {sorted.length === 0 ? (
         <EmptyState
-          title="La shortlist está vacía"
-          description="Marcá perfiles desde la pestaña Perfiles para armar la propuesta que ve el cliente."
+          title={t('shortlistVaciaTitulo')}
+          description={t('shortlistVaciaBajada')}
         />
       ) : (
         <>
@@ -88,7 +89,7 @@ export function ShortlistPanel({
                       type="number"
                       min={1}
                       className="w-16"
-                      aria-label={`Orden de ${item.influencer.displayName}`}
+                      aria-label={t('ordenDe', { nombre: item.influencer.displayName })}
                       value={orders[item.id] ?? ''}
                       onChange={(event) =>
                         setOrders((current) => ({ ...current, [item.id]: Number(event.target.value) }))
@@ -100,15 +101,15 @@ export function ShortlistPanel({
                   <div className="min-w-48 flex-1">
                     <p className="text-sm font-medium text-ink-900">{item.influencer.displayName}</p>
                     <p className="text-xs text-ink-500">
-                      {item.clusterLabel ?? 'sin cluster'} · {formatFollowers(profile?.followers)} ·{' '}
-                      {formatPercent(profile?.engagementRate)}
+                      {item.clusterLabel ?? t('sinClusterMinuscula')} · {formatFollowers(profile?.followers, idioma)} ·{' '}
+                      {formatPercent(profile?.engagementRate, idioma)}
                     </p>
                   </div>
                   <StarsLabel value={item.fitScore} />
                   <ApprovalBadge approval={item.clientApproval} />
                   {canManage ? (
                     <Button size="sm" variant="ghost" onClick={() => remove(item.id)} disabled={pending}>
-                      Quitar
+                      {t('quitar')}
                     </Button>
                   ) : null}
                 </li>
@@ -118,7 +119,7 @@ export function ShortlistPanel({
           {canManage ? (
             <CardBody className="border-t border-ink-200">
               <Button onClick={save} disabled={pending}>
-                {pending ? 'Guardando…' : 'Guardar orden'}
+                {pending ? t('guardando') : t('guardarOrden')}
               </Button>
             </CardBody>
           ) : null}

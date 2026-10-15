@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -19,6 +20,8 @@ export function AddCandidacyDialog({
   campaignId: string
   clusters: Array<{ id: string; label: string }>
 }) {
+  const t = useTranslations('campanas')
+  const idioma = useLocale()
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState('')
@@ -51,7 +54,7 @@ export function AddCandidacyDialog({
         toast.error(result.message)
         return
       }
-      toast.success('Influencer agregado a la campaña.')
+      toast.success(t('candidaturaCreada'))
       setOpen(false)
       router.refresh()
     })
@@ -60,23 +63,23 @@ export function AddCandidacyDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">Agregar influencer</Button>
+        <Button size="sm">{t('agregarInfluencer')}</Button>
       </DialogTrigger>
-      <DialogContent title="Agregar influencer a la campaña" description="Buscá en la base global de la agencia.">
+      <DialogContent title={t('agregarTitulo')} description={t('agregarBajada')}>
         <div className="space-y-4">
-          <Field label="Buscar" htmlFor="query">
+          <Field label={t('campoBuscar')} htmlFor="query">
             <Input
               id="query"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Nombre o @handle"
+              placeholder={t('buscarPista')}
               autoFocus
             />
           </Field>
           {clusters.length > 0 ? (
-            <Field label="Cluster" htmlFor="clusterId">
+            <Field label={t('campoCluster')} htmlFor="clusterId">
               <Select id="clusterId" value={clusterId} onChange={(event) => setClusterId(event.target.value)}>
-                <option value="">Sin cluster</option>
+                <option value="">{t('sinCluster')}</option>
                 {clusters.map((cluster) => (
                   <option key={cluster.id} value={cluster.id}>
                     {cluster.label}
@@ -88,10 +91,10 @@ export function AddCandidacyDialog({
 
           <div className="max-h-72 overflow-y-auto rounded-lg border border-ink-200">
             {query.trim().length < 2 ? (
-              <p className="px-4 py-6 text-center text-sm text-ink-500">Escribí al menos dos caracteres.</p>
+              <p className="px-4 py-6 text-center text-sm text-ink-500">{t('dosCaracteres')}</p>
             ) : results.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-ink-500">
-                {pending ? 'Buscando…' : 'No hay resultados. Podés crear el influencer desde la sección Influencers.'}
+                {pending ? t('buscandoInfluencer') : t('sinResultados')}
               </p>
             ) : (
               <ul className="divide-y divide-ink-100">
@@ -100,12 +103,12 @@ export function AddCandidacyDialog({
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-ink-900">{item.displayName}</p>
                       <p className="truncate text-xs text-ink-500">
-                        {item.handle ? `@${item.handle}` : 'sin handle'} · {formatFollowers(item.followers)} ·{' '}
+                        {item.handle ? `@${item.handle}` : t('sinHandle')} · {formatFollowers(item.followers, idioma)} ·{' '}
                         {item.country ?? '—'}
                       </p>
                     </div>
                     <Button size="sm" variant="secondary" onClick={() => add(item.id)} disabled={pending}>
-                      Agregar
+                      {t('agregar')}
                     </Button>
                   </li>
                 ))}
@@ -116,7 +119,7 @@ export function AddCandidacyDialog({
           <div className="flex justify-end">
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cerrar
+                {t('cerrarDialogo')}
               </Button>
             </DialogClose>
           </div>

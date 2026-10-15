@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { getLocale, getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
 import { Card } from '@/components/ui/card'
@@ -39,6 +40,8 @@ const cerrada = (status: string): boolean => status === 'CLOSED' || status === '
 export default async function CampaignsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const ctx = await requireContext()
+  const t = await getTranslations('campanas')
+  const idioma = await getLocale()
 
   const orden = resolverOrden(COLUMNAS, params)
   const statusFilter = params.estado && params.estado in CAMPAIGN_STATUS_TONES ? [params.estado] : null
@@ -66,8 +69,8 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader
-        title="Campañas"
-        description="Todas las campañas de los clientes a los que tenés acceso."
+        title={t('titulo')}
+        description={t('bajada')}
         actions={canCreate ? <NewCampaignDialog clients={ctx.clients.map((c) => ({ id: c.id, name: c.name }))} /> : null}
       />
       <div className="space-y-4 px-5 py-6 sm:px-8">
@@ -76,8 +79,8 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
         <Card>
           {campaigns.items.length === 0 ? (
             <EmptyState
-              title="No hay campañas que coincidan"
-              description="Probá quitando filtros, o creá una campaña nueva."
+              title={t('vacioTitulo')}
+              description={t('vacioBajada')}
             />
           ) : (
             <>
@@ -86,27 +89,27 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                 <Table>
                   <thead>
                     <tr>
-                      {canManage ? <Th className="w-10"><span className="sr-only">Elegir</span></Th> : null}
+                      {canManage ? <Th className="w-10"><span className="sr-only">{t('elegir')}</span></Th> : null}
                       <ThOrdenable columna={columna('nombre')} orden={orden} base="/campanas" params={params}>
-                        Campaña
+                        {t('colCampana')}
                       </ThOrdenable>
                       <ThOrdenable columna={columna('cliente')} orden={orden} base="/campanas" params={params}>
-                        Cliente
+                        {t('colCliente')}
                       </ThOrdenable>
                       <ThOrdenable columna={columna('estado')} orden={orden} base="/campanas" params={params}>
-                        Estado
+                        {t('colEstado')}
                       </ThOrdenable>
                       <ThOrdenable columna={columna('perfiles')} orden={orden} base="/campanas" params={params} className="text-right" alineado="derecha">
-                        Perfiles
+                        {t('colPerfiles')}
                       </ThOrdenable>
-                      <Th className="text-right">Aprobados</Th>
-                      <Th className="text-right">Pendientes</Th>
+                      <Th className="text-right">{t('colAprobados')}</Th>
+                      <Th className="text-right">{t('colPendientes')}</Th>
                       <ThOrdenable columna={columna('fechas')} orden={orden} base="/campanas" params={params}>
-                        Fechas
+                        {t('colFechas')}
                       </ThOrdenable>
                       {/* El presupuesto no se puede ordenar: no todos lo ven, y
                           el orden filtraría igual una columna oculta. */}
-                      <Th className="text-right">Presupuesto</Th>
+                      <Th className="text-right">{t('colPresupuesto')}</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -142,10 +145,12 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                           {campaign.pendingApprovalCount}
                         </Td>
                         <Td className="whitespace-nowrap text-xs text-ink-600">
-                          {formatDate(campaign.startDate, ctx.user.timezone)} → {formatDate(campaign.endDate, ctx.user.timezone)}
+                          {formatDate(campaign.startDate, ctx.user.timezone, idioma)} → {formatDate(campaign.endDate, ctx.user.timezone, idioma)}
                         </Td>
                         <Td className="text-right tabular-nums">
-                          {campaign.budget ? formatMoney(campaign.budget.estimated, campaign.currency) : 'restringido'}
+                          {campaign.budget
+                            ? formatMoney(campaign.budget.estimated, campaign.currency, idioma)
+                            : t('restringido')}
                         </Td>
                       </Tr>
                     ))}
@@ -159,7 +164,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                 page={campaigns.page}
                 pageCount={campaigns.pageCount}
                 total={campaigns.total}
-                unidad="campañas"
+                unidad={t('unidad')}
               />
             </>
           )}

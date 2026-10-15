@@ -14,6 +14,7 @@ import { createCampaignAction } from '../actions/campaigns'
 const PLATFORMS = ['INSTAGRAM', 'TIKTOK', 'YOUTUBE', 'X', 'TWITCH', 'LINKEDIN', 'FACEBOOK']
 
 export function NewCampaignDialog({ clients }: { clients: Array<{ id: string; name: string }> }) {
+  const t = useTranslations('campanas')
   const tEtiqueta = useTranslations('etiquetas')
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -47,7 +48,7 @@ export function NewCampaignDialog({ clients }: { clients: Array<{ id: string; na
         toast.error(result.message)
         return
       }
-      toast.success('Campaña creada.')
+      toast.success(t('creada'))
       setOpen(false)
       router.push(`/campanas/${result.data.id}`)
     })
@@ -56,11 +57,11 @@ export function NewCampaignDialog({ clients }: { clients: Array<{ id: string; na
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Nueva campaña</Button>
+        <Button>{t('nueva')}</Button>
       </DialogTrigger>
-      <DialogContent title="Nueva campaña">
+      <DialogContent title={t('nueva')}>
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
-          <Field label="Cliente" htmlFor="clientId" required>
+          <Field label={t('campoCliente')} htmlFor="clientId" required>
             <Select id="clientId" name="clientId" required>
               {clients.map((client) => (
                 <option key={client.id} value={client.id}>
@@ -69,17 +70,17 @@ export function NewCampaignDialog({ clients }: { clients: Array<{ id: string; na
               ))}
             </Select>
           </Field>
-          <Field label="Nombre" htmlFor="name" errors={errors.name} required>
+          <Field label={t('campoNombre')} htmlFor="name" errors={errors.name} required>
             <Input id="name" name="name" required autoFocus maxLength={160} />
           </Field>
-          <Field label="Objetivo" htmlFor="objective">
+          <Field label={t('campoObjetivo')} htmlFor="objective">
             <Input id="objective" name="objective" maxLength={2000} />
           </Field>
-          <Field label="Descripción" htmlFor="description">
+          <Field label={t('campoDescripcion')} htmlFor="description">
             <Textarea id="description" name="description" maxLength={4000} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Estado" htmlFor="status">
+            <Field label={t('colEstado')} htmlFor="status">
               <Select id="status" name="status" defaultValue="BRIEFING">
                 {CAMPAIGN_STATUS_VALUES.map((key) => (
                   <option key={key} value={key}>
@@ -88,7 +89,7 @@ export function NewCampaignDialog({ clients }: { clients: Array<{ id: string; na
                 ))}
               </Select>
             </Field>
-            <Field label="Moneda" htmlFor="currency">
+            <Field label={t('campoMoneda')} htmlFor="currency">
               <Select id="currency" name="currency" defaultValue="USD">
                 {['USD', 'ARS', 'EUR', 'BRL', 'MXN', 'COP', 'CLP'].map((code) => (
                   <option key={code} value={code}>
@@ -97,19 +98,19 @@ export function NewCampaignDialog({ clients }: { clients: Array<{ id: string; na
                 ))}
               </Select>
             </Field>
-            <Field label="Desde" htmlFor="startDate">
+            <Field label={t('campoDesde')} htmlFor="startDate">
               <Input id="startDate" name="startDate" type="date" />
             </Field>
-            <Field label="Hasta" htmlFor="endDate" errors={errors.endDate}>
+            <Field label={t('campoHasta')} htmlFor="endDate" errors={errors.endDate}>
               <Input id="endDate" name="endDate" type="date" />
             </Field>
-            <Field label="Presupuesto estimado" htmlFor="budgetEstimated">
+            <Field label={t('campoPresupuesto')} htmlFor="budgetEstimated">
               <Input id="budgetEstimated" name="budgetEstimated" type="number" min={0} step="0.01" />
             </Field>
-            <Field label="Presupuesto de caché" htmlFor="budgetCache">
+            <Field label={t('campoCache')} htmlFor="budgetCache">
               <Input id="budgetCache" name="budgetCache" type="number" min={0} step="0.01" />
             </Field>
-            <Field label="Países" htmlFor="countries" hint="Ctrl o Cmd para varios.">
+            <Field label={t('campoPaises')} htmlFor="countries" hint={t('paisesAyuda')}>
               <Select id="countries" name="countries" multiple size={4} className="h-auto">
                 {MARKET_SEED.map((market) => (
                   <option key={market} value={market}>
@@ -118,7 +119,7 @@ export function NewCampaignDialog({ clients }: { clients: Array<{ id: string; na
                 ))}
               </Select>
             </Field>
-            <Field label="Plataformas" htmlFor="platforms" hint="Ctrl o Cmd para varias.">
+            <Field label={t('campoPlataformas')} htmlFor="platforms" hint={t('plataformasAyuda')}>
               <Select id="platforms" name="platforms" multiple size={4} className="h-auto">
                 {PLATFORMS.map((platform) => (
                   <option key={platform} value={platform}>
@@ -131,11 +132,11 @@ export function NewCampaignDialog({ clients }: { clients: Array<{ id: string; na
           <div className="flex justify-end gap-2">
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancelar
+                {t('cancelar')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={pending}>
-              {pending ? 'Creando…' : 'Crear campaña'}
+              {pending ? t('creando') : t('crear')}
             </Button>
           </div>
         </form>

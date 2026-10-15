@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -32,6 +33,8 @@ export function InsightsPanel({
   spend: { spent: number; limit: number }
   timezone: string
 }) {
+  const t = useTranslations('campanas')
+  const idioma = useLocale()
   const router = useRouter()
   const [pending, startTransition] = React.useTransition()
   const [busy, setBusy] = React.useState<string | null>(null)
@@ -51,15 +54,15 @@ export function InsightsPanel({
       const result = await action()
       setBusy(null)
       if (!result.ok) {
-        toast.error(result.message ?? 'No se pudo generar el análisis.')
+        toast.error(result.message ?? t('noSeGeneroAnalisis'))
         return
       }
       if (result.data?.status === 'FAILED') {
-        toast.error(result.data.errorMessage ?? 'No se pudo generar el análisis.')
+        toast.error(result.data.errorMessage ?? t('noSeGeneroAnalisis'))
         router.refresh()
         return
       }
-      toast.success('Análisis listo.')
+      toast.success(t('analisisListo'))
       router.refresh()
     })
   }
@@ -71,7 +74,7 @@ export function InsightsPanel({
         toast.error(result.message)
         return
       }
-      toast.success(visible ? 'El cliente ya lo ve en su portal.' : 'Se dejó de compartir.')
+      toast.success(visible ? t('ahoraLoVe') : t('dejoDeCompartirse'))
       router.refresh()
     })
   }
@@ -82,21 +85,16 @@ export function InsightsPanel({
     <div className="space-y-4">
       {!configured ? (
         <InfoNote>
-          <p className="font-medium">El análisis con IA no está conectado.</p>
-          <p className="mt-1 text-xs">
-            Cargá <code>ANTHROPIC_API_KEY</code> para habilitarlo. Mientras tanto no se genera nada: preferimos no
-            mostrar un análisis inventado.
-          </p>
+          <p className="font-medium">{t('iaNoConectadaTitulo')}</p>
+          <p className="mt-1 text-xs">{t.rich('iaNoConectadaBajada', { c: (texto) => <code>{texto}</code> })}</p>
         </InfoNote>
       ) : null}
 
       {canRun ? (
         <Card>
           <CardHeader>
-            <CardTitle>Generar un análisis</CardTitle>
-            <p className="text-xs text-ink-500">
-              Se analiza con los datos que hay cargados. Lo que falte, el análisis lo va a decir en vez de suponerlo.
-            </p>
+            <CardTitle>{t('generarAnalisis')}</CardTitle>
+            <p className="text-xs text-ink-500">{t('generarAnalisisBajada')}</p>
           </CardHeader>
           <CardBody className="space-y-3">
             <div className="flex flex-wrap gap-2">
@@ -105,7 +103,7 @@ export function InsightsPanel({
                 disabled={!configured || pending}
                 onClick={() => run('analisis', () => analyzeCampaignAction({ campaignId }))}
               >
-                {busy === 'analisis' ? 'Analizando…' : 'Cómo viene la campaña'}
+                {busy === 'analisis' ? t('analizando') : t('comoViene')}
               </Button>
               <Button
                 size="sm"
@@ -113,7 +111,7 @@ export function InsightsPanel({
                 disabled={!configured || pending}
                 onClick={() => run('creatividades', () => suggestCreativesAction({ campaignId }))}
               >
-                {busy === 'creatividades' ? 'Pensando…' : 'Sugerir creatividades'}
+                {busy === 'creatividades' ? t('pensando') : t('sugerirCreatividades')}
               </Button>
               <Button
                 size="sm"
@@ -121,7 +119,7 @@ export function InsightsPanel({
                 disabled={!configured || pending}
                 onClick={() => run('reporte-interno', () => campaignReportAction({ campaignId, audience: 'AGENCIA' }))}
               >
-                {busy === 'reporte-interno' ? 'Escribiendo…' : 'Reporte interno'}
+                {busy === 'reporte-interno' ? t('escribiendo') : t('reporteInterno')}
               </Button>
               <Button
                 size="sm"
@@ -129,13 +127,15 @@ export function InsightsPanel({
                 disabled={!configured || pending}
                 onClick={() => run('reporte-cliente', () => campaignReportAction({ campaignId, audience: 'CLIENTE' }))}
               >
-                {busy === 'reporte-cliente' ? 'Escribiendo…' : 'Reporte para el cliente'}
+                {busy === 'reporte-cliente' ? t('escribiendo') : t('reporteCliente')}
               </Button>
             </div>
             {remaining !== null ? (
               <p className="text-xs text-ink-500">
-                Gasto de IA este mes: {formatMoney(spend.spent, 'USD')} de {formatMoney(spend.limit, 'USD')}. Cuando se
-                agota, deja de generar.
+                {t('gastoIa', {
+                  gastado: formatMoney(spend.spent, 'USD', idioma),
+                  tope: formatMoney(spend.limit, 'USD', idioma),
+                })}
               </p>
             ) : null}
           </CardBody>
@@ -145,12 +145,8 @@ export function InsightsPanel({
       {insights.length === 0 ? (
         <Card>
           <EmptyState
-            title="Todavía no hay análisis"
-            description={
-              canRun
-                ? 'Generá el primero con los botones de arriba.'
-                : 'Cuando la agencia comparta un análisis, va a aparecer acá.'
-            }
+            title={t('sinAnalisisTitulo')}
+            description={canRun ? t('sinAnalisisPuedeCorrer') : t('sinAnalisisCliente')}
           />
         </Card>
       ) : (
@@ -165,7 +161,7 @@ export function InsightsPanel({
                     onChange={(event) => toggleShare(insight.id, event.target.checked)}
                     disabled={pending}
                   />
-                  Compartir este análisis con el cliente en su portal
+                  {t('compartirAnalisis')}
                 </label>
               ) : null}
             </div>

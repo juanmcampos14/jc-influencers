@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -53,7 +53,9 @@ export function FunnelBoard({
   campaignId: string
   puedeMover: boolean
 }) {
+  const t = useTranslations('campanas')
   const tEtiqueta = useTranslations('etiquetas')
+  const idioma = useLocale()
   const router = useRouter()
   const [moviendo, setMoviendo] = React.useState<string | null>(null)
   const [encima, setEncima] = React.useState<string | null>(null)
@@ -83,15 +85,18 @@ export function FunnelBoard({
         // Vuelve a donde estaba: dejarla en la columna nueva mostraría un
         // cambio que la base no tiene.
         setOptimista((actual) => ({ ...actual, [item.id]: anterior }))
-        toast.error(resultado && !resultado.ok ? resultado.message : 'No se pudo mover. Reintentá en un momento.')
+        toast.error(resultado && !resultado.ok ? resultado.message : t('noSePudoMover'))
         return
       }
 
       toast.success(
-        `${item.influencer.displayName} → ${STATUS_BY_KEY.get(statusKey)?.label ?? statusKey}.`,
+        t('movido', {
+          nombre: item.influencer.displayName,
+          estado: STATUS_BY_KEY.get(statusKey)?.label ?? statusKey,
+        }),
         {
           action: {
-            label: 'Deshacer',
+            label: t('deshacer'),
             onClick: () => mover(item, anterior),
           },
         },
@@ -119,14 +124,13 @@ export function FunnelBoard({
     <div className="space-y-3">
       {esMuestra ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          Los números de cada columna son de la campaña completa ({total} perfiles). Las tarjetas muestran{' '}
-          {mostrando}: para ver el resto, entrá a Perfiles.
+          {t('funnelMuestra', { total, mostrando })}
         </p>
       ) : null}
 
       {puedeMover ? (
         <p className="text-xs text-ink-500">
-          Arrastrá una tarjeta a otra columna para moverla, o usá el selector de cada una.
+          {t('funnelArrastrar')}
         </p>
       ) : null}
 
@@ -170,7 +174,7 @@ export function FunnelBoard({
               <ul className="space-y-2 p-2">
                 {column.items.length === 0 ? (
                   <li className="px-2 py-6 text-center text-xs text-ink-500">
-                    {column.total === 0 ? 'Nadie en esta etapa' : `${column.total} sin mostrar acá`}
+                    {column.total === 0 ? t('funnelVacio') : t('funnelSinMostrar', { cantidad: column.total })}
                   </li>
                 ) : (
                   column.items.map((item) => {
@@ -192,7 +196,7 @@ export function FunnelBoard({
                       >
                         <p className="text-sm font-medium text-ink-900">{item.influencer.displayName}</p>
                         <p className="text-xs text-ink-500">
-                          {profile?.handle ? `@${profile.handle}` : '—'} · {formatFollowers(profile?.followers)}
+                          {profile?.handle ? `@${profile.handle}` : '—'} · {formatFollowers(profile?.followers, idioma)}
                         </p>
                         <div className="mt-1.5 flex flex-wrap items-center gap-1">
                           <Badge tone={STATUS_BY_KEY.get(actual)?.color ?? 'slate'}>
@@ -204,7 +208,7 @@ export function FunnelBoard({
                         </div>
                         {puedeMover ? (
                           <Select
-                            aria-label={`Mover a ${item.influencer.displayName}`}
+                            aria-label={t('moverA', { nombre: item.influencer.displayName })}
                             className="mt-2 h-8 text-xs"
                             value={actual}
                             disabled={moviendo === item.id}

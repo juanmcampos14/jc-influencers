@@ -21,7 +21,7 @@ import { NotFoundError } from '@/lib/authz/errors'
 import { getBrief, getCampaign } from '@/lib/repos/campaigns'
 import { candidacySummary, duplicateWarnings, listCandidacies, perfilesPorCluster } from '@/lib/repos/candidacies'
 import { listComments } from '@/lib/repos/comments'
-import { getTranslations } from 'next-intl/server'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { platformLabel } from '@/lib/domain/labels'
 import { formatDate, formatMoney } from '@/lib/util/format'
 import { hrefCon } from '@/lib/util/query'
@@ -38,15 +38,19 @@ import { AddCandidacyDialog } from './add-candidacy-dialog'
 export const metadata: Metadata = { title: 'Campaña' }
 export const dynamic = 'force-dynamic'
 
+/*
+ * El nombre de cada pestaña se resuelve al pintar: la lista vive fuera del
+ * componente y no puede leer traducciones, así que guarda la clave.
+ */
 const TABS = [
-  { key: 'perfiles', label: 'Perfiles' },
-  { key: 'funnel', label: 'Funnel' },
-  { key: 'shortlist', label: 'Shortlist' },
-  { key: 'brief', label: 'Brief' },
-  { key: 'resultados', label: 'Resultados' },
-  { key: 'pagos', label: 'Pagos' },
-  { key: 'analisis', label: 'Análisis IA' },
-  { key: 'actividad', label: 'Actividad' },
+  { key: 'perfiles', clave: 'tabPerfiles' },
+  { key: 'funnel', clave: 'tabFunnel' },
+  { key: 'shortlist', clave: 'tabShortlist' },
+  { key: 'brief', clave: 'tabBrief' },
+  { key: 'resultados', clave: 'tabResultados' },
+  { key: 'pagos', clave: 'tabPagos' },
+  { key: 'analisis', clave: 'tabAnalisis' },
+  { key: 'actividad', clave: 'tabActividad' },
 ] as const
 
 export default async function CampaignDetailPage({
@@ -59,6 +63,8 @@ export default async function CampaignDetailPage({
   const { campaignId } = await params
   const query = await searchParams
   const ctx = await requireContext()
+  const t = await getTranslations('campanas')
+  const idioma = await getLocale()
   const tEtiqueta = await getTranslations('etiquetas')
 
   let campaign
@@ -198,7 +204,7 @@ export default async function CampaignDetailPage({
         breadcrumb={
           <span className="flex gap-1">
             <Link href="/campanas" className="hover:underline">
-              Campañas
+              {t('titulo')}
             </Link>
             <span>/</span>
             <Link href={`/clientes/${clientId}`} className="hover:underline">
@@ -210,7 +216,7 @@ export default async function CampaignDetailPage({
           <>
             {canExport ? (
               <Button asChild variant="secondary" size="sm">
-                <a href={`/api/exportar/campana/${campaign.id}`}>Exportar CSV</a>
+                <a href={`/api/exportar/campana/${campaign.id}`}>{t('exportarCsv')}</a>
               </Button>
             ) : null}
             {canManage ? <AddCandidacyDialog campaignId={campaign.id} clusters={brief?.clusters ?? []} /> : null}
@@ -226,34 +232,38 @@ export default async function CampaignDetailPage({
         */}
       <div className="border-b border-ink-200 bg-surface px-5 pb-4 sm:px-8">
         <StatStrip>
-          <Stat label="Perfiles propuestos" value={summary.total} />
+          <Stat label={t('statPropuestos')} value={summary.total} />
           <Stat
-            label="Esperando al cliente"
+            label={t('statEsperandoCliente')}
             value={(summary.byApproval.PENDING ?? 0) + (summary.byApproval.NEEDS_REVIEW ?? 0)}
             tone="accent"
           />
-          <Stat label="Aprobados" value={summary.byApproval.APPROVED ?? 0} tone="good" />
-          <Stat label="En shortlist" value={summary.shortlist} />
+          <Stat label={t('statAprobados')} value={summary.byApproval.APPROVED ?? 0} tone="good" />
+          <Stat label={t('statShortlist')} value={summary.shortlist} />
         </StatStrip>
 
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-ink-600">
           <span>
             {campaign.startDate || campaign.endDate ? (
               <>
-                {formatDate(campaign.startDate, ctx.user.timezone)} → {formatDate(campaign.endDate, ctx.user.timezone)}
+                {formatDate(campaign.startDate, ctx.user.timezone, idioma)} → {formatDate(campaign.endDate, ctx.user.timezone, idioma)}
               </>
             ) : (
-              <span className="text-ink-500">Sin fechas definidas</span>
+              <span className="text-ink-500">{t('sinFechas')}</span>
             )}
           </span>
           {canSeeBudget && campaign.budget && campaign.budget.estimated != null ? (
             <span>
-              Presupuesto estimado:{' '}
-              <strong className="text-ink-900">{formatMoney(campaign.budget.estimated, campaign.currency)}</strong>
-              {campaign.budget.cache != null ? (
-                <> · caché {formatMoney(campaign.budget.cache, campaign.currency)}</>
-              ) : null}
-              {campaign.budget.barterDescription ? <> · canje: {campaign.budget.barterDescription}</> : null}
+              {t('presupuestoEstimado')}{' '}
+              <strong className="text-ink-900">
+                {formatMoney(campaign.budget.estimated, campaign.currency, idioma)}
+              </strong>
+              {campaign.budget.cache != null
+                ? t('cache', { monto: formatMoney(campaign.budget.cache, campaign.currency, idioma) })
+                : null}
+              {campaign.budget.barterDescription
+                ? t('canje', { detalle: campaign.budget.barterDescription })
+                : null}
             </span>
           ) : null}
           {campaign.platforms.length > 0 ? (
@@ -272,7 +282,7 @@ export default async function CampaignDetailPage({
         activa={tab}
         tabs={TABS.filter((entry) => entry.key !== 'pagos' || puedeVerPlata).map((entry) => ({
           key: entry.key,
-          label: entry.label,
+          label: t(entry.clave),
           href: hrefCon(`/campanas/${campaign.id}`, query, {
             tab: entry.key,
             // Cambiar de sección arranca desde la primera página; el filtro se
@@ -285,11 +295,7 @@ export default async function CampaignDetailPage({
       <div className="space-y-4 px-5 py-6 sm:px-8">
         {duplicates.length > 0 && (tab === 'perfiles' || tab === 'shortlist') ? (
           <InfoNote>
-            <p className="font-medium">
-              {duplicates.length === 1
-                ? 'Hay 1 perfil de esta campaña marcado como posible duplicado.'
-                : `Hay ${duplicates.length} perfiles de esta campaña marcados como posible duplicado.`}
-            </p>
+            <p className="font-medium">{t('duplicadosAviso', { cantidad: duplicates.length })}</p>
             <ul className="mt-1 space-y-0.5 text-sm">
               {duplicates.slice(0, 5).map((warning, index) => (
                 <li key={`${warning.influencerId}-${index}`}>
@@ -302,9 +308,9 @@ export default async function CampaignDetailPage({
               ))}
             </ul>
             <p className="mt-1 text-xs">
-              No se fusionan solos.{' '}
+              {t('noSeFusionanSolos')}{' '}
               <Link href="/influencers/duplicados" className="underline underline-offset-2">
-                Resolverlos
+                {t('resolverlos')}
               </Link>
               .
             </p>
@@ -344,10 +350,7 @@ export default async function CampaignDetailPage({
         ) : null}
 
         {tab === 'resultados' && !resultados ? (
-          <InfoNote>
-            La sección de Resultados todavía no está habilitada en esta base: falta correr la migración. Avisale al
-            equipo.
-          </InfoNote>
+          <InfoNote>{t('faltaMigracionResultados')}</InfoNote>
         ) : null}
 
         {tab === 'resultados' && objetivos ? (
@@ -375,9 +378,7 @@ export default async function CampaignDetailPage({
             <PagosPanel plan={plan} campaignId={campaign.id} puedeEditar={can(ctx, 'budget.manage', clientId)} />
           ) : (
             <InfoNote>
-              {puedeVerPlata
-                ? 'La sección de Pagos todavía no está habilitada en esta base: falta correr la migración. Avisale al equipo.'
-                : 'No tenés permiso para ver los números de esta campaña.'}
+              {puedeVerPlata ? t('faltaMigracionPagos') : t('sinPermisoPlata')}
             </InfoNote>
           )
         ) : null}

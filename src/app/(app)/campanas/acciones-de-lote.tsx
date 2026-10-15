@@ -1,6 +1,7 @@
 "use client"
 
 import { Ban, Archive } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Seleccion, CasillaDeFila } from '@/components/ui/seleccion'
 import { BotonDeLote, useAccionDeLote } from '@/components/ui/acciones-de-lote'
 import { cerrarCampanasAction } from '../actions/lote'
@@ -21,49 +22,48 @@ export function SeleccionDeCampanas({
   idsDeLaPagina: string[]
   children: React.ReactNode
 }) {
+  const t = useTranslations('campanas')
   const { ejecutar, pendiente } = useAccionDeLote()
 
   return (
-    <Seleccion idsDeLaPagina={idsDeLaPagina} etiqueta="elegidas" acciones={(ids, limpiar) => (
+    <Seleccion idsDeLaPagina={idsDeLaPagina} etiqueta={t('elegidas')} acciones={(ids, limpiar) => (
       <>
         <BotonDeLote
           pendiente={pendiente}
           confirmacion={{
-            title: `Cerrar ${ids.length === 1 ? 'la campaña' : `${ids.length} campañas`}`,
-            description:
-              'Quedan como terminadas: siguen visibles con todo su historial, pero dejan de contar como activas y sus pendientes dejan de pedir una decisión.',
-            confirmLabel: 'Cerrar',
+            title: t('cerrarTitulo', { cantidad: ids.length }),
+            description: t('cerrarBajada'),
+            confirmLabel: t('cerrar'),
           }}
           onConfirm={() =>
             ejecutar(
               () => cerrarCampanasAction({ ids, destino: 'CLOSED' }),
-              { singular: 'campaña cerrada', plural: 'campañas cerradas', ninguno: 'No se cerró ninguna.' },
+              { singular: t('cerradaSingular'), plural: t('cerradaPlural'), ninguno: t('cerradaNinguna') },
               limpiar,
             )
           }
         >
           <Archive className="size-4" aria-hidden="true" />
-          Cerrar
+          {t('cerrar')}
         </BotonDeLote>
         <BotonDeLote
           variant="ghost"
           pendiente={pendiente}
           confirmacion={{
-            title: `Cancelar ${ids.length === 1 ? 'la campaña' : `${ids.length} campañas`}`,
-            description:
-              'Cancelada es distinto de cerrada: es una campaña que no llegó a pasar. Se guarda esa diferencia porque el año que viene alguien va a preguntar por qué.',
-            confirmLabel: 'Cancelar la campaña',
+            title: t('cancelarTitulo', { cantidad: ids.length }),
+            description: t('cancelarBajada'),
+            confirmLabel: t('cancelarConfirmar'),
           }}
           onConfirm={() =>
             ejecutar(
               () => cerrarCampanasAction({ ids, destino: 'CANCELLED' }),
-              { singular: 'campaña cancelada', plural: 'campañas canceladas', ninguno: 'No se canceló ninguna.' },
+              { singular: t('canceladaSingular'), plural: t('canceladaPlural'), ninguno: t('canceladaNinguna') },
               limpiar,
             )
           }
         >
           <Ban className="size-4" aria-hidden="true" />
-          Cancelar
+          {t('cancelar')}
         </BotonDeLote>
       </>
     )}>

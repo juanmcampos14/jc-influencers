@@ -1,5 +1,7 @@
+import { getTranslations } from 'next-intl/server'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 
-export default function Loading() {
-  return <PageSkeleton title="Campañas" stats={false} />
+export default async function Loading() {
+  const t = await getTranslations('campanas')
+  return <PageSkeleton title={t('titulo')} stats={false} />
 }

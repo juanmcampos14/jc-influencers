@@ -8,7 +8,9 @@ import { useTranslations } from 'next-intl'
 import { CAMPAIGN_STATUS_VALUES, campaignStatusLabel } from '@/components/status-badge'
 
 export function CampaignFilters({ clients }: { clients: Array<{ id: string; name: string }> }) {
+  const t = useTranslations('filtros')
   const tEtiqueta = useTranslations('etiquetas')
+  const tCampana = useTranslations('campanas')
   const router = useRouter()
   const params = useSearchParams()
   /*
@@ -33,16 +35,16 @@ export function CampaignFilters({ clients }: { clients: Array<{ id: string; name
     <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3" role="search">
       <div className="min-w-52 flex-1">
         <label htmlFor="q" className="mb-1 block text-xs font-medium text-ink-600">
-          Buscar
+          {t('buscar')}
         </label>
-        <Input id="q" name="q" defaultValue={params.get('q') ?? ''} placeholder="Nombre o descripción" />
+        <Input id="q" name="q" defaultValue={params.get('q') ?? ''} placeholder={tCampana('filtroBuscarPista')} />
       </div>
       <div className="w-44">
         <label htmlFor="estado" className="mb-1 block text-xs font-medium text-ink-600">
-          Estado
+          {t('estado')}
         </label>
         <Select id="estado" name="estado" defaultValue={params.get('estado') ?? ''}>
-          <option value="">Todos</option>
+          <option value="">{t('todos')}</option>
           {CAMPAIGN_STATUS_VALUES.map((key) => (
             <option key={key} value={key}>
               {campaignStatusLabel(tEtiqueta, key)}
@@ -53,10 +55,10 @@ export function CampaignFilters({ clients }: { clients: Array<{ id: string; name
       {clients.length > 1 ? (
         <div className="w-52">
           <label htmlFor="cliente" className="mb-1 block text-xs font-medium text-ink-600">
-            Cliente
+            {t('cliente')}
           </label>
           <Select id="cliente" name="cliente" defaultValue={params.get('cliente') ?? ''}>
-            <option value="">Todos</option>
+            <option value="">{t('todos')}</option>
             {clients.map((client) => (
               <option key={client.id} value={client.id}>
                 {client.name}
@@ -66,7 +68,7 @@ export function CampaignFilters({ clients }: { clients: Array<{ id: string; name
         </div>
       ) : null}
       <Button type="submit" variant="secondary" disabled={filtrando}>
-        {filtrando ? 'Filtrando…' : 'Filtrar'}
+        {filtrando ? t('filtrando') : t('filtrar')}
       </Button>
     </form>
   )
