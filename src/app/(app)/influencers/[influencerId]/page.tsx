@@ -1,4 +1,5 @@
 import type * as React from 'react'
+import { getLocale, getTranslations } from 'next-intl/server'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -22,15 +23,14 @@ import { AddProfileDialog } from './add-profile-dialog'
 export const metadata: Metadata = { title: 'Influencer' }
 export const dynamic = 'force-dynamic'
 
-const ADULT_LABELS: Record<string, string> = {
-  CONFIRMED: 'Mayoría de edad confirmada',
-  NOT_CONFIRMED: 'Mayoría de edad sin confirmar',
-  NOT_APPLICABLE: 'No aplica',
-}
+/* El texto vive en las traducciones; acá queda sólo el conjunto conocido. */
+const ADULT_VALUES = ['CONFIRMED', 'NOT_CONFIRMED', 'NOT_APPLICABLE']
 
 export default async function InfluencerDetailPage({ params }: { params: Promise<{ influencerId: string }> }) {
   const { influencerId } = await params
   const ctx = await requireContext()
+  const t = await getTranslations('influencers')
+  const idioma = await getLocale()
 
   let influencer
   try {
@@ -67,7 +67,7 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
         description={influencer.bio ?? undefined}
         breadcrumb={
           <Link href="/influencers" className="hover:underline">
-            Influencers
+            {t('titulo')}
           </Link>
         }
         actions={
@@ -106,7 +106,7 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
       <div className="space-y-6 px-5 py-6 sm:px-8">
         {openDuplicates.length > 0 ? (
           <InfoNote>
-            <p className="font-medium">Posibles duplicados sin resolver</p>
+            <p className="font-medium">{t('posiblesDuplicados')}</p>
             <ul className="mt-1 space-y-0.5">
               {openDuplicates.map((duplicate) => (
                 <li key={duplicate.id}>
@@ -118,7 +118,7 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
                 </li>
               ))}
             </ul>
-            <p className="mt-1 text-xs">Nunca se fusionan automáticamente: la decisión es de una persona.</p>
+            <p className="mt-1 text-xs">{t('nuncaSeFusionan')}</p>
           </InfoNote>
         ) : null}
 
@@ -126,24 +126,24 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
           <div className="space-y-6 lg:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle>Perfiles sociales</CardTitle>
+                <CardTitle>{t('perfilesSociales')}</CardTitle>
               </CardHeader>
               {influencer.profiles.length === 0 ? (
                 <CardBody>
-                  <p className="text-sm text-ink-500">Todavía no hay perfiles cargados.</p>
+                  <p className="text-sm text-ink-500">{t('sinPerfilesCargados')}</p>
                 </CardBody>
               ) : (
                 <TableWrap>
                   <Table>
                     <thead>
                       <tr>
-                        <Th>Plataforma</Th>
-                        <Th>Perfil</Th>
-                        <Th className="text-right">Seguidores</Th>
-                        <Th className="text-right">ER</Th>
-                        <Th className="text-right">Views prom.</Th>
-                        <Th className="text-right">% audiencia local</Th>
-                        <Th>Fuente y fecha</Th>
+                        <Th>{t('colPlataforma')}</Th>
+                        <Th>{t('colPerfil')}</Th>
+                        <Th className="text-right">{t('colSeguidores')}</Th>
+                        <Th className="text-right">{t('colEr')}</Th>
+                        <Th className="text-right">{t('colViewsProm')}</Th>
+                        <Th className="text-right">{t('colAudienciaLocal')}</Th>
+                        <Th>{t('colFuenteYFecha')}</Th>
                       </tr>
                     </thead>
                     <tbody>
@@ -151,7 +151,7 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
                         <Tr key={profile.id}>
                           <Td>
                             <Badge tone="slate">{profile.platform}</Badge>
-                            {profile.isPrimary ? <Badge tone="blue" className="ml-1">principal</Badge> : null}
+                            {profile.isPrimary ? <Badge tone="blue" className="ml-1">{t('principal')}</Badge> : null}
                           </Td>
                           <Td className="text-xs">
                             <ExternalLink href={profile.url}>
@@ -159,26 +159,26 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
                             </ExternalLink>
                           </Td>
                           <Td className="text-right tabular-nums">
-                            {formatFollowers(profile.followers)}
+                            {formatFollowers(profile.followers, idioma)}
                             {profile.followersRaw ? (
-                              <span className="block text-[11px] text-ink-400" title="Valor tal cual venía del origen">
-                                origen: {profile.followersRaw}
+                              <span className="block text-[11px] text-ink-400" title={t('valorDelOrigen')}>
+                                {t('origenValor', { valor: profile.followersRaw })}
                               </span>
                             ) : null}
                             {profile.followersUnparsed ? (
-                              <span className="block text-[11px] font-medium text-amber-700">sin normalizar</span>
+                              <span className="block text-[11px] font-medium text-amber-700">{t('sinNormalizar')}</span>
                             ) : null}
                           </Td>
-                          <Td className="text-right tabular-nums">{formatPercent(profile.engagementRate)}</Td>
+                          <Td className="text-right tabular-nums">{formatPercent(profile.engagementRate, idioma)}</Td>
                           <Td className="text-right tabular-nums">
-                            {profile.avgViews === null ? '—' : formatFollowers(profile.avgViews)}
+                            {profile.avgViews === null ? '—' : formatFollowers(profile.avgViews, idioma)}
                           </Td>
-                          <Td className="text-right tabular-nums">{formatPercent(profile.audienceLocalPercent)}</Td>
+                          <Td className="text-right tabular-nums">{formatPercent(profile.audienceLocalPercent, idioma)}</Td>
                           <Td className="text-xs">
-                            <p className="text-ink-700">{profile.metricSource ?? 'sin fuente'}</p>
+                            <p className="text-ink-700">{profile.metricSource ?? t('sinFuente')}</p>
                             <p className={profile.stale ? 'font-medium text-amber-700' : 'text-ink-500'}>
-                              {profile.measuredAt ? formatDate(profile.measuredAt, ctx.user.timezone) : 'sin fecha'}
-                              {profile.stale ? ' · desactualizado' : ''}
+                              {profile.measuredAt ? formatDate(profile.measuredAt, ctx.user.timezone, idioma) : t('sinFecha')}
+                              {profile.stale ? ` · ${t('desactualizado')}` : ''}
                             </p>
                           </Td>
                         </Tr>
@@ -191,22 +191,22 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
 
             <Card>
               <CardHeader>
-                <CardTitle>Historial en campañas</CardTitle>
+                <CardTitle>{t('historialEnCampanas')}</CardTitle>
               </CardHeader>
               {influencer.campaigns.length === 0 ? (
                 <CardBody>
-                  <p className="text-sm text-ink-500">Todavía no participó en ninguna campaña.</p>
+                  <p className="text-sm text-ink-500">{t('sinCampanas')}</p>
                 </CardBody>
               ) : (
                 <TableWrap>
                   <Table>
                     <thead>
                       <tr>
-                        <Th>Campaña</Th>
-                        <Th>Cliente</Th>
-                        <Th>Estado</Th>
-                        <Th>Aprobación</Th>
-                        <Th>Actualizado</Th>
+                        <Th>{t('colCampana')}</Th>
+                        <Th>{t('colCliente')}</Th>
+                        <Th>{t('colEstado')}</Th>
+                        <Th>{t('colAprobacion')}</Th>
+                        <Th>{t('colActualizado')}</Th>
                       </tr>
                     </thead>
                     <tbody>
@@ -224,7 +224,7 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
                           <Td>
                             <ApprovalBadge approval={row.clientApproval} />
                           </Td>
-                          <Td className="text-xs text-ink-600">{formatDate(row.updatedAt, ctx.user.timezone)}</Td>
+                          <Td className="text-xs text-ink-600">{formatDate(row.updatedAt, ctx.user.timezone, idioma)}</Td>
                         </Tr>
                       ))}
                     </tbody>
@@ -235,34 +235,32 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
 
             <Card>
               <CardHeader>
-                <CardTitle>Historial de métricas</CardTitle>
-                <p className="text-xs text-ink-500">
-                  Las métricas nunca se pisan: cada lectura queda con su fuente y su fecha.
-                </p>
+                <CardTitle>{t('historialDeMetricas')}</CardTitle>
+                <p className="text-xs text-ink-500">{t('metricasNoSePisan')}</p>
               </CardHeader>
               {influencer.history.length === 0 ? (
                 <CardBody>
-                  <p className="text-sm text-ink-500">Sin lecturas registradas.</p>
+                  <p className="text-sm text-ink-500">{t('sinLecturas')}</p>
                 </CardBody>
               ) : (
                 <TableWrap>
                   <Table>
                     <thead>
                       <tr>
-                        <Th>Fecha</Th>
-                        <Th>Plataforma</Th>
-                        <Th className="text-right">Seguidores</Th>
-                        <Th className="text-right">ER</Th>
-                        <Th>Fuente</Th>
+                        <Th>{t('colFecha')}</Th>
+                        <Th>{t('colPlataforma')}</Th>
+                        <Th className="text-right">{t('colSeguidores')}</Th>
+                        <Th className="text-right">{t('colEr')}</Th>
+                        <Th>{t('colFuente')}</Th>
                       </tr>
                     </thead>
                     <tbody>
                       {influencer.history.map((row, index) => (
                         <Tr key={`${row.profileId}-${index}`}>
-                          <Td className="whitespace-nowrap text-xs">{formatDateTime(row.capturedAt, ctx.user.timezone)}</Td>
+                          <Td className="whitespace-nowrap text-xs">{formatDateTime(row.capturedAt, ctx.user.timezone, idioma)}</Td>
                           <Td className="text-xs">{row.platform}</Td>
-                          <Td className="text-right tabular-nums">{formatFollowers(row.followers)}</Td>
-                          <Td className="text-right tabular-nums">{formatPercent(row.engagementRate)}</Td>
+                          <Td className="text-right tabular-nums">{formatFollowers(row.followers, idioma)}</Td>
+                          <Td className="text-right tabular-nums">{formatPercent(row.engagementRate, idioma)}</Td>
                           <Td className="text-xs text-ink-600">{row.source ?? '—'}</Td>
                         </Tr>
                       ))}
@@ -276,22 +274,29 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Ficha</CardTitle>
+                <CardTitle>{t('ficha')}</CardTitle>
               </CardHeader>
               <CardBody>
                 <dl className="space-y-2 text-sm">
-                  <Row label="Nombre real" value={influencer.realName} />
-                  <Row label="Handle" value={influencer.primaryHandle ? `@${influencer.primaryHandle}` : null} />
-                  <Row label="País" value={influencer.country} />
-                  <Row label="Ciudad" value={influencer.city} />
-                  <Row label="Idioma" value={influencer.language} />
-                  <Row label="Representante" value={influencer.representative} />
-                  <Row label="Estado" value={<InfluencerStatusBadge status={influencer.status} />} />
-                  <Row label="Edad" value={ADULT_LABELS[influencer.adultStatus] ?? influencer.adultStatus} />
+                  <Row label={t('campoNombreReal')} value={influencer.realName} />
+                  <Row label={t('campoHandleCorto')} value={influencer.primaryHandle ? `@${influencer.primaryHandle}` : null} />
+                  <Row label={t('campoPais')} value={influencer.country} />
+                  <Row label={t('campoCiudad')} value={influencer.city} />
+                  <Row label={t('campoIdioma')} value={influencer.language} />
+                  <Row label={t('campoRepresentanteCorto')} value={influencer.representative} />
+                  <Row label={t('colEstado')} value={<InfluencerStatusBadge status={influencer.status} />} />
+                  <Row
+                    label={t('campoEdad')}
+                    value={
+                      ADULT_VALUES.includes(influencer.adultStatus)
+                        ? t(`edad${influencer.adultStatus}`)
+                        : influencer.adultStatus
+                    }
+                  />
                 </dl>
                 {influencer.niches.length > 0 ? (
                   <div className="mt-3">
-                    <p className="mb-1 text-xs text-ink-500">Nichos</p>
+                    <p className="mb-1 text-xs text-ink-500">{t('colNichos')}</p>
                     <div className="flex flex-wrap gap-1">
                       {influencer.niches.map((niche) => (
                         <Badge key={niche} tone="slate">
@@ -303,7 +308,7 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
                 ) : null}
                 {influencer.tags.length > 0 ? (
                   <div className="mt-3">
-                    <p className="mb-1 text-xs text-ink-500">Tags</p>
+                    <p className="mb-1 text-xs text-ink-500">{t('tags')}</p>
                     <div className="flex flex-wrap gap-1">
                       {influencer.tags.map((tag) => (
                         <Badge key={tag} tone="blue">
@@ -319,15 +324,15 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
             {influencer.contact ? (
               <Card>
                 <CardHeader>
-                  <CardTitle>Contacto</CardTitle>
-                  <p className="text-xs text-ink-500">Acceso restringido y auditado.</p>
+                  <CardTitle>{t('contacto')}</CardTitle>
+                  <p className="text-xs text-ink-500">{t('contactoAyuda')}</p>
                 </CardHeader>
                 <CardBody>
                   <dl className="space-y-2 text-sm">
-                    <Row label="Email" value={influencer.contact.email} />
-                    <Row label="Teléfono" value={influencer.contact.phone} />
-                    <Row label="Base legal declarada" value={influencer.contact.legalBasis} />
-                    <Row label="Notas" value={influencer.contact.notes} />
+                    <Row label={t('campoEmail')} value={influencer.contact.email} />
+                    <Row label={t('campoTelefono')} value={influencer.contact.phone} />
+                    <Row label={t('campoBaseLegal')} value={influencer.contact.legalBasis} />
+                    <Row label={t('campoNotas')} value={influencer.contact.notes} />
                   </dl>
                 </CardBody>
               </Card>
@@ -336,8 +341,8 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
             {influencer.internalNotes ? (
               <Card>
                 <CardHeader>
-                  <CardTitle>Notas internas</CardTitle>
-                  <p className="text-xs text-ink-500">Sólo agencia.</p>
+                  <CardTitle>{t('notasInternas')}</CardTitle>
+                  <p className="text-xs text-ink-500">{t('soloAgencia')}</p>
                 </CardHeader>
                 <CardBody>
                   <p className="whitespace-pre-wrap text-sm text-ink-700">{influencer.internalNotes}</p>

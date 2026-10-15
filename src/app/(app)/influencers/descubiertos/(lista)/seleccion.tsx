@@ -1,6 +1,7 @@
 "use client"
 
 import { UserPlus } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Seleccion, CasillaDeFila } from '@/components/ui/seleccion'
 import { BotonDeLote, useAccionDeLote } from '@/components/ui/acciones-de-lote'
 import { importarDescubiertosAction } from '../../../actions/lote'
@@ -27,6 +28,7 @@ export function SeleccionDeDescubiertos({
   idsDeLaPagina: string[]
   children: React.ReactNode
 }) {
+  const t = useTranslations('descubiertos')
   const { ejecutar, pendiente } = useAccionDeLote()
 
   return (
@@ -37,21 +39,20 @@ export function SeleccionDeDescubiertos({
         <BotonDeLote
           pendiente={pendiente}
           confirmacion={{
-            title: `Pasar ${ids.length === 1 ? 'este perfil' : `${ids.length} perfiles`} al padrón`,
-            description:
-              'Se crea una ficha para cada uno, con su usuario, sus seguidores y su engagement. A partir de ahí se pueden sumar a una campaña. El que ya estuviera en el padrón se ata al existente en vez de duplicarse.',
-            confirmLabel: 'Pasar al padrón',
+            title: t('pasarTitulo', { cantidad: ids.length }),
+            description: t('pasarBajada'),
+            confirmLabel: t('pasarAlPadron'),
           }}
           onConfirm={() =>
             ejecutar(
               () => importarDescubiertosAction({ ids }),
-              { singular: 'perfil pasado al padrón', plural: 'perfiles pasados al padrón', ninguno: 'No se importó ninguno.' },
+              { singular: t('importadoSingular'), plural: t('importadoPlural'), ninguno: t('importadoNinguno') },
               limpiar,
             )
           }
         >
           <UserPlus className="size-4" aria-hidden="true" />
-          Pasar al padrón
+          {t('pasarAlPadron')}
         </BotonDeLote>
       )}
     >

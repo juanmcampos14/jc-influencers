@@ -1,6 +1,7 @@
 "use client"
 
 import { cn } from '@/lib/util/format'
+import { useTranslations } from 'next-intl'
 
 const REDES = [
   { valor: 'INSTAGRAM', etiqueta: 'Instagram' },
@@ -28,9 +29,10 @@ export function SelectorDeRed({
   /** Redes que algún proveedor puede buscar en el modo actual. */
   disponibles?: ReadonlySet<Red>
 }) {
+  const t = useTranslations('scouting')
   return (
     <fieldset>
-      <legend className="mb-1.5 text-[13px] font-medium text-ink-700">Red</legend>
+      <legend className="mb-1.5 text-[13px] font-medium text-ink-700">{t('redTitulo')}</legend>
       <div className="inline-flex rounded-xl border border-ink-300 bg-ink-50 p-1">
         {REDES.map((red) => {
           const activa = valor === red.valor
@@ -38,7 +40,7 @@ export function SelectorDeRed({
           return (
             <label
               key={red.valor}
-              title={habilitada ? undefined : 'Ningún proveedor conectado puede buscar acá todavía.'}
+              title={habilitada ? undefined : t('redNoDisponible')}
               className={cn(
                 'relative rounded-lg px-4 py-2 text-sm transition-colors',
                 'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-600',

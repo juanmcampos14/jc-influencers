@@ -34,6 +34,7 @@ export default async function AuditPage({
   const params = await searchParams
   const ctx = await requireContext()
   const t = await getTranslations('auditoria')
+  const tEtiqueta = await getTranslations('etiquetas')
   const idioma = await getLocale()
   const clientFilter = params.cliente && ctx.clients.some((c) => c.id === params.cliente) ? params.cliente : null
 
@@ -95,11 +96,11 @@ export default async function AuditPage({
                             title={row.action}
                             dot
                           >
-                            {auditActionLabel(row.action)}
+                            {auditActionLabel(tEtiqueta, row.action)}
                           </Badge>
                         </Td>
                         <Td className="text-xs">
-                          <p className="text-ink-800">{entityTypeLabel(row.entityType)}</p>
+                          <p className="text-ink-800">{entityTypeLabel(tEtiqueta, row.entityType)}</p>
                           {row.entityId ? <p className="font-mono text-[11px] text-ink-500">{row.entityId}</p> : null}
                         </Td>
                         <Td className="text-xs text-ink-600">{row.ip ?? '—'}</Td>

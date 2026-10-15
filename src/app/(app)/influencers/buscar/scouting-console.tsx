@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,7 @@ import { platformLabel } from '@/lib/domain/labels'
 import { formatDateTime, formatFollowers, formatMoney, formatMoneyFino, formatPercent } from '@/lib/util/format'
 import { SelectorDeRed, type Red } from '@/components/scouting/selector-de-red'
 import { FiltrosAvanzados } from '@/components/scouting/filtros-avanzados'
+import type { Motivo } from '@/lib/domain/filtros-scouting'
 import type { BudgetState, PreviewResult, ScoutingResultDto } from '@/lib/repos/scouting'
 import {
   cancelScoutingAction,
@@ -25,6 +27,14 @@ import {
   startScoutingAction,
 } from '../../actions/scouting'
 import { listResultsAction } from './results-action'
+
+/**
+ * Lo que estas funciones de afuera del componente necesitan para escribir.
+ *
+ * Viven al margen del árbol --no pueden usar hooks-- así que reciben el
+ * traductor como cualquier otro argumento.
+ */
+type Traducciones = (clave: string, valores?: Record<string, string | number>) => string
 
 type Run = {
   id: string
@@ -50,13 +60,8 @@ const STATUS_TONES: Record<string, string> = {
   CANCELLED: 'slate',
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  PREVIEW: 'Sin ejecutar',
-  RUNNING: 'En curso',
-  COMPLETED: 'Terminada',
-  FAILED: 'Falló',
-  CANCELLED: 'Cancelada',
-}
+/* El texto de cada estado vive en las traducciones, bajo `estado<CLAVE>`. */
+const ESTADOS_CONOCIDOS = new Set(Object.keys(STATUS_TONES))
 
 export function ScoutingConsole({
   clients,
@@ -99,6 +104,9 @@ export function ScoutingConsole({
   puedeFiltrarAudiencia: boolean
   canManageBudget: boolean
 }) {
+  const t = useTranslations('scouting')
+  const idioma = useLocale()
+  const tEtiqueta = useTranslations('etiquetas')
   const router = useRouter()
   const params = useSearchParams()
   const [preview, setPreview] = React.useState<PreviewResult | null>(null)
@@ -107,7 +115,7 @@ export function ScoutingConsole({
   /* Vive en estado para poder decir el costo mientras se escribe. */
   const [limite, setLimite] = React.useState(30)
   /** El que va a hacer ESTA búsqueda, no el que está por defecto. */
-  const provider = proveedorPorRed[red] ?? { name: 'sin configurar', configured: false, unitCostUsd: 0 }
+  const provider = proveedorPorRed[red] ?? { name: t('sinProveedorElegido'), configured: false, unitCostUsd: 0 }
   const [openRun, setOpenRun] = React.useState<string | null>(null)
   const [results, setResults] = React.useState<ScoutingResultDto[]>([])
   const [selected, setSelected] = React.useState<Set<string>>(new Set())
@@ -144,8 +152,8 @@ export function ScoutingConsole({
           if (result.ok && result.data.status !== 'RUNNING') {
             toast.info(
               result.data.status === 'COMPLETED'
-                ? `Búsqueda terminada: ${result.data.collected} perfiles.`
-                : `La búsqueda terminó con estado ${result.data.status}.`,
+                ? t('terminadaConPerfiles', { cantidad: result.data.collected })
+                : t('terminadaConEstado', { estado: result.data.status }),
             )
             router.refresh()
           }
@@ -153,7 +161,7 @@ export function ScoutingConsole({
       })
     }, 10_000)
     return () => clearInterval(timer)
-  }, [enCurso, router])
+  }, [enCurso, router, t])
 
   /*
    * Cancelar gastaba plata y no daba ninguna señal: sin confirmación, sin
@@ -167,7 +175,7 @@ export function ScoutingConsole({
         toast.error(resultado.message)
         return
       }
-      toast.success('Se pidió cortar la búsqueda.')
+      toast.success(t('seCorto'))
       router.refresh()
     })
   }
@@ -258,7 +266,7 @@ export function ScoutingConsole({
        */
       if (!result.data.puedeEjecutar) {
         setPreview(result.data)
-        const motivo = result.data.bloqueos[0] ?? 'No se puede ejecutar esta búsqueda.'
+        const motivo = result.data.bloqueos[0] ?? t('noSePuedeEjecutarGenerico')
         setError(motivo)
         toast.error(motivo)
         return
@@ -284,7 +292,7 @@ export function ScoutingConsole({
         router.refresh()
         return
       }
-      toast.success('Scouting en marcha. Te avisamos cuando termine.')
+      toast.success(t('enMarcha'))
       setPreview(null)
       router.refresh()
     }
@@ -338,7 +346,9 @@ export function ScoutingConsole({
       }
       const { created, linked, addedToCampaign } = result.data
       toast.success(
-        `${created} influencers nuevos, ${linked} ya existían${addedToCampaign > 0 ? `, ${addedToCampaign} agregados a la campaña` : ''}.`,
+        t('importado', { nuevos: created, existentes: linked }) +
+          (addedToCampaign > 0 ? t('importadoEnCampana', { cantidad: addedToCampaign }) : '') +
+          '.',
       )
       setSelected(new Set())
       openResults(openRun)
@@ -358,7 +368,7 @@ export function ScoutingConsole({
         toast.error(result.message)
         return
       }
-      toast.success('Tope actualizado.')
+      toast.success(t('topeActualizado'))
       router.refresh()
     })
   }
@@ -370,45 +380,39 @@ export function ScoutingConsole({
     <div className="space-y-6">
       {!provider.configured ? (
         <InfoNote>
-          <p className="font-medium">El proveedor de scouting no está conectado.</p>
+          <p className="font-medium">{t('sinProveedorTitulo')}</p>
           {/* El nombre de una variable de entorno no es información para quien
               usa el producto: es para quien lo configura, y ése ya sabe dónde
               buscarlo. */}
-          <p className="mt-1 text-xs">
-            Podés armar la búsqueda y ver cuánto costaría, pero no se va a poder ejecutar hasta que un administrador
-            técnico conecte las credenciales del proveedor. No mostramos datos simulados.
-          </p>
+          <p className="mt-1 text-xs">{t('sinProveedorBajada')}</p>
         </InfoNote>
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>¿A quién buscás?</CardTitle>
-            <p className="text-xs text-ink-500">
-              Un tema y una red. Todo lo que filtres se comprueba contra los datos que devuelve la red: si a un
-              creador le falta el dato, se marca, no se descarta.
-            </p>
+            <CardTitle>{t('aQuienBuscas')}</CardTitle>
+            <p className="text-xs text-ink-500">{t('aQuienBuscasAyuda')}</p>
           </CardHeader>
           <CardBody>
             <form onSubmit={buscar} className="space-y-4">
               {mode === 'DISCOVER' ? (
                 <Field
-                  label="Tema o nicho"
+                  label={t('campoTema')}
                   htmlFor="keywords"
-                  hint="Uno por línea. Salen del brief de la campaña."
+                  hint={t('temaAyuda')}
                   required
                 >
                   <Textarea
                     id="keywords"
                     name="keywords"
                     rows={3}
-                    placeholder={'finanzas personales\nstablecoins'}
+                    placeholder={t('temaPista')}
                     required
                   />
                 </Field>
               ) : (
-                <Field label="Perfiles a actualizar" htmlFor="urls" hint="Una URL por línea." required>
+                <Field label={t('campoUrls')} htmlFor="urls" hint={t('urlsAyuda')} required>
                   <Textarea
                     id="urls"
                     name="urls"
@@ -421,21 +425,21 @@ export function ScoutingConsole({
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <SelectorDeRed valor={red} onChange={setRed} />
-                <Field label="Qué querés hacer" htmlFor="mode">
+                <Field label={t('campoModo')} htmlFor="mode">
                   <Select
                     id="mode"
                     value={mode}
                     onChange={(event) => setMode(event.target.value as 'DISCOVER' | 'ENRICH')}
                   >
-                    <option value="DISCOVER">Descubrir perfiles nuevos</option>
-                    <option value="ENRICH">Actualizar métricas de perfiles</option>
+                    <option value="DISCOVER">{t('modoDescubrir')}</option>
+                    <option value="ENRICH">{t('modoActualizar')}</option>
                   </Select>
                 </Field>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 {clients.length > 1 ? (
-                  <Field label="Para qué cliente" htmlFor="clientSelect">
+                  <Field label={t('campoCliente')} htmlFor="clientSelect">
                     <Select id="clientSelect" value={clientId} onChange={(event) => switchClient(event.target.value)}>
                       {clients.map((client) => (
                         <option key={client.id} value={client.id}>
@@ -447,7 +451,7 @@ export function ScoutingConsole({
                 ) : null}
                 {mode === 'DISCOVER' ? (
                   <Field
-                    label="Cuántos perfiles como máximo"
+                    label={t('campoLimite')}
                     htmlFor="limit"
                     /*
                      * El costo se dice mientras se escribe, no después de un
@@ -456,8 +460,12 @@ export function ScoutingConsole({
                      */
                     hint={
                       provider.unitCostUsd > 0
-                        ? `${provider.name} · ${formatMoneyFino(provider.unitCostUsd)} perfiles · esta búsqueda cuesta hasta ${formatMoneyFino(provider.unitCostUsd * limite)}`
-                        : 'Cada perfil tiene costo.'
+                        ? t('limiteAyuda', {
+                            proveedor: provider.name,
+                            porMil: formatMoneyFino(provider.unitCostUsd, 'USD', idioma),
+                            total: formatMoneyFino(provider.unitCostUsd * limite, 'USD', idioma),
+                          })
+                        : t('limiteAyudaSinCosto')
                     }
                   >
                     <Input
@@ -481,9 +489,9 @@ export function ScoutingConsole({
                 />
               ) : null}
 
-              <Field label="Agregar a una campaña (opcional)" htmlFor="campaignId">
+              <Field label={t('campoCampana')} htmlFor="campaignId">
                 <Select id="campaignId" name="campaignId" defaultValue={campaignId ?? ''}>
-                  <option value="">No asociar a ninguna campaña</option>
+                  <option value="">{t('sinCampana')}</option>
                   {campaigns.map((campaign) => (
                     <option key={campaign.id} value={campaign.id}>
                       {campaign.name}
@@ -494,10 +502,10 @@ export function ScoutingConsole({
 
               <Button type="submit" disabled={pending}>
                 {pending
-                  ? 'Buscando…'
+                  ? t('buscando')
                   : mode === 'DISCOVER' && provider.unitCostUsd > 0
-                    ? `Buscar · hasta ${formatMoneyFino(provider.unitCostUsd * limite)}`
-                    : 'Buscar'}
+                    ? t('buscarConCosto', { total: formatMoneyFino(provider.unitCostUsd * limite, 'USD', idioma) })
+                    : t('buscarBoton')}
               </Button>
             </form>
 
@@ -509,14 +517,14 @@ export function ScoutingConsole({
 
             {preview ? (
               <div className="mt-4 rounded-lg border border-brand-200 bg-brand-50 p-4">
-                <p className="text-sm font-semibold text-ink-900">Antes de ejecutar</p>
+                <p className="text-sm font-semibold text-ink-900">{t('antesDeEjecutar')}</p>
                 <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-3">
                   <div>
-                    <dt className="text-xs text-ink-500">Perfiles a consultar</dt>
+                    <dt className="text-xs text-ink-500">{t('perfilesAConsultar')}</dt>
                     <dd className="font-semibold tabular-nums text-ink-900">{preview.requestedRecords}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-ink-500">Costo estimado</dt>
+                    <dt className="text-xs text-ink-500">{t('costoEstimado')}</dt>
                     {/*
                       * Sin proveedor o sin dataset, el costo no es cero: es
                       * desconocido. Mostrar "US$ 0" se lee como "es gratis",
@@ -526,12 +534,12 @@ export function ScoutingConsole({
                       {preview.unitCostUsd > 0 ? (
                         formatMoneyFino(preview.estimatedCostUsd)
                       ) : (
-                        <span className="text-ink-400">sin calcular</span>
+                        <span className="text-ink-400">{t('sinCalcular')}</span>
                       )}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-ink-500">Queda este mes</dt>
+                    <dt className="text-xs text-ink-500">{t('quedaEsteMes')}</dt>
                     <dd className="font-semibold tabular-nums text-ink-900">
                       {formatMoney(preview.budget.remainingUsd, 'USD')}
                     </dd>
@@ -540,7 +548,7 @@ export function ScoutingConsole({
                 {preview.bloqueos.length > 0 ? (
                   <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3">
                     <p className="text-sm font-semibold text-rose-900">
-                      {preview.bloqueos.length === 1 ? 'No se puede ejecutar' : 'No se puede ejecutar, por dos motivos'}
+                      {preview.bloqueos.length === 1 ? t('noSePuedeEjecutar') : t('noSePuedeEjecutarVarios')}
                     </p>
                     <ul className="mt-1 space-y-0.5 text-xs text-rose-800">
                       {preview.bloqueos.map((bloqueo) => (
@@ -560,7 +568,7 @@ export function ScoutingConsole({
                   */}
                 <div className="mt-3">
                   <Button variant="secondary" onClick={discard} disabled={pending}>
-                    Entendido
+                    {t('entendido')}
                   </Button>
                 </div>
               </div>
@@ -570,14 +578,17 @@ export function ScoutingConsole({
 
         <Card>
           <CardHeader>
-            <CardTitle>Tope de gasto · {budget.period}</CardTitle>
+            <CardTitle>{t('topeDeGasto', { periodo: budget.period })}</CardTitle>
           </CardHeader>
           <CardBody className="space-y-3">
             <div>
               <div className="mb-1 flex items-baseline justify-between text-sm">
-                <span className="text-ink-600">Gastado</span>
+                <span className="text-ink-600">{t('gastado')}</span>
                 <span className="font-semibold tabular-nums text-ink-900">
-                  {formatMoney(budget.globalSpentUsd, 'USD')} de {formatMoney(budget.globalLimitUsd, 'USD')}
+                  {t('gastadoDe', {
+                    gastado: formatMoney(budget.globalSpentUsd, 'USD', idioma),
+                    tope: formatMoney(budget.globalLimitUsd, 'USD', idioma),
+                  })}
                 </span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-ink-100">
@@ -586,21 +597,21 @@ export function ScoutingConsole({
                   style={{ width: `${usedPercent}%` }}
                 />
               </div>
-              <p className="mt-1 text-xs text-ink-500">
-                Cuando se agota, el sistema deja de ejecutar. No es un aviso: es un corte.
-              </p>
+              <p className="mt-1 text-xs text-ink-500">{t('topeCorta')}</p>
             </div>
 
             {budget.clientLimitUsd !== null ? (
               <p className="text-xs text-ink-600">
-                Tope propio de este cliente: {formatMoney(budget.clientLimitUsd, 'USD')} · gastado{' '}
-                {formatMoney(budget.clientSpentUsd, 'USD')}
+                {t('topePropio', {
+                  tope: formatMoney(budget.clientLimitUsd, 'USD', idioma),
+                  gastado: formatMoney(budget.clientSpentUsd, 'USD', idioma),
+                })}
               </p>
             ) : null}
 
             {canManageBudget ? (
               <form onSubmit={saveBudget} className="flex items-end gap-2">
-                <Field label="Tope del cliente (USD)" htmlFor="limitUsd" className="flex-1">
+                <Field label={t('campoTope')} htmlFor="limitUsd" className="flex-1">
                   <Input
                     id="limitUsd"
                     name="limitUsd"
@@ -611,37 +622,35 @@ export function ScoutingConsole({
                   />
                 </Field>
                 <Button type="submit" size="sm" variant="secondary" disabled={pending}>
-                  Guardar
+                  {t('guardar')}
                 </Button>
               </form>
             ) : null}
 
-            <p className="text-xs text-ink-500">Proveedor: {provider.name}</p>
+            <p className="text-xs text-ink-500">{t('proveedorEs', { nombre: provider.name })}</p>
           </CardBody>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Búsquedas</CardTitle>
-          {runs.length >= 30 ? (
-            <p className="text-xs text-ink-500">Se muestran las 30 más recientes.</p>
-          ) : null}
+          <CardTitle>{t('busquedas')}</CardTitle>
+          {runs.length >= 30 ? <p className="text-xs text-ink-500">{t('ultimas30')}</p> : null}
         </CardHeader>
         {runs.length === 0 ? (
-          <EmptyState title="Todavía no hiciste ninguna búsqueda" description="Armá una arriba para empezar." />
+          <EmptyState title={t('sinBusquedasTitulo')} description={t('sinBusquedasBajada')} />
         ) : (
           <TableWrap>
             <Table>
               <thead>
                 <tr>
-                  <Th>Cuándo</Th>
-                  <Th>Qué</Th>
-                  <Th>Estado</Th>
-                  <Th className="text-right">Pedidos</Th>
-                  <Th className="text-right">Entregados</Th>
-                  <Th className="text-right">Costo</Th>
-                  <Th><span className="sr-only">Acciones</span></Th>
+                  <Th>{t('colCuando')}</Th>
+                  <Th>{t('colQue')}</Th>
+                  <Th>{t('colEstado')}</Th>
+                  <Th className="text-right">{t('colPedidos')}</Th>
+                  <Th className="text-right">{t('colEntregados')}</Th>
+                  <Th className="text-right">{t('colCosto')}</Th>
+                  <Th><span className="sr-only">{t('acciones')}</span></Th>
                 </tr>
               </thead>
               <tbody>
@@ -649,10 +658,13 @@ export function ScoutingConsole({
                   <Tr key={run.id}>
                     <Td className="whitespace-nowrap text-xs text-ink-600">{formatDateTime(run.startedAt)}</Td>
                     <Td className="text-xs">
-                      {run.mode === 'DISCOVER' ? 'Descubrir' : 'Actualizar'} · {platformLabel(run.platform)}
+                      {run.mode === 'DISCOVER' ? t('modoDescubrirCorto') : t('modoActualizarCorto')} ·{' '}
+                      {platformLabel(tEtiqueta, run.platform)}
                     </Td>
                     <Td>
-                      <Badge tone={STATUS_TONES[run.status] ?? 'slate'}>{STATUS_LABELS[run.status] ?? run.status}</Badge>
+                      <Badge tone={STATUS_TONES[run.status] ?? 'slate'}>
+                        {ESTADOS_CONOCIDOS.has(run.status) ? t(`estado${run.status}`) : run.status}
+                      </Badge>
                       {run.errorMessage ? (
                         <p className="mt-0.5 max-w-64 text-[11px] text-rose-700">{run.errorMessage}</p>
                       ) : null}
@@ -662,25 +674,25 @@ export function ScoutingConsole({
                     <Td className="text-right tabular-nums">
                       {formatMoneyFino(run.actualCostUsd ?? run.estimatedCostUsd)}
                       {run.actualCostUsd === null && run.status !== 'PREVIEW' ? (
-                        <span className="block text-[11px] text-ink-400">estimado</span>
+                        <span className="block text-[11px] text-ink-400">{t('estimado')}</span>
                       ) : null}
                     </Td>
                     <Td>
                       {run.resultCount > 0 ? (
                         <Button size="sm" variant="ghost" onClick={() => openResults(run.id)}>
-                          Ver {run.resultCount}
+                          {t('verCantidad', { cantidad: run.resultCount })}
                         </Button>
                       ) : run.status === 'RUNNING' ? (
                         <ConfirmButton
-                          title="Cancelar la búsqueda"
-                          description="Se le pide al proveedor que corte. Lo que ya recolectó se cobra igual."
-                          confirmLabel="Sí, cancelar"
+                          title={t('cancelarTitulo')}
+                          description={t('cancelarBajada')}
+                          confirmLabel={t('cancelarConfirmar')}
                           tone="danger"
                           onConfirm={() => cancelar(run.id)}
                           pending={pending}
                         >
                           <Button size="sm" variant="ghost" disabled={pending}>
-                            Cancelar
+                            {t('cancelar')}
                           </Button>
                         </ConfirmButton>
                       ) : null}
@@ -696,7 +708,7 @@ export function ScoutingConsole({
       {openRun ? (
         <Card id="resultados-scouting">
           <CardHeader>
-            <CardTitle>Resultados</CardTitle>
+            <CardTitle>{t('resultados')}</CardTitle>
             {/*
               * Antes decía "los que no importes no se guardan". Era verdad para
               * el padrón y falso para todo lo demás: cada búsqueda ya guarda lo
@@ -705,9 +717,9 @@ export function ScoutingConsole({
               * pagar la misma búsqueda.
               */}
             <p className="text-xs text-ink-500">
-              Todos estos <strong className="text-ink-700">ya quedaron guardados en Descubiertos</strong>, con las
-              palabras que usaste y sus métricas: podés buscarlos ahí cuando quieras, gratis. Importar es otra cosa:
-              pasarlos al padrón para poder sumarlos a una campaña.
+              {t.rich('yaGuardados', {
+                b: (texto) => <strong className="text-ink-700">{texto}</strong>,
+              })}
             </p>
             {/*
               * Qué se buscó, arriba de lo que se encontró.
@@ -719,7 +731,7 @@ export function ScoutingConsole({
             {(() => {
               const run = runs.find((r) => r.id === openRun)
               if (!run) return null
-              const partes = describirBusqueda(run)
+              const partes = describirBusqueda(run, t, idioma)
               if (partes.length === 0) return null
               return (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -731,11 +743,7 @@ export function ScoutingConsole({
                           ? 'rounded-md bg-emerald-50 px-2 py-0.5 text-xs text-emerald-900'
                           : 'rounded-md bg-ink-100 px-2 py-0.5 text-xs text-ink-700'
                       }
-                      title={
-                        parte.enOrigen
-                          ? 'El proveedor filtró por esto antes de devolver, así que todos lo cumplen.'
-                          : 'Se comprueba sobre lo que devolvió la red.'
-                      }
+                      title={parte.enOrigen ? t('filtroEnOrigen') : t('filtroComprobado')}
                     >
                       {parte.texto}
                     </span>
@@ -755,9 +763,13 @@ export function ScoutingConsole({
                */
               return (
                 <p className="mt-1.5 text-xs text-ink-600">
-                  <strong className="text-ink-900">{cumplen}</strong> cumplen lo que pediste
-                  {sinDato > 0 ? ` · ${sinDato} no se pudieron comprobar` : ''}
-                  {fuera > 0 ? ` · ${fuera} quedaron fuera` : ''}. Ninguno se descarta solo: los tenés todos acá.
+                  {t.rich('recuento', {
+                    cumplen,
+                    b: (texto) => <strong className="text-ink-900">{texto}</strong>,
+                  })}
+                  {sinDato > 0 ? t('recuentoSinDato', { cantidad: sinDato }) : ''}
+                  {fuera > 0 ? t('recuentoFuera', { cantidad: fuera }) : ''}
+                  {t('recuentoCierre')}
                 </p>
               )
             })()}
@@ -765,7 +777,7 @@ export function ScoutingConsole({
           {results.length === 0 ? (
             <CardBody>
               {pending ? (
-                <p className="text-sm text-ink-500">Trayendo los perfiles…</p>
+                <p className="text-sm text-ink-500">{t('trayendo')}</p>
               ) : (
                 /*
                  * Un panel que no aparece se lee como un botón roto. Si la
@@ -773,12 +785,8 @@ export function ScoutingConsole({
                  * decirlo: el proveedor cobró igual.
                  */
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-ink-900">Esta búsqueda no dejó ningún perfil guardado.</p>
-                  <p className="text-xs text-ink-500">
-                    El proveedor entregó registros, pero ninguno tenía los datos mínimos para armar un perfil
-                    --nombre de usuario y enlace--. El gasto se cobró igual. Si se repite, probá con otra plataforma
-                    o avisale al equipo: puede ser el proveedor y no la búsqueda.
-                  </p>
+                  <p className="text-sm font-medium text-ink-900">{t('sinPerfilesTitulo')}</p>
+                  <p className="text-xs text-ink-500">{t('sinPerfilesBajada')}</p>
                 </div>
               )}
             </CardBody>
@@ -786,9 +794,9 @@ export function ScoutingConsole({
 
           {results.length > 0 ? (
           <CardBody className="flex flex-wrap items-end gap-3 border-b border-ink-200">
-            <Field label="Agregar a la campaña" htmlFor="targetCampaign" className="w-64">
+            <Field label={t('agregarALaCampana')} htmlFor="targetCampaign" className="w-64">
               <Select id="targetCampaign" value={targetCampaign} onChange={(event) => setTargetCampaign(event.target.value)}>
-                <option value="">Sólo a la base de influencers</option>
+                <option value="">{t('soloALaBase')}</option>
                 {campaigns.map((campaign) => (
                   <option key={campaign.id} value={campaign.id}>
                     {campaign.name}
@@ -797,7 +805,7 @@ export function ScoutingConsole({
               </Select>
             </Field>
             <Button onClick={importSelected} disabled={pending || selected.size === 0}>
-              Importar {selected.size > 0 ? `${selected.size} perfiles` : 'seleccionados'}
+              {selected.size > 0 ? t('importarCantidad', { cantidad: selected.size }) : t('importarSeleccionados')}
             </Button>
           </CardBody>
           ) : null}
@@ -808,7 +816,7 @@ export function ScoutingConsole({
                 <tr>
                   <Th className="w-10">
                     <Checkbox
-                      aria-label="Seleccionar todos"
+                      aria-label={t('seleccionarTodos')}
                       checked={selected.size === results.filter((r) => !r.imported).length && selected.size > 0}
                       onChange={(event) =>
                         setSelected(
@@ -819,14 +827,14 @@ export function ScoutingConsole({
                       }
                     />
                   </Th>
-                  <Th>Perfil</Th>
-                  <Th>Red</Th>
-                  <Th className="text-right">Seguidores</Th>
-                  <Th className="text-right">ER</Th>
-                  <Th>País</Th>
-                  <Th>Lo trajo</Th>
-                  <Th>Contra tus filtros</Th>
-                  <Th>Estado</Th>
+                  <Th>{t('colPerfil')}</Th>
+                  <Th>{t('colRed')}</Th>
+                  <Th className="text-right">{t('colSeguidores')}</Th>
+                  <Th className="text-right">{t('colEr')}</Th>
+                  <Th>{t('colPais')}</Th>
+                  <Th>{t('colLoTrajo')}</Th>
+                  <Th>{t('colContraFiltros')}</Th>
+                  <Th>{t('colEstado')}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -834,7 +842,7 @@ export function ScoutingConsole({
                   <Tr key={result.id}>
                     <Td>
                       <Checkbox
-                        aria-label={`Seleccionar ${result.displayName ?? result.url}`}
+                        aria-label={t('seleccionarUno', { nombre: result.displayName ?? result.url })}
                         disabled={result.imported}
                         checked={selected.has(result.id)}
                         onChange={(event) =>
@@ -854,35 +862,35 @@ export function ScoutingConsole({
                       </ExternalLink>
                       {result.bio ? <p className="mt-0.5 max-w-96 text-xs text-ink-500">{result.bio}</p> : null}
                     </Td>
-                    <Td className="text-xs">{platformLabel(result.platform)}</Td>
+                    <Td className="text-xs">{platformLabel(tEtiqueta, result.platform)}</Td>
                     <Td className="text-right tabular-nums">{formatFollowers(result.followers)}</Td>
                     <Td className="text-right tabular-nums">{formatPercent(result.engagementRate)}</Td>
                     <Td className="text-xs">
-                      {result.country ?? <span className="text-ink-500">no lo informa</span>}
+                      {result.country ?? <span className="text-ink-500">{t('noLoInforma')}</span>}
                     </Td>
                     <Td className="text-xs text-ink-600">{result.provider}</Td>
                     <Td className="text-xs">
                       {result.veredicto === 'CUMPLE' ? (
-                        <Badge tone="emerald">Cumple</Badge>
+                        <Badge tone="emerald">{t('cumple')}</Badge>
                       ) : result.veredicto === 'SIN_DATO' ? (
                         <>
-                          <Badge tone="amber">Falta un dato</Badge>
-                          <p className="mt-0.5 text-ink-500">{result.motivos.join(' · ')}</p>
+                          <Badge tone="amber">{t('faltaUnDato')}</Badge>
+                          <p className="mt-0.5 text-ink-500">{motivos(result.motivos, t)}</p>
                         </>
                       ) : (
                         <>
-                          <Badge tone="slate">Fuera</Badge>
-                          <p className="mt-0.5 text-ink-500">{result.motivos.join(' · ')}</p>
+                          <Badge tone="slate">{t('fuera')}</Badge>
+                          <p className="mt-0.5 text-ink-500">{motivos(result.motivos, t)}</p>
                         </>
                       )}
                     </Td>
                     <Td>
                       {result.imported ? (
-                        <Badge tone="emerald">Importado</Badge>
+                        <Badge tone="emerald">{t('importadoBadge')}</Badge>
                       ) : result.matchedInfluencerId ? (
-                        <Badge tone="blue">Ya está en la base</Badge>
+                        <Badge tone="blue">{t('yaEnLaBase')}</Badge>
                       ) : (
-                        <Badge tone="slate">Nuevo</Badge>
+                        <Badge tone="slate">{t('nuevo')}</Badge>
                       )}
                     </Td>
                   </Tr>
@@ -895,6 +903,16 @@ export function ScoutingConsole({
       ) : null}
     </div>
   )
+}
+
+/**
+ * Los motivos de un veredicto, en una frase.
+ *
+ * El dominio devuelve claves y valores --nunca la frase escrita-- así que el
+ * texto se arma acá, en el idioma de quien mira.
+ */
+function motivos(lista: Motivo[], t: Traducciones): string {
+  return lista.map((m) => t(m.clave, m.valores)).join(' · ')
 }
 
 /**
@@ -937,9 +955,11 @@ function leerAudiencia(form: FormData): {
  * "de estos, miramos cuáles dicen ser argentinos". La diferencia es lo que
  * hacía que una búsqueda perfecta se leyera como "0 cumplen".
  */
-function describirBusqueda(run: {
-  query: unknown
-}): Array<{ texto: string; enOrigen: boolean }> {
+function describirBusqueda(
+  run: { query: unknown },
+  t: Traducciones,
+  idioma: string,
+): Array<{ texto: string; enOrigen: boolean }> {
   const query = (run.query ?? {}) as {
     keywords?: string[]
     limit?: number
@@ -953,46 +973,64 @@ function describirBusqueda(run: {
 
   for (const palabra of query.keywords ?? []) partes.push({ texto: palabra, enOrigen: false })
 
-  if (f.pais) partes.push({ texto: `país: ${String(f.pais)}`, enOrigen: enOrigen.has('pais') })
-  if (f.zona) partes.push({ texto: `zona: ${String(f.zona)}`, enOrigen: enOrigen.has('zona') })
+  if (f.pais) partes.push({ texto: t('queryPais', { valor: String(f.pais) }), enOrigen: enOrigen.has('pais') })
+  if (f.zona) partes.push({ texto: t('queryZona', { valor: String(f.zona) }), enOrigen: enOrigen.has('zona') })
   if (f.bioMenciona) {
-    partes.push({ texto: `bio: ${String(f.bioMenciona)}`, enOrigen: enOrigen.has('bioMenciona') })
+    partes.push({
+      texto: t('queryBio', { valor: String(f.bioMenciona) }),
+      enOrigen: enOrigen.has('bioMenciona'),
+    })
   }
 
   const desde = f.seguidoresDesde as number | null | undefined
   const hasta = f.seguidoresHasta as number | null | undefined
   if (desde != null || hasta != null) {
-    const rango =
+    const texto =
       desde != null && hasta != null
-        ? `${formatFollowers(desde)} a ${formatFollowers(hasta)}`
+        ? t('querySeguidoresRango', {
+            desde: formatFollowers(desde, idioma),
+            hasta: formatFollowers(hasta, idioma),
+          })
         : desde != null
-          ? `desde ${formatFollowers(desde)}`
-          : `hasta ${formatFollowers(hasta ?? null)}`
-    partes.push({ texto: `seguidores ${rango}`, enOrigen: enOrigen.has('seguidores') })
+          ? t('querySeguidoresDesde', { desde: formatFollowers(desde, idioma) })
+          : t('querySeguidoresHasta', { hasta: formatFollowers(hasta ?? null, idioma) })
+    partes.push({ texto, enOrigen: enOrigen.has('seguidores') })
   }
 
   const er = f.engagementMinimo as number | null | undefined
-  if (er != null) partes.push({ texto: `ER ≥ ${er}%`, enOrigen: enOrigen.has('engagement') })
+  if (er != null) partes.push({ texto: t('queryEr', { valor: er }), enOrigen: enOrigen.has('engagement') })
 
   const a = query.audiencia
   if (a?.paisDelPublico) {
     const dato = a.paisDelPublico as { pais?: string; porcentajeMinimo?: number }
     // La audiencia siempre la aplica el proveedor: no hay forma de comprobarla después.
-    partes.push({ texto: `público de ${dato.pais} ≥ ${dato.porcentajeMinimo}%`, enOrigen: true })
+    partes.push({
+      texto: t('queryPublicoPais', { pais: dato.pais ?? '—', pct: dato.porcentajeMinimo ?? 0 }),
+      enOrigen: true,
+    })
   }
   if (a?.generoDelPublico) {
     const dato = a.generoDelPublico as { genero?: string; porcentajeMinimo?: number }
     partes.push({
-      texto: `público ${dato.genero === 'female' ? 'mujeres' : 'varones'} ≥ ${dato.porcentajeMinimo}%`,
+      texto: t('queryPublicoGenero', {
+        genero: dato.genero === 'female' ? t('generoMujeres') : t('generoVarones'),
+        pct: dato.porcentajeMinimo ?? 0,
+      }),
       enOrigen: true,
     })
   }
   if (a?.edadDelPublico) {
     const dato = a.edadDelPublico as { tramos?: string[]; porcentajeMinimo?: number }
-    partes.push({ texto: `público ${(dato.tramos ?? []).join(', ')} ≥ ${dato.porcentajeMinimo}%`, enOrigen: true })
+    partes.push({
+      texto: t('queryPublicoEdad', {
+        tramos: (dato.tramos ?? []).join(', '),
+        pct: dato.porcentajeMinimo ?? 0,
+      }),
+      enOrigen: true,
+    })
   }
   if (a?.calidadMinima != null) {
-    partes.push({ texto: `audiencia real ≥ ${String(a.calidadMinima)}`, enOrigen: true })
+    partes.push({ texto: t('queryCalidad', { valor: String(a.calidadMinima) }), enOrigen: true })
   }
 
   return partes

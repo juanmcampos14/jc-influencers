@@ -1,11 +1,13 @@
 "use client"
 
 import { useTransition } from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/field'
-import { AUDIT_ACTION_LABELS, entityTypeLabel } from '@/lib/domain/labels'
+import { AUDIT_ACTIONS, auditActionLabel, entityTypeLabel } from '@/lib/domain/labels'
 
+/* Las entidades que de verdad aparecen filtradas, no las dieciséis del modelo. */
 const ENTITIES = [
   'User',
   'Session',
@@ -20,6 +22,8 @@ const ENTITIES = [
 ]
 
 export function AuditFilters({ clients }: { clients: Array<{ id: string; name: string }> }) {
+  const t = useTranslations('filtros')
+  const tEtiqueta = useTranslations('etiquetas')
   const router = useRouter()
   const params = useSearchParams()
   /*
@@ -44,26 +48,26 @@ export function AuditFilters({ clients }: { clients: Array<{ id: string; name: s
     <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3" role="search">
       <div className="w-56">
         <label htmlFor="accion" className="mb-1 block text-xs font-medium text-ink-600">
-          Acción
+          {t('accion')}
         </label>
         <Select id="accion" name="accion" defaultValue={params.get('accion') ?? ''}>
-          <option value="">Todas</option>
-          {Object.entries(AUDIT_ACTION_LABELS).map(([key, label]) => (
+          <option value="">{t('todas')}</option>
+          {AUDIT_ACTIONS.map((key) => (
             <option key={key} value={key}>
-              {label}
+              {auditActionLabel(tEtiqueta, key)}
             </option>
           ))}
         </Select>
       </div>
       <div className="w-48">
         <label htmlFor="entidad" className="mb-1 block text-xs font-medium text-ink-600">
-          Entidad
+          {t('entidad')}
         </label>
         <Select id="entidad" name="entidad" defaultValue={params.get('entidad') ?? ''}>
-          <option value="">Todas</option>
+          <option value="">{t('todas')}</option>
           {ENTITIES.map((entity) => (
             <option key={entity} value={entity}>
-              {entityTypeLabel(entity)}
+              {entityTypeLabel(tEtiqueta, entity)}
             </option>
           ))}
         </Select>
@@ -75,23 +79,23 @@ export function AuditFilters({ clients }: { clients: Array<{ id: string; name: s
         */}
       <div className="w-36">
         <label htmlFor="desde" className="mb-1 block text-xs font-medium text-ink-600">
-          Desde
+          {t('desde')}
         </label>
         <Input id="desde" name="desde" type="date" defaultValue={params.get('desde') ?? ''} />
       </div>
       <div className="w-36">
         <label htmlFor="hasta" className="mb-1 block text-xs font-medium text-ink-600">
-          Hasta
+          {t('hasta')}
         </label>
         <Input id="hasta" name="hasta" type="date" defaultValue={params.get('hasta') ?? ''} />
       </div>
       {clients.length > 1 ? (
         <div className="w-52">
           <label htmlFor="cliente" className="mb-1 block text-xs font-medium text-ink-600">
-            Cliente
+            {t('cliente')}
           </label>
           <Select id="cliente" name="cliente" defaultValue={params.get('cliente') ?? ''}>
-            <option value="">Todos</option>
+            <option value="">{t('todos')}</option>
             {clients.map((client) => (
               <option key={client.id} value={client.id}>
                 {client.name}
@@ -102,11 +106,11 @@ export function AuditFilters({ clients }: { clients: Array<{ id: string; name: s
       ) : null}
       {params.toString() ? (
         <Button type="button" variant="ghost" onClick={() => router.push('/auditoria')}>
-          Limpiar filtros
+          {t('limpiar')}
         </Button>
       ) : null}
       <Button type="submit" variant="secondary" disabled={filtrando}>
-        {filtrando ? 'Filtrando…' : 'Filtrar'}
+        {filtrando ? t('filtrando') : t('filtrar')}
       </Button>
     </form>
   )

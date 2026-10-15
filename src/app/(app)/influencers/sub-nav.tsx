@@ -1,5 +1,7 @@
+import { useTranslations } from 'next-intl'
 import { SubNav, type ItemDeSubNav } from '@/components/ui/sub-nav'
 import { can, type AuthContext } from '@/lib/authz/context'
+import type { Traductor } from '@/lib/domain/labels'
 
 /**
  * Los cuatro lugares de Influencers.
@@ -13,12 +15,12 @@ import { can, type AuthContext } from '@/lib/authz/context'
  * Cada lugar aparece sólo si la persona puede entrar. Un lugar que se ve y da
  * error al tocarlo es peor que uno que no está.
  */
-export function itemsDeInfluencers(ctx: AuthContext): ItemDeSubNav[] {
+export function itemsDeInfluencers(ctx: AuthContext, t: Traductor): ItemDeSubNav[] {
   const items: ItemDeSubNav[] = [
     {
       href: '/influencers',
-      etiqueta: 'Padrón',
-      ayuda: 'La gente que ya incorporamos y podemos sumar a una campaña.',
+      etiqueta: t('padron'),
+      ayuda: t('padronAyuda'),
     },
   ]
 
@@ -31,21 +33,21 @@ export function itemsDeInfluencers(ctx: AuthContext): ItemDeSubNav[] {
   if (puedeBuscar) {
     items.push({
       href: '/influencers/descubiertos',
-      etiqueta: 'Descubiertos',
-      ayuda: 'Perfiles que trajeron las búsquedas y todavía no incorporamos. Buscar acá no cuesta nada.',
+      etiqueta: t('descubiertos'),
+      ayuda: t('descubiertosAyuda'),
     })
     items.push({
       href: '/influencers/buscar',
-      etiqueta: 'Buscar',
-      ayuda: 'Salir a buscar gente nueva con un proveedor. Tiene costo.',
+      etiqueta: t('buscar'),
+      ayuda: t('buscarAyuda'),
     })
   }
 
   if (can(ctx, 'influencer.manage', null)) {
     items.push({
       href: '/influencers/duplicados',
-      etiqueta: 'Duplicados',
-      ayuda: 'Perfiles que parecen la misma persona.',
+      etiqueta: t('duplicados'),
+      ayuda: t('duplicadosAyuda'),
     })
   }
 
@@ -53,5 +55,6 @@ export function itemsDeInfluencers(ctx: AuthContext): ItemDeSubNav[] {
 }
 
 export function NavDeInfluencers({ ctx, activo }: { ctx: AuthContext; activo: string }) {
-  return <SubNav items={itemsDeInfluencers(ctx)} activo={activo} etiqueta="Secciones de Influencers" />
+  const t = useTranslations('influencers')
+  return <SubNav items={itemsDeInfluencers(ctx, t)} activo={activo} etiqueta={t('seccionesDeInfluencers')} />
 }

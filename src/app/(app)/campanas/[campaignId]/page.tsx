@@ -21,6 +21,7 @@ import { NotFoundError } from '@/lib/authz/errors'
 import { getBrief, getCampaign } from '@/lib/repos/campaigns'
 import { candidacySummary, duplicateWarnings, listCandidacies, perfilesPorCluster } from '@/lib/repos/candidacies'
 import { listComments } from '@/lib/repos/comments'
+import { getTranslations } from 'next-intl/server'
 import { platformLabel } from '@/lib/domain/labels'
 import { formatDate, formatMoney } from '@/lib/util/format'
 import { hrefCon } from '@/lib/util/query'
@@ -58,6 +59,7 @@ export default async function CampaignDetailPage({
   const { campaignId } = await params
   const query = await searchParams
   const ctx = await requireContext()
+  const tEtiqueta = await getTranslations('etiquetas')
 
   let campaign
   try {
@@ -258,7 +260,7 @@ export default async function CampaignDetailPage({
             <span className="flex items-center gap-1">
               {campaign.platforms.map((platform) => (
                 <Badge key={platform} tone="slate">
-                  {platformLabel(platform)}
+                  {platformLabel(tEtiqueta, platform)}
                 </Badge>
               ))}
             </span>

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -47,6 +48,7 @@ export function ResolverDuplicado({
   b: LadoDelPar
   puedeGestionar: boolean
 }) {
+  const t = useTranslations('duplicados')
   const router = useRouter()
   const [pendiente, startTransition] = React.useTransition()
   // Por defecto sobrevive el que tiene más historia; se puede cambiar.
@@ -65,9 +67,15 @@ export function ResolverDuplicado({
         return
       }
       const { movedProfiles, movedCandidacies, conflictedCandidacies } = resultado.data
-      const partes = [`${movedProfiles} perfiles y ${movedCandidacies} candidaturas pasaron a ${sobrevive.displayName}`]
+      const partes = [
+        t('fusionResultado', {
+          perfiles: movedProfiles,
+          campanas: movedCandidacies,
+          nombre: sobrevive.displayName,
+        }),
+      ]
       if (conflictedCandidacies > 0) {
-        partes.push(`${conflictedCandidacies} quedaron sin mover: ya participaba de esa campaña`)
+        partes.push(t('fusionConflictos', { cantidad: conflictedCandidacies }))
       }
       toast.success(partes.join('. ') + '.')
       router.refresh()
@@ -87,19 +95,19 @@ export function ResolverDuplicado({
         toast.error(resultado.message)
         return
       }
-      toast.success(`${resultado.data.displayName} borrado de la base.`)
+      toast.success(t('borrado', { nombre: resultado.data.displayName }))
       router.refresh()
     })
   }
 
   function descartar() {
     startTransition(async () => {
-      const resultado = await dismissDuplicateAction({ duplicateId, notes: 'Revisado: no son la misma persona.' })
+      const resultado = await dismissDuplicateAction({ duplicateId, notes: t('notaRevisado') })
       if (!resultado.ok) {
         toast.error(resultado.message)
         return
       }
-      toast.success('Marcado como revisado.')
+      toast.success(t('marcadoRevisado'))
       router.refresh()
     })
   }
@@ -121,19 +129,22 @@ export function ResolverDuplicado({
       {puedeGestionar ? (
         <div className="flex flex-col justify-center gap-2 lg:w-56">
           <p className="text-xs leading-snug text-ink-500">
-            Se conserva <span className="font-medium text-ink-800">{sobrevive.displayName}</span>. El otro queda
-            archivado con sus datos, no se borra.
+            {t('seConserva')} <span className="font-medium text-ink-800">{sobrevive.displayName}</span>.{' '}
+            {t('seConservaAviso')}
           </p>
           <ConfirmButton
-            title="Es la misma persona"
-            description={`Todo lo de ${absorbido.displayName} pasa a ${sobrevive.displayName}: perfiles, nichos, etiquetas y campañas. ${absorbido.displayName} queda archivado con una nota que dice en quién se fusionó. No se borra nada.`}
-            confirmLabel={`Fusionar en ${sobrevive.displayName}`}
+            title={t('esLaMismaPersona')}
+            description={t('fusionBajada', {
+              absorbido: absorbido.displayName,
+              sobrevive: sobrevive.displayName,
+            })}
+            confirmLabel={t('fusionarEn', { nombre: sobrevive.displayName })}
             tone="primary"
             onConfirm={fusionar}
             pending={pendiente}
           >
             <Button size="sm" disabled={pendiente} className="w-full">
-              Es la misma persona
+              {t('esLaMismaPersona')}
             </Button>
           </ConfirmButton>
           <ConfirmButton
@@ -145,7 +156,7 @@ export function ResolverDuplicado({
             pending={pendiente}
           >
             <Button size="sm" variant="secondary" disabled={pendiente} className="w-full">
-              No son duplicados
+              {t('noSonDuplicados')}
             </Button>
           </ConfirmButton>
 
@@ -160,13 +171,12 @@ export function ResolverDuplicado({
             >
               <Button size="sm" variant="ghost" disabled={pendiente} className="w-full text-rose-700 hover:bg-rose-50">
                 <Trash2 className="size-4" aria-hidden="true" />
-                Borrar el repetido
+                {t('borrarElRepetido')}
               </Button>
             </ConfirmButton>
           ) : (
             <p className="text-[11px] leading-snug text-ink-500">
-              {absorbido.displayName} no se puede borrar: participó de{' '}
-              {absorbido.candidacies === 1 ? '1 campaña' : `${absorbido.candidacies} campañas`}.
+              {t('noSePuedeBorrar', { nombre: absorbido.displayName, cantidad: absorbido.candidacies })}
             </p>
           )}
         </div>
@@ -186,6 +196,9 @@ function Ficha({
   puedeElegir: boolean
   onElegir: () => void
 }) {
+  const t = useTranslations('duplicados')
+  const tEtiqueta = useTranslations('etiquetas')
+  const idioma = useLocale()
   const contenido = (
     <>
       <div className="flex items-start gap-2.5">
@@ -194,20 +207,20 @@ function Ficha({
           <p className="truncate text-sm font-medium text-ink-900">{lado.displayName}</p>
           {lado.primaryHandle ? <p className="truncate text-xs text-ink-500">@{lado.primaryHandle}</p> : null}
         </div>
-        {elegido ? <Badge tone="emerald">Se conserva</Badge> : null}
+        {elegido ? <Badge tone="emerald">{t('seConserva')}</Badge> : null}
       </div>
 
       <dl className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-600">
         <div className="flex gap-1">
-          <dt>Perfiles:</dt>
+          <dt>{t('perfiles')}</dt>
           <dd className="font-medium text-ink-900">{lado.totalProfiles}</dd>
         </div>
         <div className="flex gap-1">
-          <dt>Campañas:</dt>
+          <dt>{t('campanas')}</dt>
           <dd className="font-medium text-ink-900">{lado.candidacies}</dd>
         </div>
         <div className="flex gap-1">
-          <dt>País:</dt>
+          <dt>{t('pais')}</dt>
           <dd className="font-medium text-ink-900">{lado.country ?? '—'}</dd>
         </div>
       </dl>
@@ -217,15 +230,15 @@ function Ficha({
           {lado.profiles.map((perfil) => (
             <li key={perfil.url} className="flex items-baseline justify-between gap-2 text-xs">
               <span className="truncate text-ink-600">
-                {platformLabel(perfil.platform)}
+                {platformLabel(tEtiqueta, perfil.platform)}
                 {perfil.handle ? ` · @${perfil.handle}` : ''}
               </span>
-              <span className="shrink-0 tabular-nums text-ink-800">{formatFollowers(perfil.followers)}</span>
+              <span className="shrink-0 tabular-nums text-ink-800">{formatFollowers(perfil.followers, idioma)}</span>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="mt-2 text-xs text-ink-500">Sin perfiles cargados.</p>
+        <p className="mt-2 text-xs text-ink-500">{t('sinPerfilesCargados')}</p>
       )}
 
       <div className="mt-2.5 flex items-center justify-between gap-2">
@@ -235,7 +248,7 @@ function Ficha({
           className="inline-flex items-center gap-1 text-xs text-ink-600 underline-offset-4 hover:text-ink-950 hover:underline"
           onClick={(event) => event.stopPropagation()}
         >
-          Ver ficha
+          {t('verFicha')}
           <ArrowRight className="size-3" aria-hidden="true" />
         </Link>
       </div>

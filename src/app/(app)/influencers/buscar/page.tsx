@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,7 @@ export default async function BuscarPage({
 }) {
   const params = await searchParams
   const ctx = await requireContext()
+  const t = await getTranslations('scouting')
 
   const usable = ctx.clients.filter((client) => can(ctx, 'scouting.run', client.id))
   if (usable.length === 0) {
@@ -31,25 +33,25 @@ export default async function BuscarPage({
     const sinClientes = ctx.clients.length === 0
     return (
       <>
-        <PageHeader title="Influencers" description="Buscar gente nueva." />
+        <PageHeader title={t('titulo')} description={t('bajadaCorta')} />
         <div className="px-5 py-6 sm:px-8">
           <Card>
             {sinClientes ? (
               <EmptyState
-                title="Todavía no hay clientes"
-                description="El scouting busca perfiles para un cliente concreto. Creá el primero y volvé."
+                title={t('sinClientesTitulo')}
+                description={t('sinClientesBajada')}
                 action={
                   can(ctx, 'client.manage', null) ? (
                     <Button asChild variant="secondary" size="sm">
-                      <Link href="/clientes">Ir a Clientes</Link>
+                      <Link href="/clientes">{t('irAClientes')}</Link>
                     </Button>
                   ) : null
                 }
               />
             ) : (
               <EmptyState
-                title="No tenés permiso para ejecutar scouting"
-                description="Esta función tiene costo por uso, así que está limitada a la agencia. Pedísela a un administrador."
+                title={t('sinPermisoTitulo')}
+                description={t('sinPermisoBajada')}
               />
             )}
           </Card>
@@ -91,8 +93,8 @@ export default async function BuscarPage({
   return (
     <>
       <PageHeader
-        title="Influencers"
-        description="Buscar gente nueva con un proveedor externo. Tiene costo por registro, así que siempre te decimos cuánto va a salir antes de ejecutar. Antes de gastar, fijate en Descubiertos: eso ya está pago."
+        title={t('titulo')}
+        description={t('bajada')}
       />
       <div className="px-5 py-6 sm:px-8">
         <NavDeInfluencers ctx={ctx} activo="/influencers/buscar" />

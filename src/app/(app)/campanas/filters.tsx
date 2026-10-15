@@ -4,9 +4,11 @@ import { useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/field'
-import { CAMPAIGN_STATUS_LABELS } from '@/components/status-badge'
+import { useTranslations } from 'next-intl'
+import { CAMPAIGN_STATUS_VALUES, campaignStatusLabel } from '@/components/status-badge'
 
 export function CampaignFilters({ clients }: { clients: Array<{ id: string; name: string }> }) {
+  const tEtiqueta = useTranslations('etiquetas')
   const router = useRouter()
   const params = useSearchParams()
   /*
@@ -41,9 +43,9 @@ export function CampaignFilters({ clients }: { clients: Array<{ id: string; name
         </label>
         <Select id="estado" name="estado" defaultValue={params.get('estado') ?? ''}>
           <option value="">Todos</option>
-          {Object.entries(CAMPAIGN_STATUS_LABELS).map(([key, value]) => (
+          {CAMPAIGN_STATUS_VALUES.map((key) => (
             <option key={key} value={key}>
-              {value.label}
+              {campaignStatusLabel(tEtiqueta, key)}
             </option>
           ))}
         </Select>

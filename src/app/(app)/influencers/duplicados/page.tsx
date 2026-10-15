@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { PageHeader } from '@/components/app-shell'
 import { NavDeInfluencers } from '../sub-nav'
 import { Card } from '@/components/ui/card'
@@ -32,6 +33,8 @@ type LadoParaPantalla = LadoDelPar
 export default async function DuplicatesPage({ searchParams }: { searchParams: Promise<{ pagina?: string }> }) {
   const params = await searchParams
   const ctx = await requireContext()
+  const t = await getTranslations('duplicados')
+  const idioma = await getLocale()
   const page = await loadPage(() => listOpenDuplicates(ctx, { page: Number(params.pagina ?? 1) || 1, pageSize: 30 }))
   const canManage = can(ctx, 'influencer.manage', null)
 
@@ -45,7 +48,7 @@ export default async function DuplicatesPage({ searchParams }: { searchParams: P
         <NavDeInfluencers ctx={ctx} activo="/influencers/duplicados" />
         <Card className={canManage ? 'px-5 pt-4' : undefined}>
           {page.items.length === 0 ? (
-            <EmptyState title="No hay duplicados pendientes" description="Todo lo detectado ya fue resuelto." />
+            <EmptyState title={t('vacioTitulo')} description={t('vacioBajada')} />
           ) : (
             <SeleccionDeDuplicados idsDeLaPagina={canManage ? page.items.map((d) => d.id) : []}>
             <ul className="divide-y divide-ink-100">
@@ -55,14 +58,16 @@ export default async function DuplicatesPage({ searchParams }: { searchParams: P
                     {canManage ? (
                       <CasillaDeFila
                         id={duplicate.id}
-                        nombre={`el par ${duplicate.a.displayName} y ${duplicate.b.displayName}`}
+                        nombre={t('elPar', { a: duplicate.a.displayName, b: duplicate.b.displayName })}
                       />
                     ) : null}
-                    <span className="font-semibold tabular-nums text-ink-800">{duplicate.score}% de parecido</span>
+                    <span className="font-semibold tabular-nums text-ink-800">
+                      {t('parecido', { pct: duplicate.score })}
+                    </span>
                     <span aria-hidden="true">·</span>
                     <span>{duplicate.reason}</span>
                     <span aria-hidden="true">·</span>
-                    <span>detectado {formatDate(duplicate.detectedAt, ctx.user.timezone)}</span>
+                    <span>{t('detectado', { fecha: formatDate(duplicate.detectedAt, ctx.user.timezone, idioma) })}</span>
                   </div>
                   <ResolverDuplicado
                     duplicateId={duplicate.id}

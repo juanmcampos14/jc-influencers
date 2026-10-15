@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { getLocale, getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
 import { Card } from '@/components/ui/card'
@@ -18,7 +19,7 @@ import { can } from '@/lib/authz/context'
 import { listCampaigns } from '@/lib/repos/campaigns'
 import { resumenDeLaBase, searchInfluencers } from '@/lib/repos/influencers'
 import { scoped } from '@/lib/repos/base'
-import { formatFollowers, formatPercent } from '@/lib/util/format'
+import { formatFollowers, formatNumber, formatPercent } from '@/lib/util/format'
 import { InfluencerFilters } from '../filters'
 import { CasillaDeFila, SeleccionDeInfluencers } from '../seleccion'
 import { NewInfluencerDialog } from '../new-influencer-dialog'
@@ -56,6 +57,8 @@ const columna = (clave: Clave): ColumnaOrdenable<Clave> => COLUMNAS.find((c) => 
 export default async function InfluencersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const ctx = await requireContext()
+  const t = await getTranslations('influencers')
+  const idioma = await getLocale()
 
   const orden = resolverOrden(COLUMNAS, params)
 
@@ -112,8 +115,8 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
   return (
     <>
       <PageHeader
-        title="Influencers"
-        description="La gente que ya incorporamos. Un influencer existe una sola vez y participa en varias campañas."
+        title={t('titulo')}
+        description={t('bajada')}
         actions={canManage ? <NewInfluencerDialog niches={niches.map((n) => ({ key: n.key, label: n.label }))} /> : null}
       />
       <div className="space-y-4 px-5 py-6 sm:px-8">
@@ -125,18 +128,22 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
         <NavDeInfluencers ctx={ctx} activo="/influencers" />
         <StatStrip>
           <Stat
-            label="En la base"
+            label={t('statEnLaBase')}
             value={resumen.total}
-            hint={resumen.filtrados !== resumen.total ? `${resumen.filtrados} con los filtros puestos` : undefined}
+            hint={
+              resumen.filtrados !== resumen.total
+                ? t('statConFiltros', { cantidad: formatNumber(resumen.filtrados, idioma) })
+                : undefined
+            }
           />
-          <Stat label="Activos" value={resumen.activos} tone="good" />
+          <Stat label={t('statActivos')} value={resumen.activos} tone="good" />
           <Stat
-            label="Sin actualizar"
+            label={t('statSinActualizar')}
             value={resumen.sinActualizar}
             tone="warn"
-            hint="Perfiles medidos hace más de 45 días"
+            hint={t('statSinActualizarAyuda')}
           />
-          <Stat label="Duplicados sin resolver" value={resumen.duplicadosAbiertos} tone="accent" />
+          <Stat label={t('statDuplicados')} value={resumen.duplicadosAbiertos} tone="accent" />
         </StatStrip>
 
         <InfluencerFilters
@@ -147,8 +154,8 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
         <Card>
           {page.items.length === 0 ? (
             <EmptyState
-              title="No hay influencers que coincidan"
-              description="Probá con menos filtros, o importá el Excel de scouting desde Importación."
+              title={t('vacioTitulo')}
+              description={t('vacioBajada')}
             />
           ) : (
             <SeleccionDeInfluencers
@@ -162,21 +169,21 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                 <Table>
                   <thead>
                     <tr>
-                      {elegible ? <Th className="w-10" aria-label="Elegir" /> : null}
+                      {elegible ? <Th className="w-10" aria-label={t('elegir')} /> : null}
                       <ThOrdenable columna={columna('nombre')} orden={orden} base="/influencers" params={params} className={columnaFija}>
-                        Creador
+                        {t('colCreador')}
                       </ThOrdenable>
                       <ThOrdenable columna={columna('pais')} orden={orden} base="/influencers" params={params}>
-                        País
+                        {t('colPais')}
                       </ThOrdenable>
-                      <Th>Nichos</Th>
-                      <Th>Perfiles</Th>
+                      <Th>{t('colNichos')}</Th>
+                      <Th>{t('colPerfiles')}</Th>
                       {/* Seguidores todavía no ordena: la cifra es la del perfil
                           principal y vive en otra tabla. Ver `OrdenDeInfluencers`. */}
-                      <Th className="text-right">Seguidores</Th>
-                      <Th className="text-right">ER</Th>
+                      <Th className="text-right">{t('colSeguidores')}</Th>
+                      <Th className="text-right">{t('colEr')}</Th>
                       <ThOrdenable columna={columna('estado')} orden={orden} base="/influencers" params={params}>
-                        Estado
+                        {t('colEstado')}
                       </ThOrdenable>
                     </tr>
                   </thead>
@@ -225,21 +232,21 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                                   {profile.platform.toLowerCase()}
                                 </ExternalLink>
                               ))}
-                              {influencer.profiles.length === 0 ? <span className="text-ink-400">sin perfil</span> : null}
+                              {influencer.profiles.length === 0 ? <span className="text-ink-400">{t('sinPerfil')}</span> : null}
                             </div>
                           </Td>
                           <Td className="text-right tabular-nums">
-                            {formatFollowers(main?.followers)}
+                            {formatFollowers(main?.followers, idioma)}
                             {main?.stale ? (
                               <span
                                 className="block text-[11px] font-medium text-amber-700"
-                                title="La última medición tiene más de 45 días"
+                                title={t('sinActualizarTitulo')}
                               >
-                                sin actualizar
+                                {t('sinActualizar')}
                               </span>
                             ) : null}
                           </Td>
-                          <Td className="text-right tabular-nums">{formatPercent(main?.engagementRate)}</Td>
+                          <Td className="text-right tabular-nums">{formatPercent(main?.engagementRate, idioma)}</Td>
                           <Td>
                             <InfluencerStatusBadge status={influencer.status} />
                           </Td>

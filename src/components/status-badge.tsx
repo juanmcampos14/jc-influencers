@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import { CANDIDACY_STATUS_SEED } from '@/lib/domain/statuses'
 import { INFLUENCER_STATUS } from '@/lib/domain/labels'
@@ -9,34 +10,47 @@ export function StatusBadge({ statusKey, label, color }: { statusKey: string; la
   return <Badge tone={color ?? seed?.color ?? 'slate'}>{label ?? seed?.label ?? statusKey}</Badge>
 }
 
-const APPROVAL_LABELS: Record<string, { label: string; tone: string }> = {
-  PENDING: { label: 'Pendiente', tone: 'slate' },
-  APPROVED: { label: 'Aprobado', tone: 'emerald' },
-  REJECTED: { label: 'Rechazado', tone: 'rose' },
-  NEEDS_REVIEW: { label: 'A revisar', tone: 'amber' },
-  REPLACEMENT_REQUESTED: { label: 'Pide reemplazo', tone: 'orange' },
+/*
+ * Los badges resuelven su propio texto. Antes recibían la etiqueta ya escrita
+ * desde un mapa de este archivo, y eso dejaba el estado en castellano en todas
+ * las pantallas en inglés -- justo el dato que más se mira de una tabla.
+ */
+const APPROVAL_TONES: Record<string, string> = {
+  PENDING: 'slate',
+  APPROVED: 'emerald',
+  REJECTED: 'rose',
+  NEEDS_REVIEW: 'amber',
+  REPLACEMENT_REQUESTED: 'orange',
 }
 
 export function ApprovalBadge({ approval }: { approval: string }) {
-  const entry = APPROVAL_LABELS[approval] ?? { label: approval, tone: 'slate' }
-  return <Badge tone={entry.tone}>{entry.label}</Badge>
+  const t = useTranslations('etiquetas')
+  const tone = APPROVAL_TONES[approval]
+  return <Badge tone={tone ?? 'slate'}>{tone ? t(`aprobacion${approval}`) : approval}</Badge>
 }
 
-export const CAMPAIGN_STATUS_LABELS: Record<string, { label: string; tone: string }> = {
-  DRAFT: { label: 'Borrador', tone: 'slate' },
-  BRIEFING: { label: 'Brief', tone: 'sky' },
-  SCOUTING: { label: 'Scouting', tone: 'indigo' },
-  PROPOSAL: { label: 'Propuesta', tone: 'blue' },
-  NEGOTIATION: { label: 'Negociación', tone: 'violet' },
-  PRODUCTION: { label: 'Producción', tone: 'amber' },
-  LIVE: { label: 'En vivo', tone: 'emerald' },
-  CLOSED: { label: 'Cerrada', tone: 'stone' },
-  CANCELLED: { label: 'Cancelada', tone: 'rose' },
+/** Estado de la campaña: tono y orden acá, texto en las traducciones. */
+export const CAMPAIGN_STATUS_TONES: Record<string, string> = {
+  DRAFT: 'slate',
+  BRIEFING: 'sky',
+  SCOUTING: 'indigo',
+  PROPOSAL: 'blue',
+  NEGOTIATION: 'violet',
+  PRODUCTION: 'amber',
+  LIVE: 'emerald',
+  CLOSED: 'stone',
+  CANCELLED: 'rose',
 }
+
+export const CAMPAIGN_STATUS_VALUES: readonly string[] = Object.keys(CAMPAIGN_STATUS_TONES)
+
+/** El texto de un estado de campaña, para un desplegable o un aviso. */
+export const campaignStatusLabel = (t: (clave: string) => string, status: string): string =>
+  status in CAMPAIGN_STATUS_TONES ? t(`campana${status}`) : status
 
 export function CampaignStatusBadge({ status }: { status: string }) {
-  const entry = CAMPAIGN_STATUS_LABELS[status] ?? { label: status, tone: 'slate' }
-  return <Badge tone={entry.tone}>{entry.label}</Badge>
+  const t = useTranslations('etiquetas')
+  return <Badge tone={CAMPAIGN_STATUS_TONES[status] ?? 'slate'}>{campaignStatusLabel(t, status)}</Badge>
 }
 
 /**
@@ -49,20 +63,23 @@ export function CampaignStatusBadge({ status }: { status: string }) {
 export const INFLUENCER_STATUS_LABELS = INFLUENCER_STATUS
 
 export function InfluencerStatusBadge({ status }: { status: string }) {
-  const entry = INFLUENCER_STATUS_LABELS[status] ?? { label: status, tone: 'slate' }
+  const t = useTranslations('etiquetas')
+  const entry = INFLUENCER_STATUS_LABELS[status]
   return (
-    <Badge tone={entry.tone} dot>
-      {entry.label}
+    <Badge tone={entry?.tone ?? 'slate'} dot>
+      {entry ? t(entry.clave) : status}
     </Badge>
   )
 }
 
 export function StarsLabel({ value }: { value: number | null }) {
+  const t = useTranslations('etiquetas')
   if (!value) return <span className="text-ink-400">—</span>
+  const texto = t('fitDeCinco', { valor: value })
   return (
-    <span className="whitespace-nowrap text-amber-600" title={`Fit ${value} de 5`}>
+    <span className="whitespace-nowrap text-amber-600" title={texto}>
       <span aria-hidden="true">{'★'.repeat(value)}</span>
-      <span className="sr-only">Fit {value} de 5</span>
+      <span className="sr-only">{texto}</span>
     </span>
   )
 }

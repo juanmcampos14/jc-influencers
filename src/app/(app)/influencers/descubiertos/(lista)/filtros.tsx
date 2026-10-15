@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/field'
@@ -19,6 +20,8 @@ import type { FiltrosDeBase } from '@/lib/repos/base-conocimiento'
 const REDES = ['INSTAGRAM', 'TIKTOK', 'YOUTUBE', 'TWITCH', 'X'] as const
 
 export function FiltrosDeDescubiertos({ filtros }: { filtros: FiltrosDeBase }) {
+  const t = useTranslations('descubiertos')
+  const tEtiqueta = useTranslations('etiquetas')
   const avanzadoPuesto =
     (filtros.palabras ?? []).length > 0 ||
     (filtros.intereses ?? []).length > 0 ||
@@ -45,20 +48,20 @@ export function FiltrosDeDescubiertos({ filtros }: { filtros: FiltrosDeBase }) {
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-52 flex-1">
           <label htmlFor="q" className="mb-1 block text-xs font-medium text-ink-600">
-            Buscar
+            {t('filtroBuscar')}
           </label>
-          <Input id="q" name="q" defaultValue={filtros.texto ?? ''} placeholder="Nombre, @handle o algo de su bio" />
+          <Input id="q" name="q" defaultValue={filtros.texto ?? ''} placeholder={t('filtroBuscarPista')} />
         </div>
 
         <div className="w-36">
           <label htmlFor="red" className="mb-1 block text-xs font-medium text-ink-600">
-            Red
+            {t('filtroRed')}
           </label>
           <Select id="red" name="red" defaultValue={filtros.platform ?? ''}>
-            <option value="">Todas</option>
+            <option value="">{t('filtroTodas')}</option>
             {REDES.map((red) => (
               <option key={red} value={red}>
-                {platformLabel(red)}
+                {platformLabel(tEtiqueta, red)}
               </option>
             ))}
           </Select>
@@ -66,28 +69,28 @@ export function FiltrosDeDescubiertos({ filtros }: { filtros: FiltrosDeBase }) {
 
         <div className="w-28">
           <label htmlFor="pais" className="mb-1 block text-xs font-medium text-ink-600">
-            País
+            {t('filtroPais')}
           </label>
           <Input id="pais" name="pais" defaultValue={filtros.pais ?? ''} placeholder="AR" maxLength={40} />
         </div>
 
         <div className="w-32">
           <label htmlFor="segDesde" className="mb-1 block text-xs font-medium text-ink-600">
-            Seguidores desde
+            {t('filtroSegDesde')}
           </label>
           <Input id="segDesde" name="segDesde" type="number" min={0} defaultValue={filtros.seguidoresDesde ?? ''} />
         </div>
 
         <div className="w-32">
           <label htmlFor="segHasta" className="mb-1 block text-xs font-medium text-ink-600">
-            hasta
+            {t('filtroSegHasta')}
           </label>
           <Input id="segHasta" name="segHasta" type="number" min={0} defaultValue={filtros.seguidoresHasta ?? ''} />
         </div>
 
         <div className="w-28">
           <label htmlFor="erDesde" className="mb-1 block text-xs font-medium text-ink-600">
-            ER mínimo
+            {t('filtroErMinimo')}
           </label>
           <Input
             id="erDesde"
@@ -102,12 +105,12 @@ export function FiltrosDeDescubiertos({ filtros }: { filtros: FiltrosDeBase }) {
 
       <details open={avanzadoPuesto} className="mt-3 border-t border-ink-200 pt-3">
         <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm text-ink-600 hover:text-ink-900">
-          Más filtros
+          {t('masFiltros')}
         </summary>
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <div className="min-w-44 flex-1">
             <label htmlFor="palabras" className="mb-1 block text-xs font-medium text-ink-600">
-              Apareció buscando
+              {t('filtroPalabras')}
             </label>
             <Input
               id="palabras"
@@ -119,17 +122,17 @@ export function FiltrosDeDescubiertos({ filtros }: { filtros: FiltrosDeBase }) {
 
           <div className="min-w-44 flex-1">
             <label htmlFor="intereses" className="mb-1 block text-xs font-medium text-ink-600">
-              Intereses
+              {t('filtroIntereses')}
             </label>
             <Input id="intereses" name="intereses" defaultValue={(filtros.intereses ?? []).join(', ')} />
           </div>
 
           <div className="w-40">
             <label htmlFor="proveedor" className="mb-1 block text-xs font-medium text-ink-600">
-              Lo trajo
+              {t('filtroProveedor')}
             </label>
             <Select id="proveedor" name="proveedor" defaultValue={filtros.proveedor ?? ''}>
-              <option value="">Cualquiera</option>
+              <option value="">{t('filtroCualquiera')}</option>
               <option value="apify">Apify</option>
               <option value="brightdata">Bright Data</option>
               <option value="hypeauditor">HypeAuditor</option>
@@ -138,34 +141,34 @@ export function FiltrosDeDescubiertos({ filtros }: { filtros: FiltrosDeBase }) {
 
           <div className="w-40">
             <label htmlFor="padron" className="mb-1 block text-xs font-medium text-ink-600">
-              Ya en el padrón
+              {t('filtroPadron')}
             </label>
             <Select id="padron" name="padron" defaultValue={filtros.enPadron ?? 'CUALQUIERA'}>
-              <option value="CUALQUIERA">No importa</option>
-              <option value="SI">Sí</option>
-              <option value="NO">Todavía no</option>
+              <option value="CUALQUIERA">{t('filtroNoImporta')}</option>
+              <option value="SI">{t('filtroSi')}</option>
+              <option value="NO">{t('filtroTodaviaNo')}</option>
             </Select>
           </div>
 
           <div className="w-44">
             <label htmlFor="campanas" className="mb-1 block text-xs font-medium text-ink-600">
-              Trabajó en campañas
+              {t('filtroCampanas')}
             </label>
             <Select id="campanas" name="campanas" defaultValue={filtros.conCampanas ?? 'CUALQUIERA'}>
-              <option value="CUALQUIERA">No importa</option>
-              <option value="SI">Sí</option>
-              <option value="NO">Nunca</option>
+              <option value="CUALQUIERA">{t('filtroNoImporta')}</option>
+              <option value="SI">{t('filtroSi')}</option>
+              <option value="NO">{t('filtroNunca')}</option>
             </Select>
           </div>
 
           <div className="w-44">
             <label htmlFor="visto" className="mb-1 block text-xs font-medium text-ink-600">
-              Visto
+              {t('filtroVisto')}
             </label>
             <Select id="visto" name="visto" defaultValue={filtros.visto ?? 'CUALQUIERA'}>
-              <option value="CUALQUIERA">Alguna vez</option>
-              <option value="ULTIMOS_30">Últimos 30 días</option>
-              <option value="ULTIMOS_90">Últimos 90 días</option>
+              <option value="CUALQUIERA">{t('filtroAlgunaVez')}</option>
+              <option value="ULTIMOS_30">{t('filtroUltimos30')}</option>
+              <option value="ULTIMOS_90">{t('filtroUltimos90')}</option>
             </Select>
           </div>
         </div>
@@ -173,11 +176,11 @@ export function FiltrosDeDescubiertos({ filtros }: { filtros: FiltrosDeBase }) {
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button type="submit" size="sm">
-          Filtrar
+          {t('filtrar')}
         </Button>
         {hayAlguno ? (
           <Button asChild variant="ghost" size="sm">
-            <Link href="/influencers/descubiertos">Limpiar</Link>
+            <Link href="/influencers/descubiertos">{t('limpiar')}</Link>
           </Button>
         ) : null}
       </div>

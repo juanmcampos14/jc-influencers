@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -9,6 +10,7 @@ import { Checkbox, Field, Input } from '@/components/ui/field'
 import { addProfileAction } from '../../actions/influencers'
 
 export function AddProfileDialog({ influencerId }: { influencerId: string }) {
+  const t = useTranslations('influencers')
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [errors, setErrors] = useState<Record<string, string[]>>({})
@@ -40,7 +42,7 @@ export function AddProfileDialog({ influencerId }: { influencerId: string }) {
         toast.error(result.message)
         return
       }
-      toast.success('Perfil guardado. Se registró un snapshot con la fecha de hoy.')
+      toast.success(t('perfilGuardado'))
       setOpen(false)
       router.refresh()
     })
@@ -49,51 +51,51 @@ export function AddProfileDialog({ influencerId }: { influencerId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">Cargar métricas</Button>
+        <Button size="sm">{t('cargarMetricas')}</Button>
       </DialogTrigger>
       <DialogContent
         title="Perfil social y métricas"
         description="Si el perfil ya existe se actualiza y queda un snapshot con la fecha y la fuente."
       >
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
-          <Field label="URL del perfil" htmlFor="url" errors={errors.url} required>
+          <Field label={t('campoUrl')} htmlFor="url" errors={errors.url} required>
             <Input id="url" name="url" required autoFocus maxLength={500} placeholder="https://www.instagram.com/…" />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Seguidores" htmlFor="followers">
+            <Field label={t('campoSeguidores')} htmlFor="followers">
               <Input id="followers" name="followers" type="number" min={0} />
             </Field>
-            <Field label="Valor original" htmlFor="followersRaw" hint='Cómo venía escrito, p. ej. "31,6k".'>
+            <Field label={t('campoValorOriginal')} htmlFor="followersRaw" hint={t('valorOriginalAyuda')}>
               <Input id="followersRaw" name="followersRaw" maxLength={60} />
             </Field>
-            <Field label="Engagement rate (%)" htmlFor="engagementRate">
+            <Field label={t('campoEr')} htmlFor="engagementRate">
               <Input id="engagementRate" name="engagementRate" type="number" step="0.01" min={0} max={100} />
             </Field>
-            <Field label="Views promedio" htmlFor="avgViews">
+            <Field label={t('campoViews')} htmlFor="avgViews">
               <Input id="avgViews" name="avgViews" type="number" min={0} />
             </Field>
-            <Field label="% audiencia local" htmlFor="audienceLocalPercent">
+            <Field label={t('campoAudienciaLocal')} htmlFor="audienceLocalPercent">
               <Input id="audienceLocalPercent" name="audienceLocalPercent" type="number" step="0.1" min={0} max={100} />
             </Field>
-            <Field label="Fuente" htmlFor="metricSource" hint="De dónde salió el dato.">
+            <Field label={t('campoFuente')} htmlFor="metricSource" hint={t('fuenteAyuda')}>
               <Input id="metricSource" name="metricSource" maxLength={200} />
             </Field>
           </div>
-          <Field label="URL de la fuente" htmlFor="metricSourceUrl" errors={errors.metricSourceUrl}>
+          <Field label={t('campoUrlFuente')} htmlFor="metricSourceUrl" errors={errors.metricSourceUrl}>
             <Input id="metricSourceUrl" name="metricSourceUrl" type="url" maxLength={500} />
           </Field>
           <label className="flex items-center gap-2 text-sm text-ink-700">
             <Checkbox name="isPrimary" />
-            Marcar como perfil principal
+            {t('marcarPrincipal')}
           </label>
           <div className="flex justify-end gap-2">
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancelar
+                {t('cancelar')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={pending}>
-              {pending ? 'Guardando…' : 'Guardar'}
+              {pending ? t('guardando') : t('guardar')}
             </Button>
           </div>
         </form>

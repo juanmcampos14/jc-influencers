@@ -1,6 +1,7 @@
 "use client"
 
 import { EyeOff, Merge } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Seleccion, CasillaDeFila } from '@/components/ui/seleccion'
 import { BotonDeLote, useAccionDeLote } from '@/components/ui/acciones-de-lote'
 import { descartarDuplicadosAction, fusionarDuplicadosAction } from '../../actions/lote'
@@ -30,48 +31,47 @@ export function SeleccionDeDuplicados({
   idsDeLaPagina: string[]
   children: React.ReactNode
 }) {
+  const t = useTranslations('duplicados')
   const { ejecutar, pendiente } = useAccionDeLote()
 
   return (
-    <Seleccion idsDeLaPagina={idsDeLaPagina} etiqueta="elegidos" acciones={(ids, limpiar) => (
+    <Seleccion idsDeLaPagina={idsDeLaPagina} etiqueta={t('elegidos')} acciones={(ids, limpiar) => (
       <>
       <BotonDeLote
         pendiente={pendiente}
         confirmacion={{
-          title: `Fusionar ${ids.length === 1 ? 'el par' : `${ids.length} pares`}`,
-          description:
-            'Se fusionan sólo los que son la misma cuenta: misma URL o mismo handle en la misma red. En cada uno se conserva la ficha con más historia (perfiles y campañas) y la otra queda archivada con una nota que dice en quién se fusionó, no se borra nada. Los que se juntaron sólo porque el nombre se parece no se tocan, y te decimos cuáles son para que los mires de a uno.',
-          confirmLabel: 'Fusionar los que son la misma cuenta',
+          title: t('fusionarTitulo', { cantidad: ids.length }),
+          description: t('fusionarBajada'),
+          confirmLabel: t('fusionarConfirmar'),
         }}
         onConfirm={() =>
           ejecutar(
             () => fusionarDuplicadosAction({ ids }),
-            { singular: 'par fusionado', plural: 'pares fusionados', ninguno: 'No se fusionó ninguno.' },
+            { singular: t('fusionadoSingular'), plural: t('fusionadoPlural'), ninguno: t('fusionadoNinguno') },
             limpiar,
           )
         }
       >
         <Merge className="size-4" aria-hidden="true" />
-        Fusionar
+        {t('fusionar')}
       </BotonDeLote>
       <BotonDeLote
         pendiente={pendiente}
         confirmacion={{
-          title: `Descartar ${ids.length === 1 ? 'el par' : `${ids.length} pares`}`,
-          description:
-            'Quedan marcados como revisados y salen de esta lista. No se borra ni se fusiona nada: sólo estás diciendo que no son la misma persona.',
-          confirmLabel: 'Descartar',
+          title: t('descartarTitulo', { cantidad: ids.length }),
+          description: t('descartarBajada'),
+          confirmLabel: t('descartar'),
         }}
         onConfirm={() =>
           ejecutar(
             () => descartarDuplicadosAction({ ids }),
-            { singular: 'par descartado', plural: 'pares descartados', ninguno: 'No se descartó ninguno.' },
+            { singular: t('descartadoSingular'), plural: t('descartadoPlural'), ninguno: t('descartadoNinguno') },
             limpiar,
           )
         }
       >
         <EyeOff className="size-4" aria-hidden="true" />
-        Descartar
+        {t('descartar')}
       </BotonDeLote>
       </>
     )}>

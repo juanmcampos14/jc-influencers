@@ -7,6 +7,7 @@ import {
   type ClaveDeFiltro,
   type FiltrosDeAudiencia,
   type FiltrosDeScouting,
+  type Motivo,
   type Veredicto,
 } from '@/lib/domain/filtros-scouting'
 import { assertCan, assertClientInScope } from '@/lib/authz/context'
@@ -534,8 +535,8 @@ export async function cancelScouting(ctx: AuthContext, runId: string): Promise<v
 export type ScoutingResultDto = {
   /** Cómo quedó contra los filtros pedidos. Ver `filtros-scouting.ts`. */
   veredicto: Veredicto
-  /** Por qué no cumple, o qué dato faltó para comprobarlo. */
-  motivos: string[]
+  /** Por qué no cumple, o qué dato faltó para comprobarlo. Claves, no frases. */
+  motivos: Motivo[]
   id: string
   platform: Platform
   handle: string | null

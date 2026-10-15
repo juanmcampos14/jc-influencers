@@ -36,7 +36,7 @@ describe('evaluarCreador', () => {
       // lista está completa.
       const r = evaluarCreador({ ...completo, country: null }, { pais: 'AR' })
       expect(r.veredicto).toBe('SIN_DATO')
-      expect(r.motivos[0]).toContain('no dice de qué país')
+      expect(r.motivos[0]?.clave).toBe('motivoSinPais')
     })
 
     it('sin engagement tampoco', () => {
@@ -57,7 +57,7 @@ describe('evaluarCreador', () => {
         { seguidoresDesde: 10_000, pais: 'AR' },
       )
       expect(r.veredicto).toBe('NO_CUMPLE')
-      expect(r.motivos[0]).toContain('menos del mínimo')
+      expect(r.motivos[0]?.clave).toBe('motivoPocosSeguidores')
     })
   })
 
@@ -73,7 +73,7 @@ describe('evaluarCreador', () => {
   it('un país distinto es un incumplimiento, no un dato faltante', () => {
     const r = evaluarCreador({ ...completo, country: 'MX' }, { pais: 'AR' })
     expect(r.veredicto).toBe('NO_CUMPLE')
-    expect(r.motivos[0]).toContain('MX')
+    expect(r.motivos[0]).toEqual({ clave: 'motivoOtroPais', valores: { pais: 'MX' } })
   })
 })
 
@@ -107,7 +107,7 @@ describe('filtros que aplicó el proveedor', () => {
   it('sin garantía, la falta del dato se marca', () => {
     const r = evaluarCreador(sinDatos, { pais: 'AR' })
     expect(r.veredicto).toBe('SIN_DATO')
-    expect(r.motivos).toContain('no dice de qué país es')
+    expect(r.motivos).toContainEqual({ clave: 'motivoSinPais' })
   })
 
   it('con la garantía del proveedor, cumple aunque no venga el dato', () => {
@@ -118,7 +118,7 @@ describe('filtros que aplicó el proveedor', () => {
     // El país lo filtró él; el engagement no, y ese dato falta.
     const r = evaluarCreador(sinDatos, { pais: 'AR', engagementMinimo: 3 }, ['pais'])
     expect(r.veredicto).toBe('SIN_DATO')
-    expect(r.motivos).toEqual(['no informa engagement'])
+    expect(r.motivos).toEqual([{ clave: 'motivoSinEngagement' }])
   })
 
   /*

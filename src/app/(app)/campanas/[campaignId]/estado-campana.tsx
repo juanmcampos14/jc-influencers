@@ -1,10 +1,11 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Select } from '@/components/ui/field'
-import { CampaignStatusBadge, CAMPAIGN_STATUS_LABELS } from '@/components/status-badge'
+import { CampaignStatusBadge, CAMPAIGN_STATUS_VALUES, campaignStatusLabel } from '@/components/status-badge'
 import { cn } from '@/lib/util/format'
 import { changeCampaignStatusAction } from '../../actions/campaigns'
 
@@ -31,6 +32,7 @@ export function EstadoDeCampana({
   version: number
   puedeEditar: boolean
 }) {
+  const tEtiqueta = useTranslations('etiquetas')
   const router = useRouter()
   const [optimista, setOptimista] = React.useState<string | null>(null)
   const [guardando, setGuardando] = React.useState(false)
@@ -55,7 +57,7 @@ export function EstadoDeCampana({
         toast.error(resultado.message)
         return
       }
-      toast.success(`Campaña en ${CAMPAIGN_STATUS_LABELS[nuevo]?.label ?? nuevo}.`, {
+      toast.success(`Campaña en ${campaignStatusLabel(tEtiqueta, nuevo)}.`, {
         action: { label: 'Deshacer', onClick: () => cambiar(anterior, nuevo) },
       })
       router.refresh()
@@ -72,9 +74,9 @@ export function EstadoDeCampana({
         disabled={guardando}
         className={cn('h-8 w-40 text-xs', guardando && 'opacity-60')}
       >
-        {Object.entries(CAMPAIGN_STATUS_LABELS).map(([key, value]) => (
+        {CAMPAIGN_STATUS_VALUES.map((key) => (
           <option key={key} value={key}>
-            {value.label}
+            {campaignStatusLabel(tEtiqueta, key)}
           </option>
         ))}
       </Select>

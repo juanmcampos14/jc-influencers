@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Archive, Plus, Trash2 } from 'lucide-react'
@@ -38,6 +39,7 @@ export function SeleccionDeInfluencers({
   puedeGestionar: boolean
   children: React.ReactNode
 }) {
+  const t = useTranslations('influencers')
   const router = useRouter()
   const [campana, setCampana] = React.useState<string>(campanas[0]?.id ?? '')
   const [agregando, startAgregar] = React.useTransition()
@@ -49,7 +51,7 @@ export function SeleccionDeInfluencers({
     startAgregar(async () => {
       const resultado = await addToCampaignAction({ campaignId: campana, influencerIds: ids }).catch(() => null)
       if (!resultado) {
-        toast.error('No se pudo agregar. Reintentá en un momento.')
+        toast.error(t('noSePudoAgregar'))
         return
       }
       if (!resultado.ok) {
@@ -59,8 +61,8 @@ export function SeleccionDeInfluencers({
       const { added, alreadyThere } = resultado.data
       // Los que ya estaban se dicen: "agregué 12" cuando agregaste 7 es una
       // mentira chica que después cuesta cara.
-      const partes = [`${added} ${added === 1 ? 'influencer agregado' : 'influencers agregados'} a ${elegida.name}`]
-      if (alreadyThere > 0) partes.push(`${alreadyThere} ya ${alreadyThere === 1 ? 'estaba' : 'estaban'}`)
+      const partes = [t('agregados', { cantidad: added, campana: elegida.name })]
+      if (alreadyThere > 0) partes.push(t('yaEstaban', { cantidad: alreadyThere }))
       toast.success(`${partes.join(' · ')}.`)
       limpiar()
       router.refresh()
@@ -70,7 +72,7 @@ export function SeleccionDeInfluencers({
   const ocupado = agregando || pendiente
 
   return (
-    <Seleccion idsDeLaPagina={idsDeLaPagina} etiqueta="elegidos" acciones={(ids, limpiar) => (
+    <Seleccion idsDeLaPagina={idsDeLaPagina} etiqueta={t('elegidos')} acciones={(ids, limpiar) => (
       <>
         {campanas.length > 0 ? (
           <>
@@ -88,7 +90,7 @@ export function SeleccionDeInfluencers({
             </Select>
             <Button size="sm" onClick={() => agregar(ids, limpiar)} disabled={ocupado || !campana}>
               <Plus className="size-4" aria-hidden="true" />
-              {agregando ? 'Agregando…' : 'Agregar a la campaña'}
+              {agregando ? t('agregando') : t('agregarALaCampana')}
             </Button>
           </>
         ) : null}
@@ -98,21 +100,20 @@ export function SeleccionDeInfluencers({
             <BotonDeLote
               pendiente={ocupado}
               confirmacion={{
-                title: `Archivar ${ids.length === 1 ? 'el influencer' : `${ids.length} influencers`}`,
-                description:
-                  'Salen de la lista por defecto y siguen en la base con todo su historial. Se puede deshacer poniéndolos en activo otra vez.',
-                confirmLabel: 'Archivar',
+                title: t('archivarTitulo', { cantidad: ids.length }),
+                description: t('archivarBajada'),
+                confirmLabel: t('archivar'),
               }}
               onConfirm={() =>
                 ejecutar(
                   () => estadoDeInfluencersAction({ ids, destino: 'ARCHIVED' }),
-                  { singular: 'influencer archivado', plural: 'influencers archivados', ninguno: 'No se archivó ninguno.' },
+                  { singular: t('archivadoSingular'), plural: t('archivadoPlural'), ninguno: t('archivadoNinguno') },
                   limpiar,
                 )
               }
             >
               <Archive className="size-4" aria-hidden="true" />
-              Archivar
+              {t('archivar')}
             </BotonDeLote>
 
             <BotonDeLote
@@ -121,33 +122,32 @@ export function SeleccionDeInfluencers({
               onConfirm={() =>
                 ejecutar(
                   () => estadoDeInfluencersAction({ ids, destino: 'ACTIVE' }),
-                  { singular: 'influencer activado', plural: 'influencers activados', ninguno: 'No se activó ninguno.' },
+                  { singular: t('activadoSingular'), plural: t('activadoPlural'), ninguno: t('activadoNinguno') },
                   limpiar,
                 )
               }
             >
-              Marcar activos
+              {t('marcarActivos')}
             </BotonDeLote>
 
             <BotonDeLote
               variant="danger"
               pendiente={ocupado}
               confirmacion={{
-                title: `Borrar ${ids.length === 1 ? 'el influencer' : `${ids.length} influencers`}`,
-                description:
-                  'Esto no se deshace. Quien haya participado de alguna campaña no se va a borrar: borrarlo dejaría esas campañas sin parte de su historia, y te vamos a decir cuáles quedaron afuera. Si es un duplicado, fusionalo; si ya no trabajás con él, archivalo.',
-                confirmLabel: 'Borrar igual',
+                title: t('borrarTitulo', { cantidad: ids.length }),
+                description: t('borrarBajada'),
+                confirmLabel: t('borrarIgual'),
               }}
               onConfirm={() =>
                 ejecutar(
                   () => borrarInfluencersAction({ ids }),
-                  { singular: 'influencer borrado', plural: 'influencers borrados', ninguno: 'No se borró ninguno.' },
+                  { singular: t('borradoSingular'), plural: t('borradoPlural'), ninguno: t('borradoNinguno') },
                   limpiar,
                 )
               }
             >
               <Trash2 className="size-4" aria-hidden="true" />
-              Borrar
+              {t('borrar')}
             </BotonDeLote>
           </>
         ) : null}

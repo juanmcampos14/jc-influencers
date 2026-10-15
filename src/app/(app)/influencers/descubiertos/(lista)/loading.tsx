@@ -1,10 +1,7 @@
+import { getTranslations } from 'next-intl/server'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 
-export default function Loading() {
-  return (
-    <PageSkeleton
-      title="Influencers"
-      description="Perfiles que trajeron las búsquedas. Buscar acá no cuesta nada: esto ya está pago."
-    />
-  )
+export default async function Loading() {
+  const t = await getTranslations('descubiertos')
+  return <PageSkeleton title={t('titulo')} description={t('bajada')} />
 }

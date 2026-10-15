@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ import { createInfluencerAction } from '../actions/influencers'
 import { addProfileAction } from '../actions/influencers'
 
 export function NewInfluencerDialog({ niches }: { niches: Array<{ key: string; label: string }> }) {
+  const t = useTranslations('influencers')
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [errors, setErrors] = useState<Record<string, string[]>>({})
@@ -42,9 +44,9 @@ export function NewInfluencerDialog({ niches }: { niches: Array<{ key: string; l
       const url = String(form.get('profileUrl') ?? '').trim()
       if (url) {
         const profile = await addProfileAction({ influencerId: created.data.id, url, isPrimary: true })
-        if (!profile.ok) toast.warning(`Se creó el influencer pero el perfil no: ${profile.message}`)
+        if (!profile.ok) toast.warning(t('creadoSinPerfil', { motivo: profile.message }))
       }
-      toast.success('Influencer creado.')
+      toast.success(t('creado'))
       setOpen(false)
       router.push(`/influencers/${created.data.id}`)
     })
@@ -53,23 +55,23 @@ export function NewInfluencerDialog({ niches }: { niches: Array<{ key: string; l
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">Nuevo influencer</Button>
+        <Button size="sm">{t('nuevo')}</Button>
       </DialogTrigger>
-      <DialogContent title="Nuevo influencer" description="Se agrega a la base global de la agencia.">
+      <DialogContent title={t('nuevo')} description={t('nuevoBajada')}>
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Nombre visible" htmlFor="displayName" errors={errors.displayName} required>
+            <Field label={t('campoNombreVisible')} htmlFor="displayName" errors={errors.displayName} required>
               <Input id="displayName" name="displayName" required autoFocus maxLength={160} />
             </Field>
-            <Field label="Nombre real" htmlFor="realName">
+            <Field label={t('campoNombreReal')} htmlFor="realName">
               <Input id="realName" name="realName" maxLength={160} />
             </Field>
-            <Field label="Handle principal" htmlFor="primaryHandle">
-              <Input id="primaryHandle" name="primaryHandle" maxLength={80} placeholder="sin arroba" />
+            <Field label={t('campoHandle')} htmlFor="primaryHandle">
+              <Input id="primaryHandle" name="primaryHandle" maxLength={80} placeholder={t('sinArroba')} />
             </Field>
-            <Field label="País" htmlFor="country">
+            <Field label={t('campoPais')} htmlFor="country">
               <Select id="country" name="country" defaultValue="ARG">
-                <option value="">Sin definir</option>
+                <option value="">{t('sinDefinir')}</option>
                 {MARKET_SEED.map((market) => (
                   <option key={market} value={market}>
                     {market}
@@ -77,27 +79,27 @@ export function NewInfluencerDialog({ niches }: { niches: Array<{ key: string; l
                 ))}
               </Select>
             </Field>
-            <Field label="Ciudad" htmlFor="city">
+            <Field label={t('campoCiudad')} htmlFor="city">
               <Input id="city" name="city" maxLength={80} />
             </Field>
-            <Field label="Idioma" htmlFor="language">
+            <Field label={t('campoIdioma')} htmlFor="language">
               <Input id="language" name="language" maxLength={40} defaultValue="es" />
             </Field>
-            <Field label="Mayoría de edad" htmlFor="adultStatus">
+            <Field label={t('campoMayoriaDeEdad')} htmlFor="adultStatus">
               <Select id="adultStatus" name="adultStatus" defaultValue="NOT_CONFIRMED">
-                <option value="CONFIRMED">Confirmada</option>
-                <option value="NOT_CONFIRMED">No confirmada</option>
-                <option value="NOT_APPLICABLE">No aplica</option>
+                <option value="CONFIRMED">{t('mayoriaConfirmada')}</option>
+                <option value="NOT_CONFIRMED">{t('mayoriaNoConfirmada')}</option>
+                <option value="NOT_APPLICABLE">{t('mayoriaNoAplica')}</option>
               </Select>
             </Field>
-            <Field label="Agencia o representante" htmlFor="representative">
+            <Field label={t('campoRepresentante')} htmlFor="representative">
               <Input id="representative" name="representative" maxLength={160} />
             </Field>
           </div>
-          <Field label="URL del perfil principal" htmlFor="profileUrl" hint="Instagram, TikTok, YouTube, Linktree…">
+          <Field label={t('campoUrlPerfil')} htmlFor="profileUrl" hint={t('urlPerfilAyuda')}>
             <Input id="profileUrl" name="profileUrl" type="url" maxLength={500} />
           </Field>
-          <Field label="Nichos" htmlFor="nicheKeys" hint="Ctrl o Cmd para varios.">
+          <Field label={t('campoNichos')} htmlFor="nicheKeys" hint={t('nichosAyuda')}>
             <Select id="nicheKeys" name="nicheKeys" multiple size={5} className="h-auto">
               {niches.map((niche) => (
                 <option key={niche.key} value={niche.key}>
@@ -106,17 +108,17 @@ export function NewInfluencerDialog({ niches }: { niches: Array<{ key: string; l
               ))}
             </Select>
           </Field>
-          <Field label="Bio o descripción" htmlFor="bio">
+          <Field label={t('campoBio')} htmlFor="bio">
             <Textarea id="bio" name="bio" maxLength={4000} />
           </Field>
           <div className="flex justify-end gap-2">
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancelar
+                {t('cancelar')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={pending}>
-              {pending ? 'Creando…' : 'Crear influencer'}
+              {pending ? t('creando') : t('crear')}
             </Button>
           </div>
         </form>

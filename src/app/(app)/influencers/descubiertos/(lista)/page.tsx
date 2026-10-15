@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { getLocale, getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
 import { Avatar } from '@/components/ui/avatar'
@@ -56,6 +57,9 @@ export default async function DescubiertosPage({
 }) {
   const params = await searchParams
   const ctx = await requireContext()
+  const t = await getTranslations('descubiertos')
+  const tEtiqueta = await getTranslations('etiquetas')
+  const idioma = await getLocale()
 
   const orden = resolverOrden(COLUMNAS, params)
   const filtros = leerFiltros(params, orden)
@@ -81,17 +85,17 @@ export default async function DescubiertosPage({
   return (
     <>
       <PageHeader
-        title="Influencers"
-        description="Perfiles que trajeron las búsquedas. Buscar acá no cuesta nada: esto ya está pago."
+        title={t('titulo')}
+        description={t('bajada')}
       />
       <div className="space-y-4 px-5 py-6 sm:px-8">
         <NavDeInfluencers ctx={ctx} activo="/influencers/descubiertos" />
 
         <StatStrip>
-          <Stat label="En la base" value={resumen.total} />
-          <Stat label="Con estos filtros" value={resultados.total} />
-          <Stat label="Todavía sin incorporar" value={resumen.sinIncorporar} tone="accent" />
-          <Stat label="Vistos en 30 días" value={resumen.recientes} />
+          <Stat label={t('statEnLaBase')} value={resumen.total} />
+          <Stat label={t('statConFiltros')} value={resultados.total} />
+          <Stat label={t('statSinIncorporar')} value={resumen.sinIncorporar} tone="accent" />
+          <Stat label={t('statRecientes')} value={resumen.recientes} />
         </StatStrip>
 
         <FiltrosDeDescubiertos filtros={filtros} />
@@ -109,24 +113,24 @@ export default async function DescubiertosPage({
           <Card>
             {resumen.total === 0 ? (
               <EmptyState
-                title="Todavía no descubrimos a nadie"
-                description="Esto se llena solo: cada búsqueda guarda acá lo que encontró, junto con las palabras que usaste. La idea es que con el tiempo tengas que preguntarle cada vez menos a los proveedores."
+                title={t('vacioTitulo')}
+                description={t('vacioBajada')}
                 action={
                   puedeBuscar ? (
                     <Button asChild variant="secondary" size="sm">
-                      <Link href="/influencers/buscar">Hacer la primera búsqueda</Link>
+                      <Link href="/influencers/buscar">{t('primeraBusqueda')}</Link>
                     </Button>
                   ) : null
                 }
               />
             ) : (
               <EmptyState
-                title="Ninguno de los que tenemos cumple con eso"
-                description="Probá aflojando algún filtro. Si de verdad no lo tenemos, hay que salir a buscarlo: eso sí cuesta."
+                title={t('sinCoincidenciasTitulo')}
+                description={t('sinCoincidenciasBajada')}
                 action={
                   puedeBuscar ? (
                     <Button asChild variant="secondary" size="sm">
-                      <Link href="/influencers/buscar">Buscar con un proveedor</Link>
+                      <Link href="/influencers/buscar">{t('buscarConProveedor')}</Link>
                     </Button>
                   ) : null
                 }
@@ -147,7 +151,7 @@ export default async function DescubiertosPage({
               <Table>
                 <thead>
                   <Tr>
-                    {puedeImportar ? <Th className="w-10" aria-label="Elegir" /> : null}
+                    {puedeImportar ? <Th className="w-10" aria-label={t('elegir')} /> : null}
                     <ThOrdenable
                       columna={columna('nombre')}
                       orden={orden}
@@ -155,10 +159,10 @@ export default async function DescubiertosPage({
                       params={params}
                       className={columnaFija}
                     >
-                      Perfil
+                      {t('colPerfil')}
                     </ThOrdenable>
-                    <Th>Red</Th>
-                    <Th>País</Th>
+                    <Th>{t('colRed')}</Th>
+                    <Th>{t('colPais')}</Th>
                     <ThOrdenable
                       columna={columna('seguidores')}
                       orden={orden}
@@ -166,7 +170,7 @@ export default async function DescubiertosPage({
                       params={params}
                       alineado="derecha"
                     >
-                      Seguidores
+                      {t('colSeguidores')}
                     </ThOrdenable>
                     <ThOrdenable
                       columna={columna('engagement')}
@@ -175,9 +179,9 @@ export default async function DescubiertosPage({
                       params={params}
                       alineado="derecha"
                     >
-                      ER
+                      {t('colEr')}
                     </ThOrdenable>
-                    <Th>Apareció buscando</Th>
+                    <Th>{t('colAparecioBuscando')}</Th>
                     <ThOrdenable
                       columna={columna('veces')}
                       orden={orden}
@@ -185,7 +189,7 @@ export default async function DescubiertosPage({
                       params={params}
                       alineado="derecha"
                     >
-                      Veces
+                      {t('colVeces')}
                     </ThOrdenable>
                     <ThOrdenable
                       columna={columna('visto')}
@@ -193,14 +197,14 @@ export default async function DescubiertosPage({
                       base="/influencers/descubiertos"
                       params={params}
                     >
-                      Última vez
+                      {t('colUltimaVez')}
                     </ThOrdenable>
-                    <Th>Estado</Th>
+                    <Th>{t('colEstado')}</Th>
                   </Tr>
                 </thead>
                 <tbody>
                   {resultados.items.map((perfil) => {
-                    const nombre = perfil.displayName ?? perfil.handle ?? 'Sin nombre'
+                    const nombre = perfil.displayName ?? perfil.handle ?? t('sinNombre')
                     const ficha = `/influencers/descubiertos/${perfil.id}`
                     return (
                       <Tr key={perfil.id}>
@@ -224,10 +228,10 @@ export default async function DescubiertosPage({
                             </span>
                           </Link>
                         </Td>
-                        <Td>{platformLabel(perfil.platform)}</Td>
-                        <Td>{perfil.country ?? <span className="text-ink-600">no dice</span>}</Td>
-                        <Td className="text-right tabular-nums">{formatFollowers(perfil.followers)}</Td>
-                        <Td className="text-right tabular-nums">{formatPercent(perfil.engagementRate)}</Td>
+                        <Td>{platformLabel(tEtiqueta, perfil.platform)}</Td>
+                        <Td>{perfil.country ?? <span className="text-ink-600">{t('noDice')}</span>}</Td>
+                        <Td className="text-right tabular-nums">{formatFollowers(perfil.followers, idioma)}</Td>
+                        <Td className="text-right tabular-nums">{formatPercent(perfil.engagementRate, idioma)}</Td>
                         <Td>
                           {perfil.keywords.length === 0 ? (
                             <span className="text-ink-600">—</span>
@@ -253,30 +257,32 @@ export default async function DescubiertosPage({
                         </Td>
                         <Td className="text-right tabular-nums">{perfil.timesSeen}</Td>
                         <Td className="whitespace-nowrap text-xs text-ink-600">
-                          {formatDate(perfil.lastSeenAt)}
+                          {formatDate(perfil.lastSeenAt, ctx.user.timezone, idioma)}
                           {/*
                             Cuando lo encontramos una sola vez, las dos fechas
                             son la misma y repetirlas no dice nada. Con más de
                             una, el "desde" cuenta hace cuánto lo conocemos.
                           */}
                           {perfil.timesSeen > 1 ? (
-                            <span className="block text-ink-500">desde {formatDate(perfil.firstSeenAt)}</span>
+                            <span className="block text-ink-500">
+                              {t('desdeFecha', { fecha: formatDate(perfil.firstSeenAt, ctx.user.timezone, idioma) })}
+                            </span>
                           ) : null}
                         </Td>
                         <Td>
                           {perfil.influencerId ? (
                             <div className="flex flex-col gap-1">
                               <Link href={`/influencers/${perfil.influencerId}`} className="w-fit">
-                                <Badge tone="green">En el padrón</Badge>
+                                <Badge tone="green">{t('enElPadron')}</Badge>
                               </Link>
                               {perfil.campanas > 0 ? (
                                 <span className="text-xs text-ink-600">
-                                  {perfil.campanas} {perfil.campanas === 1 ? 'campaña' : 'campañas'}
+                                  {t('campanasCantidad', { cantidad: perfil.campanas })}
                                 </span>
                               ) : null}
                             </div>
                           ) : (
-                            <Badge tone="slate">Sin incorporar</Badge>
+                            <Badge tone="slate">{t('sinIncorporar')}</Badge>
                           )}
                         </Td>
                       </Tr>

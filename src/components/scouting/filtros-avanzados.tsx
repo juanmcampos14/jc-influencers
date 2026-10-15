@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { ChevronDown, EyeOff, Gauge, MapPin, Users } from 'lucide-react'
 import { Field, Input, Select } from '@/components/ui/field'
 import { cn } from '@/lib/util/format'
@@ -32,6 +33,7 @@ export function FiltrosAvanzados({
   /** Si hay un proveedor conectado que filtre por el público del creador. */
   puedeFiltrarAudiencia: boolean
 }) {
+  const t = useTranslations('scouting')
   const id = React.useId()
 
   return (
@@ -49,62 +51,66 @@ export function FiltrosAvanzados({
         )}
       >
         <ChevronDown className={cn('size-4 transition-transform', abierto && 'rotate-180')} aria-hidden="true" />
-        <span className="font-medium">Más filtros</span>
+        <span className="font-medium">{t('masFiltros')}</span>
         <span className="text-xs text-ink-500">
-          {puedeFiltrarAudiencia ? 'creador · rendimiento · audiencia' : 'creador · rendimiento'}
+          {puedeFiltrarAudiencia ? t('masFiltrosConAudiencia') : t('masFiltrosSinAudiencia')}
         </span>
       </button>
 
       <div id={id} hidden={!abierto} className="mt-3 grid gap-3 lg:grid-cols-2">
-        <Grupo icono={<MapPin className="size-4" aria-hidden="true" />} titulo="Creador" bajada="Dónde está y qué dice su bio.">
+        <Grupo
+          icono={<MapPin className="size-4" aria-hidden="true" />}
+          titulo={t('grupoCreador')}
+          bajada={t('grupoCreadorBajada')}
+        >
           <div className="grid gap-3 sm:grid-cols-2">
             <Field
-              label="País donde está"
+              label={t('campoPaisCreador')}
               htmlFor="fPais"
-              hint="Sale de lo que informa la red. No es el país de su audiencia."
+              hint={t('paisCreadorAyuda')}
             >
               <Select id="fPais" name="fPais" defaultValue="">
-                <option value="">Cualquier país</option>
-                <option value="AR">Argentina</option>
-                <option value="MX">México</option>
-                <option value="ES">España</option>
-                <option value="CL">Chile</option>
-                <option value="CO">Colombia</option>
-                <option value="UY">Uruguay</option>
-                <option value="PE">Perú</option>
-                <option value="US">Estados Unidos</option>
+                <option value="">{t('cualquierPais')}</option>
+                <option value="AR">{t('paisAR')}</option>
+                <option value="MX">{t('paisMX')}</option>
+                <option value="ES">{t('paisES')}</option>
+                <option value="CL">{t('paisCL')}</option>
+                <option value="CO">{t('paisCO')}</option>
+                <option value="UY">{t('paisUY')}</option>
+                <option value="PE">{t('paisPE')}</option>
+                <option value="US">{t('paisUS')}</option>
               </Select>
             </Field>
-            <Field label="Zona o ciudad" htmlFor="fZona" hint="Tiene que nombrarla en su bio.">
-              <Input id="fZona" name="fZona" placeholder="CABA, Córdoba…" maxLength={60} />
+            <Field label={t('campoZona')} htmlFor="fZona" hint={t('zonaAyuda')}>
+              <Input id="fZona" name="fZona" placeholder={t('zonaPista')} maxLength={60} />
             </Field>
           </div>
           <Field
-            label="Su bio menciona"
+            label={t('campoBioMenciona')}
             htmlFor="fBio"
-            hint="Una palabra o frase, tal cual aparece en la bio."
+            hint={t('bioMencionaAyuda')}
           >
-            <Input id="fBio" name="fBio" placeholder="contadora" maxLength={60} />
+            <Input id="fBio" name="fBio" placeholder={t('bioMencionaPista')} maxLength={60} />
           </Field>
         </Grupo>
 
         <Grupo
           icono={<Gauge className="size-4" aria-hidden="true" />}
-          titulo="Rendimiento"
-          bajada="Seguidores y engagement leídos de la red."
+          titulo={t('grupoRendimiento')}
+          bajada={t('grupoRendimientoBajada')}
         >
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Seguidores · desde" htmlFor="fDesde">
+            <Field label={t('campoSegDesde')} htmlFor="fDesde">
               <Input id="fDesde" name="fDesde" inputMode="numeric" placeholder="10.000" />
             </Field>
-            <Field label="Seguidores · hasta" htmlFor="fHasta">
+            <Field label={t('campoSegHasta')} htmlFor="fHasta">
               <Input id="fHasta" name="fHasta" inputMode="numeric" placeholder="200.000" />
             </Field>
           </div>
           <Field
-            label="Engagement mínimo (%)"
+            label={t('campoErMinimo')}
             htmlFor="fEngagement"
-            hint="Promedio de sus últimos posteos, cuando la red lo informa."
+            hint={t('erMinimoAyuda')}
           >
             <Input id="fEngagement" name="fEngagement" inputMode="decimal" placeholder="2,5" />
           </Field>
@@ -113,8 +119,8 @@ export function FiltrosAvanzados({
         {puedeFiltrarAudiencia ? (
           <Grupo
             icono={<Users className="size-4" aria-hidden="true" />}
-            titulo="Audiencia"
-            bajada="De quién es el público, no quién publica. Es lo que decide si una campaña llega."
+            titulo={t('grupoAudiencia')}
+            bajada={t('grupoAudienciaBajada')}
             className="lg:col-span-2"
           >
             {/*
@@ -128,45 +134,44 @@ export function FiltrosAvanzados({
               * nadie que sirva.
               */}
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              <strong>Antes de usarlos:</strong> hoy el proveedor tiene demografía de audiencia casi sólo de
-              Estados Unidos. Medido el 27/08/2026: creadores argentinos de 10k a 100k hay{' '}
-              <strong className="tabular-nums">110.177</strong>, pero pidiendo además que su público sea argentino
-              quedan <strong className="tabular-nums">9</strong>. Para clientes de acá conviene dejarlos en “no
-              importa” y filtrar por el país del creador, arriba.
+              {t.rich('avisoAudiencia', {
+                b: (texto) => <strong>{texto}</strong>,
+                n: (texto) => <strong className="tabular-nums">{texto}</strong>,
+              })}
             </p>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label="País del público" htmlFor="aPais">
+              <Field label={t('campoPaisPublico')} htmlFor="aPais">
                 <Select id="aPais" name="aPais" defaultValue="">
-                  <option value="">No importa</option>
-                  <option value="AR">Argentina</option>
-                  <option value="MX">México</option>
-                  <option value="ES">España</option>
-                  <option value="CL">Chile</option>
-                  <option value="CO">Colombia</option>
-                  <option value="UY">Uruguay</option>
-                  <option value="PE">Perú</option>
-                  <option value="US">Estados Unidos</option>
+                <option value="">{t('noImporta')}</option>
+                <option value="AR">{t('paisAR')}</option>
+                <option value="MX">{t('paisMX')}</option>
+                <option value="ES">{t('paisES')}</option>
+                <option value="CL">{t('paisCL')}</option>
+                <option value="CO">{t('paisCO')}</option>
+                <option value="UY">{t('paisUY')}</option>
+                <option value="PE">{t('paisPE')}</option>
+                <option value="US">{t('paisUS')}</option>
                 </Select>
               </Field>
 
-              <Field label="Género del público" htmlFor="aGenero">
+              <Field label={t('campoGeneroPublico')} htmlFor="aGenero">
                 <Select id="aGenero" name="aGenero" defaultValue="">
-                  <option value="">No importa</option>
-                  <option value="female">Mayoría mujeres</option>
-                  <option value="male">Mayoría varones</option>
+                  <option value="">{t('noImporta')}</option>
+                  <option value="female">{t('mayoriaMujeres')}</option>
+                  <option value="male">{t('mayoriaVarones')}</option>
                 </Select>
               </Field>
 
-              <Field label="Edad del público" htmlFor="aEdad">
+              <Field label={t('campoEdadPublico')} htmlFor="aEdad">
                 <Select id="aEdad" name="aEdad" defaultValue="">
-                  <option value="">No importa</option>
-                  <option value="13-17">13 a 17</option>
-                  <option value="18-24">18 a 24</option>
-                  <option value="25-34">25 a 34</option>
-                  <option value="35-44">35 a 44</option>
-                  <option value="45-64">45 a 64</option>
-                  <option value="65+">65 o más</option>
+                  <option value="">{t('noImporta')}</option>
+                  <option value="13-17">{t('edad13')}</option>
+                  <option value="18-24">{t('edad18')}</option>
+                  <option value="25-34">{t('edad25')}</option>
+                  <option value="35-44">{t('edad35')}</option>
+                  <option value="45-64">{t('edad45')}</option>
+                  <option value="65+">{t('edad65')}</option>
                 </Select>
               </Field>
 
@@ -176,13 +181,13 @@ export function FiltrosAvanzados({
                 cambia; con "al menos la mitad" se resuelve la búsqueda real.
               */}
               <Field
-                label="Al menos"
+                label={t('campoAlMenos')}
                 htmlFor="aPorcentaje"
-                hint="Del público tiene que cumplir lo elegido."
+                hint={t('alMenosAyuda')}
               >
                 <Select id="aPorcentaje" name="aPorcentaje" defaultValue="50">
                   <option value="30">30 %</option>
-                  <option value="50">la mitad</option>
+                  <option value="50">{t('laMitad')}</option>
                   <option value="70">70 %</option>
                   <option value="85">85 %</option>
                 </Select>
@@ -190,15 +195,15 @@ export function FiltrosAvanzados({
             </div>
 
             <Field
-              label="Audiencia real"
+              label={t('campoAudienciaReal')}
               htmlFor="aCalidad"
-              hint="Cuánto de ese público no son cuentas falsas."
+              hint={t('audienciaRealAyuda')}
             >
               <Select id="aCalidad" name="aCalidad" defaultValue="">
-                <option value="">No importa</option>
-                <option value="60">Aceptable o mejor</option>
-                <option value="75">Buena o mejor</option>
-                <option value="90">Muy buena</option>
+                <option value="">{t('noImporta')}</option>
+                <option value="60">{t('calidadAceptable')}</option>
+                <option value="75">{t('calidadBuena')}</option>
+                <option value="90">{t('calidadMuyBuena')}</option>
               </Select>
             </Field>
           </Grupo>
@@ -213,23 +218,14 @@ export function FiltrosAvanzados({
         <div className="rounded-xl border border-dashed border-ink-300 p-4 lg:col-span-2">
           <p className="flex items-center gap-2 text-sm font-medium text-ink-700">
             <EyeOff className="size-4" aria-hidden="true" />
-            Lo que todavía no se puede filtrar
+            {t('noSePuedeFiltrar')}
           </p>
           <ul className="mt-1.5 space-y-1 text-xs text-ink-500">
             {puedeFiltrarAudiencia ? null : (
-              <li>
-                <strong className="text-ink-600">Audiencia</strong> — país, género y edad de quienes lo siguen. La
-                fuente actual no los devuelve. Lo que sí confirmamos es dónde está el creador.
-              </li>
+              <li>{t.rich('noAudiencia', { b: (texto) => <strong className="text-ink-600">{texto}</strong> })}</li>
             )}
-            <li>
-              <strong className="text-ink-600">Actividad reciente</strong> — cuándo publicó por última vez. No viene
-              en los datos del perfil, así que un filtro acá sería una promesa vacía.
-            </li>
-            <li>
-              <strong className="text-ink-600">Hashtags con los que publica</strong> — se puede buscar POR un
-              hashtag arriba, pero no sabemos con cuáles publica habitualmente.
-            </li>
+            <li>{t.rich('noActividad', { b: (texto) => <strong className="text-ink-600">{texto}</strong> })}</li>
+            <li>{t.rich('noHashtags', { b: (texto) => <strong className="text-ink-600">{texto}</strong> })}</li>
           </ul>
         </div>
       </div>

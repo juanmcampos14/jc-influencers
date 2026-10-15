@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
@@ -25,6 +26,7 @@ export function AgregarACampana({
   nombre: string
   campanas: Array<{ id: string; name: string; clientName: string }>
 }) {
+  const t = useTranslations('influencers')
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [campana, setCampana] = React.useState(campanas[0]?.id ?? '')
@@ -42,8 +44,8 @@ export function AgregarACampana({
         return
       }
       // Que ya estuviera no es un error, pero tampoco es lo mismo que agregarlo.
-      if (resultado.data.alreadyThere > 0) toast.info(`${nombre} ya estaba en ${elegida.name}.`)
-      else toast.success(`${nombre} agregado a ${elegida.name}.`)
+      if (resultado.data.alreadyThere > 0) toast.info(t('yaEstabaEn', { nombre, campana: elegida.name }))
+      else toast.success(t('agregadoA', { nombre, campana: elegida.name }))
       setOpen(false)
       router.refresh()
     })
@@ -54,12 +56,12 @@ export function AgregarACampana({
       <DialogTrigger asChild>
         <Button size="sm" variant="secondary">
           <Plus className="size-4" aria-hidden="true" />
-          Agregar a campaña
+          {t('agregarACampana')}
         </Button>
       </DialogTrigger>
-      <DialogContent title={`Agregar a ${nombre}`} description="Entra como propuesto, sin que el cliente lo vea todavía.">
+      <DialogContent title={t('agregarATitulo', { nombre })} description={t('agregarABajada')}>
         <div className="space-y-4">
-          <Field label="Campaña" htmlFor="campana">
+          <Field label={t('campoCampana')} htmlFor="campana">
             <Select id="campana" value={campana} onChange={(event) => setCampana(event.target.value)}>
               {campanas.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -71,11 +73,11 @@ export function AgregarACampana({
           <div className="flex justify-end gap-2">
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancelar
+                {t('cancelar')}
               </Button>
             </DialogClose>
             <Button onClick={agregar} disabled={pendiente || !campana}>
-              {pendiente ? 'Agregando…' : 'Agregar'}
+              {pendiente ? t('agregando') : t('agregar')}
             </Button>
           </div>
         </div>

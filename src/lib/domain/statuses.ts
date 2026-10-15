@@ -34,13 +34,20 @@ export const CANDIDACY_STATUS_SEED: readonly StatusSeed[] = [
 
 export const DEFAULT_STATUS_KEY = 'NUEVO'
 
-export const STATUS_CATEGORY_LABELS: Record<StatusCategory, string> = {
-  SCREENING: 'Screening',
-  PROPOSAL: 'Propuesta',
-  NEGOTIATION: 'Negociación',
-  PRODUCTION: 'Producción',
-  CLOSED: 'Cerrado',
+/**
+ * Categorías del embudo. El texto vive en `messages/*.json`; acá queda la
+ * clave, que es lo que no cambia con el idioma.
+ */
+export const STATUS_CATEGORY_CLAVES: Record<StatusCategory, string> = {
+  SCREENING: 'categoriaSCREENING',
+  PROPOSAL: 'categoriaPROPOSAL',
+  NEGOTIATION: 'categoriaNEGOTIATION',
+  PRODUCTION: 'categoriaPRODUCTION',
+  CLOSED: 'categoriaCLOSED',
 }
+
+export const statusCategoryLabel = (t: (clave: string) => string, categoria: StatusCategory): string =>
+  t(STATUS_CATEGORY_CLAVES[categoria])
 
 /** Nichos iniciales, tomados de la lista desplegable del Excel de origen. */
 export const NICHE_SEED: readonly { key: string; label: string }[] = [

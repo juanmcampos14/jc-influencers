@@ -6,13 +6,15 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 import { Field, Input, Select, Textarea } from '@/components/ui/field'
-import { CAMPAIGN_STATUS_LABELS } from '@/components/status-badge'
+import { useTranslations } from 'next-intl'
+import { CAMPAIGN_STATUS_VALUES, campaignStatusLabel } from '@/components/status-badge'
 import { MARKET_SEED } from '@/lib/domain/statuses'
 import { createCampaignAction } from '../actions/campaigns'
 
 const PLATFORMS = ['INSTAGRAM', 'TIKTOK', 'YOUTUBE', 'X', 'TWITCH', 'LINKEDIN', 'FACEBOOK']
 
 export function NewCampaignDialog({ clients }: { clients: Array<{ id: string; name: string }> }) {
+  const tEtiqueta = useTranslations('etiquetas')
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [errors, setErrors] = useState<Record<string, string[]>>({})
@@ -79,9 +81,9 @@ export function NewCampaignDialog({ clients }: { clients: Array<{ id: string; na
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Estado" htmlFor="status">
               <Select id="status" name="status" defaultValue="BRIEFING">
-                {Object.entries(CAMPAIGN_STATUS_LABELS).map(([key, value]) => (
+                {CAMPAIGN_STATUS_VALUES.map((key) => (
                   <option key={key} value={key}>
-                    {value.label}
+                    {campaignStatusLabel(tEtiqueta, key)}
                   </option>
                 ))}
               </Select>

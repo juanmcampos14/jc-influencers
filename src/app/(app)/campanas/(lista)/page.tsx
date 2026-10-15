@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { ThOrdenable } from '@/components/ui/ordenar'
 import { resolverOrden, type ColumnaOrdenable } from '@/lib/domain/orden'
-import { CampaignStatusBadge, CAMPAIGN_STATUS_LABELS } from '@/components/status-badge'
+import { CampaignStatusBadge, CAMPAIGN_STATUS_TONES } from '@/components/status-badge'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
 import { can } from '@/lib/authz/context'
@@ -41,7 +41,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   const ctx = await requireContext()
 
   const orden = resolverOrden(COLUMNAS, params)
-  const statusFilter = params.estado && params.estado in CAMPAIGN_STATUS_LABELS ? [params.estado] : null
+  const statusFilter = params.estado && params.estado in CAMPAIGN_STATUS_TONES ? [params.estado] : null
   // El cliente del filtro se valida contra el alcance dentro del repositorio.
   const clientFilter = params.cliente && ctx.clients.some((c) => c.id === params.cliente) ? params.cliente : null
 

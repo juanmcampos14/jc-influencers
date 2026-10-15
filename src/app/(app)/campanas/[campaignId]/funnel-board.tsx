@@ -1,12 +1,13 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/field'
 import { ApprovalBadge, StarsLabel } from '@/components/status-badge'
-import { CANDIDACY_STATUS_SEED, STATUS_CATEGORY_LABELS } from '@/lib/domain/statuses'
+import { CANDIDACY_STATUS_SEED, statusCategoryLabel } from '@/lib/domain/statuses'
 import { cn, formatFollowers } from '@/lib/util/format'
 import type { CandidacyDto } from '@/lib/domain/dto'
 import { changeStatusAction } from '../../actions/candidacies'
@@ -52,6 +53,7 @@ export function FunnelBoard({
   campaignId: string
   puedeMover: boolean
 }) {
+  const tEtiqueta = useTranslations('etiquetas')
   const router = useRouter()
   const [moviendo, setMoviendo] = React.useState<string | null>(null)
   const [encima, setEncima] = React.useState<string | null>(null)
@@ -106,7 +108,7 @@ export function FunnelBoard({
 
   const columns = CATEGORIES.map((category) => ({
     category,
-    label: STATUS_CATEGORY_LABELS[category],
+    label: statusCategoryLabel(tEtiqueta, category),
     total: totalDe(category),
     items: items.filter((item) => STATUS_BY_KEY.get(estadoDe(item))?.category === category),
   }))
@@ -209,7 +211,7 @@ export function FunnelBoard({
                             onChange={(evento) => mover(item, evento.target.value)}
                           >
                             {CATEGORIES.map((category) => (
-                              <optgroup key={category} label={STATUS_CATEGORY_LABELS[category]}>
+                              <optgroup key={category} label={statusCategoryLabel(tEtiqueta, category)}>
                                 {estadosDe(category).map((status) => (
                                   <option key={status.key} value={status.key}>
                                     {status.label}

@@ -4,126 +4,161 @@
  * Una sola fuente para todo el producto. Tenerlas repetidas hacía que la tabla
  * dijera "En reserva" y el filtro "Backlog" para el mismo valor: quien veía la
  * etiqueta no la encontraba en el desplegable.
+ *
+ * El texto no vive acá: vive en `messages/*.json`, bajo `etiquetas`. Acá queda
+ * la clave, el tono y el orden -- lo que no cambia con el idioma. Antes el
+ * texto estaba escrito en este archivo y en inglés la pantalla seguía diciendo
+ * "En reserva".
  */
 
-export const INFLUENCER_STATUS: Record<string, { label: string; tone: string }> = {
-  NEW: { label: 'Nuevo', tone: 'sky' },
-  ACTIVE: { label: 'Activo', tone: 'emerald' },
-  BACKLOG: { label: 'En reserva', tone: 'slate' },
-  BLOCKED: { label: 'Bloqueado', tone: 'rose' },
-  ARCHIVED: { label: 'Archivado', tone: 'stone' },
+/** Lo único que se le pide a una función de traducción para resolver una etiqueta. */
+export type Traductor = (clave: string) => string
+
+export const INFLUENCER_STATUS: Record<string, { clave: string; tone: string }> = {
+  NEW: { clave: 'estadoNEW', tone: 'sky' },
+  ACTIVE: { clave: 'estadoACTIVE', tone: 'emerald' },
+  BACKLOG: { clave: 'estadoBACKLOG', tone: 'slate' },
+  BLOCKED: { clave: 'estadoBLOCKED', tone: 'rose' },
+  ARCHIVED: { clave: 'estadoARCHIVED', tone: 'stone' },
 }
 
-/** Nombre de cada red tal como se escribe, no como lo guarda la base. */
-export const PLATFORM_LABELS: Record<string, string> = {
+/**
+ * Nombre de cada red tal como se escribe, no como lo guarda la base.
+ *
+ * Casi todos son nombres propios y se escriben igual en cualquier idioma: los
+ * dos que no --"Sitio web" y "Otra"-- salen de las traducciones.
+ */
+const PLATFORM_NOMBRES: Record<string, string> = {
   INSTAGRAM: 'Instagram',
   TIKTOK: 'TikTok',
   YOUTUBE: 'YouTube',
   LINKTREE: 'Linktree',
-  WEBSITE: 'Sitio web',
   X: 'X',
   TWITCH: 'Twitch',
   FACEBOOK: 'Facebook',
   LINKEDIN: 'LinkedIn',
-  OTHER: 'Otra',
 }
 
-export const platformLabel = (value: string): string =>
-  PLATFORM_LABELS[value.toUpperCase()] ?? value
+const PLATFORM_CLAVES: Record<string, string> = {
+  WEBSITE: 'redWEBSITE',
+  OTHER: 'redOTHER',
+}
+
+/** Las redes que ofrece un desplegable, en el orden en que conviene leerlas. */
+export const PLATFORM_VALUES: readonly string[] = [
+  ...Object.keys(PLATFORM_NOMBRES),
+  ...Object.keys(PLATFORM_CLAVES),
+]
+
+export const platformLabel = (t: Traductor, value: string): string => {
+  const key = value.toUpperCase()
+  const clave = PLATFORM_CLAVES[key]
+  return clave ? t(clave) : (PLATFORM_NOMBRES[key] ?? value)
+}
 
 /** Opciones para un desplegable, en el orden en que conviene leerlas. */
-export const opcionesDe = (mapa: Record<string, { label: string }>) =>
-  Object.entries(mapa).map(([value, { label }]) => ({ value, label }))
+export const opcionesDe = (mapa: Record<string, { clave: string }>, t: Traductor) =>
+  Object.entries(mapa).map(([value, { clave }]) => ({ value, label: t(clave) }))
 
 /**
- * Qué pasó, en castellano.
+ * Qué pasó, legible.
  *
  * La auditoría mostraba la clave técnica: `candidacy.status.changed`,
  * `auth.login.failure`. Una auditoría existe para que alguien de afuera pueda
  * leerla -- un cliente, un abogado, vos dentro de seis meses -- y para eso
- * tiene que estar escrita en el idioma del producto.
+ * tiene que estar escrita en el idioma de quien la lee.
  */
-export const AUDIT_ACTION_LABELS: Record<string, string> = {
-  'admin.exceptional_access': 'Acceso excepcional de administrador',
-  'ai.insight.created': 'Análisis de IA generado',
-  'ai.insight.shared': 'Análisis compartido con el cliente',
-  'auth.login.failure': 'Intento de acceso fallido',
-  'auth.login.success': 'Acceso',
-  'auth.logout': 'Cierre de sesión',
-  'auth.password_reset.complete': 'Contraseña cambiada',
-  'auth.password.changed': 'Contraseña cambiada desde la cuenta',
-  'auth.password_reset.request': 'Recuperación de contraseña pedida',
-  'auth.session.revoked': 'Sesión revocada',
-  'brand.extracted': 'Identidad visual analizada',
-  'brand.reset': 'Identidad visual restablecida',
-  'brand.mural.drawn': 'Mural de marca dibujado',
-  'brand.mural.removed': 'Mural de marca quitado',
-  'brand.updated': 'Identidad visual actualizada',
-  'brief.updated': 'Brief actualizado',
-  'budget.changed': 'Presupuesto modificado',
-  'campaign.created': 'Campaña creada',
-  'campaign.updated': 'Campaña modificada',
-  'campaign.goal.saved': 'Objetivo de campaña definido',
-  'campaign.goal.deleted': 'Objetivo de campaña quitado',
-  'campaign.finance.updated': 'Términos económicos actualizados',
-  'payment.created': 'Movimiento de plata registrado',
-  'payment.updated': 'Movimiento de plata actualizado',
-  'payment.deleted': 'Movimiento de plata borrado',
-  'link.created': 'Link medido creado',
-  'link.archived': 'Link medido archivado',
-  'deliverable.saved': 'Entrega cargada',
-  'candidacy.approval': 'Decisión del cliente sobre un perfil',
-  'candidacy.created': 'Perfil agregado a una campaña',
-  'candidacy.shortlist.changed': 'Shortlist modificada',
-  'candidacy.status.changed': 'Cambio de estado de un perfil',
-  'candidacy.updated': 'Perfil de campaña modificado',
-  'candidacy.visibility': 'Visibilidad para el cliente cambiada',
-  'client.created': 'Cliente creado',
-  'client.updated': 'Cliente modificado',
-  'client.preview.entered': 'Entró a ver el espacio como el cliente',
-  'client.preview.left': 'Salió de la vista del cliente',
-  'comment.created': 'Comentario',
-  'export.created': 'Exportación generada',
-  'import.cancelled': 'Importación cancelada',
-  'import.confirmed': 'Importación confirmada',
-  'import.preview': 'Importación previsualizada',
-  'influencer.created': 'Influencer creado',
-  'influencer.deleted': 'Influencer borrado',
-  'influencer.merged': 'Influencers fusionados',
-  'influencer.updated': 'Influencer modificado',
-  'invitation.accepted': 'Invitación aceptada',
-  'invitation.created': 'Invitación enviada',
-  'invitation.revoked': 'Invitación revocada',
-  'membership.changed': 'Accesos modificados',
-  'membership.removed': 'Acceso quitado',
-  'scouting.budget.changed': 'Tope de gasto de scouting modificado',
-  'scouting.imported': 'Perfiles importados desde scouting',
-  'scouting.preview': 'Costo de scouting calculado',
-  'scouting.run': 'Búsqueda de scouting ejecutada',
-  'user.disabled': 'Usuario desactivado',
-  'user.enabled': 'Usuario activado',
-}
+export const AUDIT_ACTIONS: readonly string[] = [
+  'admin.exceptional_access',
+  'ai.insight.created',
+  'ai.insight.shared',
+  'auth.login.failure',
+  'auth.login.success',
+  'auth.logout',
+  'auth.password_reset.complete',
+  'auth.password.changed',
+  'auth.password_reset.request',
+  'auth.session.revoked',
+  'brand.extracted',
+  'brand.reset',
+  'brand.mural.drawn',
+  'brand.mural.removed',
+  'brand.updated',
+  'brief.updated',
+  'budget.changed',
+  'campaign.created',
+  'campaign.updated',
+  'campaign.goal.saved',
+  'campaign.goal.deleted',
+  'campaign.finance.updated',
+  'payment.created',
+  'payment.updated',
+  'payment.deleted',
+  'link.created',
+  'link.archived',
+  'deliverable.saved',
+  'candidacy.approval',
+  'candidacy.created',
+  'candidacy.shortlist.changed',
+  'candidacy.status.changed',
+  'candidacy.updated',
+  'candidacy.visibility',
+  'client.created',
+  'client.updated',
+  'client.preview.entered',
+  'client.preview.left',
+  'comment.created',
+  'export.created',
+  'import.cancelled',
+  'import.confirmed',
+  'import.preview',
+  'influencer.created',
+  'influencer.deleted',
+  'influencer.merged',
+  'influencer.updated',
+  'invitation.accepted',
+  'invitation.created',
+  'invitation.revoked',
+  'membership.changed',
+  'membership.removed',
+  'scouting.budget.changed',
+  'scouting.imported',
+  'scouting.preview',
+  'scouting.run',
+  'user.disabled',
+  'user.enabled',
+]
 
-export const auditActionLabel = (key: string): string => AUDIT_ACTION_LABELS[key] ?? key
+const ACCIONES_CONOCIDAS = new Set(AUDIT_ACTIONS)
 
-/** Sobre qué se hizo. El modelo se llama en inglés; la pantalla no. */
-export const ENTITY_TYPE_LABELS: Record<string, string> = {
-  Campaign: 'Campaña',
-  CampaignBrief: 'Brief',
-  Candidacy: 'Perfil de campaña',
-  Client: 'Cliente',
-  ClientBrand: 'Identidad visual',
-  Comment: 'Comentario',
-  Export: 'Exportación',
-  ImportRun: 'Importación',
-  Influencer: 'Influencer',
-  Invitation: 'Invitación',
-  Membership: 'Acceso',
-  ScoutingBudget: 'Tope de scouting',
-  ScoutingRun: 'Búsqueda de scouting',
-  Session: 'Sesión',
-  User: 'Usuario',
-  AiInsight: 'Análisis de IA',
-}
+/** La clave de traducción de una acción: los puntos no sirven, son anidamiento. */
+export const claveDeAccion = (key: string): string => `accion_${key.replace(/[.-]/g, '_')}`
 
-export const entityTypeLabel = (key: string): string => ENTITY_TYPE_LABELS[key] ?? key
+/** Una clave que no conocemos se muestra cruda: es preferible a un hueco. */
+export const auditActionLabel = (t: Traductor, key: string): string =>
+  ACCIONES_CONOCIDAS.has(key) ? t(claveDeAccion(key)) : key
+
+/** Sobre qué se hizo. El modelo se llama en inglés; la pantalla no siempre. */
+export const ENTITY_TYPES: readonly string[] = [
+  'Campaign',
+  'CampaignBrief',
+  'Candidacy',
+  'Client',
+  'ClientBrand',
+  'Comment',
+  'Export',
+  'ImportRun',
+  'Influencer',
+  'Invitation',
+  'Membership',
+  'ScoutingBudget',
+  'ScoutingRun',
+  'Session',
+  'User',
+  'AiInsight',
+]
+
+const ENTIDADES_CONOCIDAS = new Set(ENTITY_TYPES)
+
+export const entityTypeLabel = (t: Traductor, key: string): string =>
+  ENTIDADES_CONOCIDAS.has(key) ? t(`entidad${key}`) : key

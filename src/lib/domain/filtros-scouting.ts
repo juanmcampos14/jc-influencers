@@ -40,10 +40,19 @@ export type Veredicto = 'CUMPLE' | 'NO_CUMPLE' | 'SIN_DATO'
 /** Los filtros que un proveedor puede haber aplicado él mismo. */
 export type ClaveDeFiltro = 'pais' | 'zona' | 'bioMenciona' | 'seguidores' | 'engagement'
 
+/**
+ * Un motivo, listo para traducir.
+ *
+ * Antes era la frase ya escrita en castellano. Esto es dominio puro, lo corre
+ * el servidor, y la frase terminaba tal cual en una pantalla en inglés: lo que
+ * se devuelve ahora es la clave y sus valores, y el texto lo arma quien pinta.
+ */
+export type Motivo = { clave: string; valores?: Record<string, string | number> }
+
 export type Evaluacion = {
   veredicto: Veredicto
   /** Qué filtro falló o no se pudo comprobar. Vacío si cumple todo. */
-  motivos: string[]
+  motivos: Motivo[]
 }
 
 const normalizar = (valor: string): string =>
@@ -80,30 +89,30 @@ export function evaluarCreador(
    */
   garantizados: ReadonlyArray<ClaveDeFiltro> = [],
 ): Evaluacion {
-  const incumple: string[] = []
-  const sinDato: string[] = []
+  const incumple: Motivo[] = []
+  const sinDato: Motivo[] = []
   const enOrigen = new Set(garantizados)
 
   if (!enOrigen.has('seguidores') && (filtros.seguidoresDesde != null || filtros.seguidoresHasta != null)) {
-    if (creador.followers === null) sinDato.push('no informa seguidores')
+    if (creador.followers === null) sinDato.push({ clave: 'motivoSinSeguidores' })
     else if (filtros.seguidoresDesde != null && creador.followers < filtros.seguidoresDesde) {
-      incumple.push(`tiene ${creador.followers} seguidores, menos del mínimo`)
+      incumple.push({ clave: 'motivoPocosSeguidores', valores: { cantidad: creador.followers } })
     } else if (filtros.seguidoresHasta != null && creador.followers > filtros.seguidoresHasta) {
-      incumple.push(`tiene ${creador.followers} seguidores, más del máximo`)
+      incumple.push({ clave: 'motivoMuchosSeguidores', valores: { cantidad: creador.followers } })
     }
   }
 
   if (!enOrigen.has('engagement') && filtros.engagementMinimo != null) {
-    if (creador.engagementRate === null) sinDato.push('no informa engagement')
+    if (creador.engagementRate === null) sinDato.push({ clave: 'motivoSinEngagement' })
     else if (creador.engagementRate < filtros.engagementMinimo) {
-      incumple.push(`engagement ${creador.engagementRate}%, debajo del mínimo`)
+      incumple.push({ clave: 'motivoEngagementBajo', valores: { valor: creador.engagementRate } })
     }
   }
 
   if (!enOrigen.has('pais') && filtros.pais) {
-    if (!creador.country) sinDato.push('no dice de qué país es')
+    if (!creador.country) sinDato.push({ clave: 'motivoSinPais' })
     else if (normalizar(creador.country) !== normalizar(filtros.pais)) {
-      incumple.push(`está en ${creador.country}`)
+      incumple.push({ clave: 'motivoOtroPais', valores: { pais: creador.country } })
     }
   }
 
@@ -113,16 +122,16 @@ export function evaluarCreador(
    * dónde mirar, y eso es distinto de "la bio no lo dice".
    */
   if (!enOrigen.has('zona') && filtros.zona) {
-    if (!creador.bio) sinDato.push('no tiene bio donde buscar la zona')
+    if (!creador.bio) sinDato.push({ clave: 'motivoSinBioZona' })
     else if (!normalizar(creador.bio).includes(normalizar(filtros.zona))) {
-      incumple.push('su bio no nombra esa zona')
+      incumple.push({ clave: 'motivoBioSinZona' })
     }
   }
 
   if (!enOrigen.has('bioMenciona') && filtros.bioMenciona) {
-    if (!creador.bio) sinDato.push('no tiene bio')
+    if (!creador.bio) sinDato.push({ clave: 'motivoSinBio' })
     else if (!normalizar(creador.bio).includes(normalizar(filtros.bioMenciona))) {
-      incumple.push('su bio no menciona eso')
+      incumple.push({ clave: 'motivoBioSinMencion' })
     }
   }
 

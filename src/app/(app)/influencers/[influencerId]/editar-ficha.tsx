@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Pencil } from 'lucide-react'
@@ -46,6 +47,8 @@ export function EditarFicha({
   ficha: FichaEditable
   niches: Array<{ key: string; label: string }>
 }) {
+  const t = useTranslations('influencers')
+  const tEtiqueta = useTranslations('etiquetas')
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [errors, setErrors] = React.useState<Record<string, string[]>>({})
@@ -77,7 +80,7 @@ export function EditarFicha({
         toast.error(resultado.message)
         return
       }
-      toast.success('Ficha actualizada.')
+      toast.success(t('fichaActualizada'))
       setOpen(false)
       router.refresh()
     })
@@ -88,7 +91,7 @@ export function EditarFicha({
       <DialogTrigger asChild>
         <Button size="sm" variant="secondary">
           <Pencil className="size-4" aria-hidden="true" />
-          Editar ficha
+          {t('editarFicha')}
         </Button>
       </DialogTrigger>
       <DialogContent
@@ -97,13 +100,13 @@ export function EditarFicha({
       >
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Nombre visible" htmlFor="displayName" errors={errors.displayName} required>
+            <Field label={t('campoNombreVisible')} htmlFor="displayName" errors={errors.displayName} required>
               <Input id="displayName" name="displayName" defaultValue={ficha.displayName} required />
             </Field>
-            <Field label="Nombre real" htmlFor="realName">
+            <Field label={t('campoNombreReal')} htmlFor="realName">
               <Input id="realName" name="realName" defaultValue={ficha.realName ?? ''} />
             </Field>
-            <Field label="Handle principal" htmlFor="primaryHandle">
+            <Field label={t('campoHandle')} htmlFor="primaryHandle">
               <Input id="primaryHandle" name="primaryHandle" defaultValue={ficha.primaryHandle ?? ''} />
             </Field>
             <Field
@@ -112,35 +115,35 @@ export function EditarFicha({
               hint="«Bloqueado» deja constancia de que no se trabaja más con esta persona."
             >
               <Select id="status" name="status" defaultValue={ficha.status}>
-                {opcionesDe(INFLUENCER_STATUS).map((opcion) => (
+                {opcionesDe(INFLUENCER_STATUS, tEtiqueta).map((opcion) => (
                   <option key={opcion.value} value={opcion.value}>
                     {opcion.label}
                   </option>
                 ))}
               </Select>
             </Field>
-            <Field label="País" htmlFor="country">
+            <Field label={t('campoPais')} htmlFor="country">
               <Input id="country" name="country" defaultValue={ficha.country ?? ''} />
             </Field>
-            <Field label="Ciudad" htmlFor="city">
+            <Field label={t('campoCiudad')} htmlFor="city">
               <Input id="city" name="city" defaultValue={ficha.city ?? ''} />
             </Field>
-            <Field label="Idioma" htmlFor="language">
+            <Field label={t('campoIdioma')} htmlFor="language">
               <Input id="language" name="language" defaultValue={ficha.language ?? ''} />
             </Field>
-            <Field label="Mayoría de edad" htmlFor="adultStatus">
+            <Field label={t('campoMayoriaDeEdad')} htmlFor="adultStatus">
               <Select id="adultStatus" name="adultStatus" defaultValue={ficha.adultStatus}>
-                <option value="NOT_CONFIRMED">Sin confirmar</option>
-                <option value="CONFIRMED">Confirmada</option>
-                <option value="NOT_APPLICABLE">No aplica</option>
+                <option value="NOT_CONFIRMED">{t('mayoriaSinConfirmar')}</option>
+                <option value="CONFIRMED">{t('mayoriaConfirmada')}</option>
+                <option value="NOT_APPLICABLE">{t('mayoriaNoAplica')}</option>
               </Select>
             </Field>
-            <Field label="Agencia o representante" htmlFor="representative" className="sm:col-span-2">
+            <Field label={t('campoRepresentante')} htmlFor="representative" className="sm:col-span-2">
               <Input id="representative" name="representative" defaultValue={ficha.representative ?? ''} />
             </Field>
           </div>
 
-          <Field label="Nichos" htmlFor="nicheKeys" hint="Podés elegir varios con Ctrl o Cmd.">
+          <Field label={t('campoNichos')} htmlFor="nicheKeys" hint={t('nichosAyudaLarga')}>
             <Select id="nicheKeys" name="nicheKeys" multiple size={6} defaultValue={ficha.nicheKeys} className="h-auto">
               {niches.map((niche) => (
                 <option key={niche.key} value={niche.key}>
@@ -150,22 +153,22 @@ export function EditarFicha({
             </Select>
           </Field>
 
-          <Field label="Bio o descripción" htmlFor="bio">
+          <Field label={t('campoBio')} htmlFor="bio">
             <Textarea id="bio" name="bio" defaultValue={ficha.bio ?? ''} rows={3} />
           </Field>
 
-          <Field label="Notas internas" htmlFor="internalNotes" hint="Nunca las ve el cliente.">
+          <Field label={t('notasInternas')} htmlFor="internalNotes" hint={t('notasInternasAyuda')}>
             <Textarea id="internalNotes" name="internalNotes" defaultValue={ficha.internalNotes ?? ''} rows={3} />
           </Field>
 
           <div className="flex justify-end gap-2 pt-1">
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancelar
+                {t('cancelar')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={pending}>
-              {pending ? 'Guardando…' : 'Guardar cambios'}
+              {pending ? t('guardando') : t('guardarCambios')}
             </Button>
           </div>
         </form>
