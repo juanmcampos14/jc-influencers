@@ -1997,5 +1997,18 @@
     "urlInvalida": "Ingresá una URL válida.",
     "utmIncompletos": "Fuente, medio y campaña no pueden quedar vacíos.",
     "vistaPreviaEsSoloLectura": "Estás mirando el espacio como lo ve el cliente, y eso es sólo lectura. Salí de la vista previa para hacer cambios."
+  },
+  "emails": {
+    "invitacionActivar": "Para activar tu cuenta y definir tu contraseña, entrá acá:",
+    "invitacionAsunto": "Te invitaron a JC Influencers",
+    "invitacionCuerpo": "La agencia JC te dio acceso a la plataforma de campañas de influencers.",
+    "invitacionIgnorar": "Si no esperabas esta invitación, ignorá este mensaje.",
+    "invitacionSaludo": "Hola {nombre},",
+    "invitacionVence": "El enlace vence el {fecha} y se puede usar una sola vez.",
+    "recuperarAsunto": "Recuperar acceso a JC Influencers",
+    "recuperarCuerpo": "Pediste recuperar el acceso a la plataforma. Definí una contraseña nueva acá:",
+    "recuperarIgnorar": "Si no pediste esto, ignorá el mensaje: tu contraseña actual sigue funcionando.",
+    "recuperarSaludo": "Hola {nombre},",
+    "recuperarVence": "El enlace vence en una hora y se puede usar una sola vez."
   }
 }

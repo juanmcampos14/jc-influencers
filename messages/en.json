@@ -1997,5 +1997,18 @@
     "urlInvalida": "Enter a valid URL.",
     "utmIncompletos": "Source, medium and campaign cannot be left empty.",
     "vistaPreviaEsSoloLectura": "You are looking at the workspace the way the client sees it, and that is read-only. Leave the preview to make changes."
+  },
+  "emails": {
+    "invitacionActivar": "To activate your account and set your password, go here:",
+    "invitacionAsunto": "You have been invited to JC Influencers",
+    "invitacionCuerpo": "The JC agency has given you access to the influencer campaign platform.",
+    "invitacionIgnorar": "If you were not expecting this invitation, ignore this message.",
+    "invitacionSaludo": "Hello {nombre},",
+    "invitacionVence": "The link expires on {fecha} and can be used only once.",
+    "recuperarAsunto": "Recover access to JC Influencers",
+    "recuperarCuerpo": "You asked to recover access to the platform. Set a new password here:",
+    "recuperarIgnorar": "If you did not ask for this, ignore the message: your current password still works.",
+    "recuperarSaludo": "Hello {nombre},",
+    "recuperarVence": "The link expires in an hour and can be used only once."
   }
 }

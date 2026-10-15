@@ -6,6 +6,8 @@ import { AUDIT, recordAudit } from '@/lib/audit'
 import { emailSender } from '@/lib/ports/email'
 import { ValidationError } from '@/lib/authz/errors'
 import { consumeRateLimit } from './rate-limit'
+import { idiomaDelPedido, textoDelPedido } from '@/lib/i18n/castellano'
+import { intlDe } from '@/lib/util/format'
 import { hashPassword, passwordProblems, verifyPassword } from './password'
 import { generateToken, hashToken, normalizeEmail } from './tokens'
 import {
@@ -202,19 +204,26 @@ export async function createInvitation(input: CreateInvitationInput): Promise<Cr
   })
 
   const acceptUrl = `${env().APP_URL}/invitacion/${token}`
+  /*
+   * El mail se escribe en el idioma de quien invita: es la única preferencia que
+   * existe en ese momento --la persona invitada todavía no tiene cuenta-- y en
+   * una agencia es la misma que la de su cliente.
+   */
+  const texto = await textoDelPedido('emails')
+  const idioma = await idiomaDelPedido()
   await emailSender().send({
     to: email,
-    subject: 'Te invitaron a JC Influencers',
+    subject: texto('invitacionAsunto'),
     text: [
-      `Hola ${input.name},`,
+      texto('invitacionSaludo', { nombre: input.name }),
       '',
-      'La agencia JC te dio acceso a la plataforma de campañas de influencers.',
-      'Para activar tu cuenta y definir tu contraseña, entrá acá:',
+      texto('invitacionCuerpo'),
+      texto('invitacionActivar'),
       '',
       acceptUrl,
       '',
-      `El enlace vence el ${expiresAt.toLocaleString('es-AR')} y se puede usar una sola vez.`,
-      'Si no esperabas esta invitación, ignorá este mensaje.',
+      texto('invitacionVence', { fecha: expiresAt.toLocaleString(intlDe(idioma)) }),
+      texto('invitacionIgnorar'),
     ].join('\n'),
   })
 
@@ -438,18 +447,19 @@ export async function requestPasswordReset(input: {
     })
   })
 
+  const texto = await textoDelPedido('emails')
   await emailSender().send({
     to: email,
-    subject: 'Recuperar acceso a JC Influencers',
+    subject: texto('recuperarAsunto'),
     text: [
-      `Hola ${user.name},`,
+      texto('recuperarSaludo', { nombre: user.name }),
       '',
-      'Pediste recuperar el acceso a la plataforma. Definí una contraseña nueva acá:',
+      texto('recuperarCuerpo'),
       '',
       `${env().APP_URL}/recuperar/${token}`,
       '',
-      'El enlace vence en una hora y se puede usar una sola vez.',
-      'Si no pediste esto, ignorá el mensaje: tu contraseña actual sigue funcionando.',
+      texto('recuperarVence'),
+      texto('recuperarIgnorar'),
     ].join('\n'),
   })
 }
