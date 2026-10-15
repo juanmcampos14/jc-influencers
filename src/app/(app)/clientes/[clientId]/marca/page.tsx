@@ -10,7 +10,14 @@ import { getClient } from '@/lib/repos/clients'
 import { scoutingProvider } from '@/lib/ports/scouting'
 import { BrandStudio } from './brand-studio'
 
-export const metadata: Metadata = { title: 'Identidad visual' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('identidadVisual') }
+}
 export const dynamic = 'force-dynamic'
 
 export default async function BrandPage({ params }: { params: Promise<{ clientId: string }> }) {

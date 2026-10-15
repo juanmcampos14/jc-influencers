@@ -24,7 +24,14 @@ import { nombreDeRol } from '@/lib/authz/capabilities'
 import { formatDate } from '@/lib/util/format'
 import { ClientSettingsForm } from './settings-form'
 
-export const metadata: Metadata = { title: 'Cliente' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('cliente') }
+}
 export const dynamic = 'force-dynamic'
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {

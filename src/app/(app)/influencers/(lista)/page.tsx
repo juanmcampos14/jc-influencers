@@ -25,7 +25,14 @@ import { CasillaDeFila, SeleccionDeInfluencers } from '../seleccion'
 import { NewInfluencerDialog } from '../new-influencer-dialog'
 import { NavDeInfluencers } from '../sub-nav'
 
-export const metadata: Metadata = { title: 'Influencers' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('influencers') }
+}
 export const dynamic = 'force-dynamic'
 
 type SearchParams = {

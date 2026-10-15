@@ -14,7 +14,14 @@ import { auditActionLabel, entityTypeLabel } from '@/lib/domain/labels'
 import { formatDateTime } from '@/lib/util/format'
 import { AuditFilters } from './filters'
 
-export const metadata: Metadata = { title: 'Auditoría' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('auditoria') }
+}
 export const dynamic = 'force-dynamic'
 
 export default async function AuditPage({

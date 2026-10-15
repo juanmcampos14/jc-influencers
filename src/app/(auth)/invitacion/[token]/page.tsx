@@ -4,7 +4,14 @@ import { Card, CardBody } from '@/components/ui/card'
 import { inspectInvitation } from '@/lib/auth/flows'
 import { AcceptForm } from './accept-form'
 
-export const metadata: Metadata = { title: 'Aceptar invitación' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('aceptarInvitacion') }
+}
 
 export default async function InvitationPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params

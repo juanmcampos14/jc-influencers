@@ -1,7 +1,8 @@
+import { NextIntlClientProvider } from 'next-intl'
 import { redirect } from 'next/navigation'
 import { AppShell, type NavItem } from '@/components/app-shell'
 import { getAuthContext } from '@/lib/auth/current'
-import { getTranslations } from 'next-intl/server'
+import { getMessages, getTranslations } from 'next-intl/server'
 import { nombreDeRol } from '@/lib/authz/capabilities'
 import { can } from '@/lib/authz/context'
 
@@ -36,18 +37,27 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
   if (can(ctx, 'audit.view', clientId)) nav.push({ href: '/auditoria', labelKey: 'auditoria', icon: 'auditoria' })
 
+  /*
+   * Acá adentro ya hay sesión de agencia, así que viaja el catálogo entero:
+   * cualquier pantalla puede abrirse sin pasar por otro layout. La pantalla
+   * pública --el ingreso-- recibe sólo lo suyo; ver `app/layout.tsx`.
+   */
+  const mensajes = await getMessages()
+
   return (
-    <AppShell
-      nav={nav}
-      clients={ctx.clients.map((client) => ({ id: client.id, name: client.name }))}
-      activeClientId={ctx.activeClientId}
-      verTodos={ctx.allClients}
-      user={{ name: ctx.user.name, email: ctx.user.email }}
-      roleLabel={ctx.agencyRole ? nombreDeRol(tPermiso, ctx.agencyRole) : ''}
-      sideLabel={t('panelDeAgencia')}
-      accountHref="/cuenta"
-    >
-      {children}
-    </AppShell>
+    <NextIntlClientProvider messages={mensajes}>
+      <AppShell
+        nav={nav}
+        clients={ctx.clients.map((client) => ({ id: client.id, name: client.name }))}
+        activeClientId={ctx.activeClientId}
+        verTodos={ctx.allClients}
+        user={{ name: ctx.user.name, email: ctx.user.email }}
+        roleLabel={ctx.agencyRole ? nombreDeRol(tPermiso, ctx.agencyRole) : ''}
+        sideLabel={t('panelDeAgencia')}
+        accountHref="/cuenta"
+      >
+        {children}
+      </AppShell>
+    </NextIntlClientProvider>
   )
 }

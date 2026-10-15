@@ -4,7 +4,14 @@ import { PageHeader } from '@/components/app-shell'
 import { PantallaCuenta } from '@/components/cuenta/pantalla-cuenta'
 import { requireContext } from '@/lib/auth/current'
 
-export const metadata: Metadata = { title: 'Mi cuenta' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('miCuenta') }
+}
 export const dynamic = 'force-dynamic'
 
 export default async function CuentaPage() {

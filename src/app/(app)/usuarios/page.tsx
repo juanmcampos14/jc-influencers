@@ -17,7 +17,14 @@ import { UserActions } from './user-actions'
 import { EditarAccesos } from './editar-accesos'
 import { RevokeInvitationButton } from './revoke-invitation-button'
 
-export const metadata: Metadata = { title: 'Usuarios' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('usuarios') }
+}
 export const dynamic = 'force-dynamic'
 
 const INVITATION_STATUS: Record<string, { label: string; tone: string }> = {

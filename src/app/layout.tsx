@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Anton, Inter } from 'next/font/google'
 import { Toaster } from 'sonner'
 import { NextIntlClientProvider } from 'next-intl'
-import { getLocale, getTranslations } from 'next-intl/server'
+import { getLocale, getMessages, getTranslations } from 'next-intl/server'
 import './globals.css'
 
 /**
@@ -44,6 +44,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
    */
   const locale = await getLocale()
   const t = await getTranslations('general')
+  /*
+   * Al navegador sólo le viajan los textos que necesita.
+   *
+   * `NextIntlClientProvider` sin `messages` manda el catálogo ENTERO en cada
+   * página: 96 KB con el vocabulario interno de la agencia --nombres de
+   * secciones, ayudas de permisos, mensajes de error-- hasta en la pantalla de
+   * ingreso, que ve cualquiera sin cuenta. Acá van los grupos que usan los
+   * componentes de cliente del árbol público; cada espacio con sesión agrega
+   * los suyos en su propio layout.
+   */
+  const mensajes = await getMessages()
+  const publicos = Object.fromEntries(
+    (['general', 'idioma', 'ingreso', 'cuenta'] as const).map((grupo) => [grupo, mensajes[grupo]]),
+  )
 
   return (
     <html lang={locale} className={`${inter.variable} ${anton.variable}`}>
@@ -54,7 +68,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           {t('saltarAlContenido')}
         </a>
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        <NextIntlClientProvider messages={publicos}>{children}</NextIntlClientProvider>
         <Toaster position="top-right" richColors closeButton />
       </body>
     </html>

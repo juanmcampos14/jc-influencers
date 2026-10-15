@@ -11,7 +11,14 @@ import { listImportRuns } from '@/lib/import/runner'
 import { formatDateTime } from '@/lib/util/format'
 import { ImportWizard } from './import-wizard'
 
-export const metadata: Metadata = { title: 'Importación' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('importacion') }
+}
 export const dynamic = 'force-dynamic'
 
 const STATUS: Record<string, { label: string; tone: string }> = {

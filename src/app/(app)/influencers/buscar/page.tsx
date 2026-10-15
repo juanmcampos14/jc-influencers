@@ -14,7 +14,14 @@ import { hayProveedorConAudiencia, scoutingProviderFor } from '@/lib/ports/scout
 import { ScoutingConsole } from './scouting-console'
 import { NavDeInfluencers } from '../sub-nav'
 
-export const metadata: Metadata = { title: 'Buscar influencers' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('buscarInfluencers') }
+}
 export const dynamic = 'force-dynamic'
 
 export default async function BuscarPage({

@@ -13,7 +13,14 @@ import { loadPage } from '@/lib/actions/page-guard'
 import { dashboard } from '@/lib/repos/dashboard'
 import { formatMoney, relativeDays } from '@/lib/util/format'
 
-export const metadata: Metadata = { title: 'Panel' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('panel') }
+}
 export const dynamic = 'force-dynamic'
 
 export default async function PanelPage() {

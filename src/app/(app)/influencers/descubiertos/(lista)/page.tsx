@@ -24,7 +24,14 @@ import { NavDeInfluencers } from '../../sub-nav'
 import { FiltrosDeDescubiertos } from './filtros'
 import { CasillaDeFila, SeleccionDeDescubiertos } from './seleccion'
 
-export const metadata: Metadata = { title: 'Descubiertos' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('descubiertos') }
+}
 export const dynamic = 'force-dynamic'
 
 /**

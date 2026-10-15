@@ -24,7 +24,14 @@ import { PanelDeObjetivos } from '@/components/objetivos/panel-objetivos'
 import { getObjetivos } from '@/lib/repos/objetivos'
 import { getVistaPreferida, resolverVista } from '@/lib/repos/view-prefs'
 
-export const metadata: Metadata = { title: 'Campaña' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('campana') }
+}
 export const dynamic = 'force-dynamic'
 
 export default async function PortalCampaignPage({

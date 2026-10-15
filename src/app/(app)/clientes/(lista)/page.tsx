@@ -17,7 +17,14 @@ import { listClients, pendientesPorCliente } from '@/lib/repos/clients'
 import { NewClientDialog } from '../new-client-dialog'
 import { CasillaDeFila, SeleccionDeClientes } from '../acciones-de-lote'
 
-export const metadata: Metadata = { title: 'Clientes' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('clientes') }
+}
 export const dynamic = 'force-dynamic'
 
 type Clave = 'nombre' | 'activas' | 'pendientes' | 'accesos'

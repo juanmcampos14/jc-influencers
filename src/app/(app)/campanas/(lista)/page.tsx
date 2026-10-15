@@ -18,7 +18,14 @@ import { CampaignFilters } from '../filters'
 import { NewCampaignDialog } from '../new-campaign-dialog'
 import { CasillaDeFila, SeleccionDeCampanas } from '../acciones-de-lote'
 
-export const metadata: Metadata = { title: 'Campañas' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('campanas') }
+}
 export const dynamic = 'force-dynamic'
 
 type SearchParams = { q?: string; estado?: string; cliente?: string; pagina?: string; orden?: string; dir?: string }

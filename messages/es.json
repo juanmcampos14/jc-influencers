@@ -2010,5 +2010,28 @@
     "recuperarIgnorar": "Si no pediste esto, ignorá el mensaje: tu contraseña actual sigue funcionando.",
     "recuperarSaludo": "Hola {nombre},",
     "recuperarVence": "El enlace vence en una hora y se puede usar una sola vez."
+  },
+  "titulos": {
+    "aceptarInvitacion": "Aceptar invitación",
+    "auditoria": "Auditoría",
+    "buscarInfluencers": "Buscar influencers",
+    "campana": "Campaña",
+    "campanas": "Campañas",
+    "cliente": "Cliente",
+    "clientes": "Clientes",
+    "descubiertos": "Descubiertos",
+    "identidadVisual": "Identidad visual",
+    "importacion": "Importación",
+    "influencer": "Influencer",
+    "influencers": "Influencers",
+    "ingresar": "Ingresar",
+    "miCuenta": "Mi cuenta",
+    "misCampanas": "Mis campañas",
+    "nuevaClave": "Nueva contraseña",
+    "panel": "Panel",
+    "perfilEnLaBase": "Perfil en la base",
+    "posiblesDuplicados": "Posibles duplicados",
+    "recuperarAcceso": "Recuperar acceso",
+    "usuarios": "Usuarios"
   }
 }

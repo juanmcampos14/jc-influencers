@@ -12,7 +12,14 @@ import { formatDate } from '@/lib/util/format'
 import { ResolverDuplicado, type LadoDelPar } from './resolver'
 import { CasillaDeFila, SeleccionDeDuplicados } from './seleccion'
 
-export const metadata: Metadata = { title: 'Posibles duplicados' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('posiblesDuplicados') }
+}
 export const dynamic = 'force-dynamic'
 
 /** Adapta lo que devuelve el repositorio a lo que la pantalla necesita mostrar. */

@@ -20,7 +20,14 @@ import { AgregarACampana } from './agregar-a-campana'
 import { formatDate, formatDateTime, formatFollowers, formatPercent } from '@/lib/util/format'
 import { AddProfileDialog } from './add-profile-dialog'
 
-export const metadata: Metadata = { title: 'Influencer' }
+/**
+ * El título de la pestaña también está traducido: se lee en el navegador, en
+ * los favoritos y en el historial.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('titulos')
+  return { title: t('influencer') }
+}
 export const dynamic = 'force-dynamic'
 
 /* El texto vive en las traducciones; acá queda sólo el conjunto conocido. */

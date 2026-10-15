@@ -2010,5 +2010,28 @@
     "recuperarIgnorar": "If you did not ask for this, ignore the message: your current password still works.",
     "recuperarSaludo": "Hello {nombre},",
     "recuperarVence": "The link expires in an hour and can be used only once."
+  },
+  "titulos": {
+    "aceptarInvitacion": "Accept the invitation",
+    "auditoria": "Audit trail",
+    "buscarInfluencers": "Find influencers",
+    "campana": "Campaign",
+    "campanas": "Campaigns",
+    "cliente": "Client",
+    "clientes": "Clients",
+    "descubiertos": "Discovered",
+    "identidadVisual": "Visual identity",
+    "importacion": "Import",
+    "influencer": "Influencer",
+    "influencers": "Influencers",
+    "ingresar": "Sign in",
+    "miCuenta": "My account",
+    "misCampanas": "My campaigns",
+    "nuevaClave": "New password",
+    "panel": "Dashboard",
+    "perfilEnLaBase": "Profile in the database",
+    "posiblesDuplicados": "Possible duplicates",
+    "recuperarAcceso": "Recover access",
+    "usuarios": "Users"
   }
 }
