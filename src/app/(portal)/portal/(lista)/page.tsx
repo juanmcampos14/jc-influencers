@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { getTranslations } from 'next-intl/server'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { PageHeader } from '@/components/app-shell'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
@@ -23,6 +23,7 @@ export const dynamic = 'force-dynamic'
 export default async function PortalHome() {
   const ctx = await requireContext()
   const t = await getTranslations('portal')
+  const idioma = await getLocale()
   const clientId = ctx.activeClientId
 
   if (!clientId) {
@@ -86,7 +87,7 @@ export default async function PortalHome() {
                     </div>
                   </dl>
                   <p className="mt-2 text-xs text-ink-400">
-                    {formatDate(campaign.startDate, ctx.user.timezone)} → {formatDate(campaign.endDate, ctx.user.timezone)}
+                    {formatDate(campaign.startDate, ctx.user.timezone, idioma)} → {formatDate(campaign.endDate, ctx.user.timezone, idioma)}
                   </p>
                 </Link>
               </li>

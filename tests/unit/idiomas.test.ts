@@ -125,3 +125,44 @@ describe('los archivos de textos', () => {
     }
   })
 })
+
+describe('fechas, números y plata siguen al idioma', () => {
+  /*
+   * No es cosmético. Un angloparlante lee "1.234" como uno coma dos tres
+   * cuatro, y en una pantalla con plata eso se paga.
+   */
+  it('cada idioma escribe lo suyo', async () => {
+    const { formatDate, formatFollowers, formatMoney, formatNumber, formatPercent } = await import(
+      '@/lib/util/format'
+    )
+    const d = new Date('2026-08-31T15:00:00Z')
+    const tz = 'America/Argentina/Buenos_Aires'
+
+    expect(formatDate(d, tz, 'es')).toBe('31 ago 2026')
+    expect(formatDate(d, tz, 'en')).toBe('Aug 31, 2026')
+
+    expect(formatNumber(110177, 'es')).toBe('110.177')
+    expect(formatNumber(110177, 'en')).toBe('110,177')
+
+    expect(formatMoney(1234.5, 'USD', 'es')).toContain('1.235')
+    expect(formatMoney(1234.5, 'USD', 'en')).toContain('1,235')
+
+    expect(formatPercent(4.31, 'es')).toBe('4,31%')
+    expect(formatPercent(4.31, 'en')).toBe('4.31%')
+  })
+
+  /* El espacio antes de la unidad es del español; en inglés va pegado. */
+  it('los seguidores abreviados respetan la convención de cada idioma', async () => {
+    const { formatFollowers } = await import('@/lib/util/format')
+    expect(formatFollowers(48210, 'es')).toBe('48,2 k')
+    expect(formatFollowers(48210, 'en')).toBe('48.2k')
+    expect(formatFollowers(1_250_000, 'es')).toBe('1,3 M')
+    expect(formatFollowers(1_250_000, 'en')).toBe('1.3M')
+  })
+
+  it('sin idioma sigue siendo español, como antes', async () => {
+    const { formatNumber, formatFollowers } = await import('@/lib/util/format')
+    expect(formatNumber(110177)).toBe('110.177')
+    expect(formatFollowers(48210)).toBe('48,2 k')
+  })
+})

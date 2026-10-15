@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { getTranslations } from 'next-intl/server'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,7 @@ export default async function PortalCampaignPage({
   const { vista: vistaPedida, foco, pagina } = await searchParams
   const ctx = await requireContext()
   const t = await getTranslations('portal')
+  const idioma = await getLocale()
 
   let campaign
   try {
@@ -134,7 +135,7 @@ export default async function PortalCampaignPage({
                   <dt className="text-xs text-ink-500">{t('seguidores')}</dt>
                   <dd className="text-ink-800">
                     {brief.followersMin || brief.followersMax
-                      ? `${formatNumber(brief.followersMin)} – ${formatNumber(brief.followersMax)}`
+                      ? `${formatNumber(brief.followersMin, idioma)} – ${formatNumber(brief.followersMax, idioma)}`
                       : '—'}
                   </dd>
                 </div>
@@ -145,7 +146,7 @@ export default async function PortalCampaignPage({
                 <div>
                   <dt className="text-xs text-ink-500">{t('fechas')}</dt>
                   <dd className="text-ink-800">
-                    {formatDate(campaign.startDate, ctx.user.timezone)} → {formatDate(campaign.endDate, ctx.user.timezone)}
+                    {formatDate(campaign.startDate, ctx.user.timezone, idioma)} → {formatDate(campaign.endDate, ctx.user.timezone, idioma)}
                   </dd>
                 </div>
               </dl>

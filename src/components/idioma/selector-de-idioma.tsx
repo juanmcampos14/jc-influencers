@@ -4,7 +4,7 @@ import * as React from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { Languages } from 'lucide-react'
 import { cn } from '@/lib/util/format'
-import { IDIOMAS, type Idioma } from '@/i18n/idiomas'
+import { BANDERA_DE_IDIOMA, IDIOMAS, type Idioma } from '@/i18n/idiomas'
 import { elegirIdiomaAction } from '@/app/(app)/actions/idioma'
 
 /**
@@ -48,6 +48,15 @@ export function SelectorDeIdioma({ className }: { className?: string }) {
                 pendiente && 'opacity-60',
               )}
             >
+              {/*
+                La bandera es decorativa: el nombre del idioma ya está al lado y
+                es lo que lee un lector de pantalla. Anunciar "bandera de
+                España · Español" sería repetir y además confundir, porque la
+                bandera nombra un país y no una lengua.
+              */}
+              <span aria-hidden="true" className="mr-1.5">
+                {BANDERA_DE_IDIOMA[idioma]}
+              </span>
               {t(idioma)}
             </button>
           )

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
@@ -45,6 +45,7 @@ export function Bandeja({
   total: number
 }) {
   const t = useTranslations('portal')
+  const idioma = useLocale()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [pendiente, startTransition] = React.useTransition()
@@ -178,11 +179,11 @@ export function Bandeja({
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
               <dt className="text-xs text-ink-500">{t('seguidores')}</dt>
-              <dd className="cifra text-lg text-ink-900">{formatFollowers(perfil?.followers)}</dd>
+              <dd className="cifra text-lg text-ink-900">{formatFollowers(perfil?.followers, idioma)}</dd>
             </div>
             <div>
               <dt className="text-xs text-ink-500">{t('engagement')}</dt>
-              <dd className="cifra text-lg text-ink-900">{formatPercent(perfil?.engagementRate)}</dd>
+              <dd className="cifra text-lg text-ink-900">{formatPercent(perfil?.engagementRate, idioma)}</dd>
             </div>
             <div>
               <dt className="text-xs text-ink-500">{t('red')}</dt>

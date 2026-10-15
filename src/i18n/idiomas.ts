@@ -18,6 +18,22 @@ export const NOMBRE_DE_IDIOMA: Record<Idioma, string> = {
   en: 'English',
 }
 
+/**
+ * Una bandera para reconocer el idioma de un vistazo.
+ *
+ * Son emoji y no imágenes: no hay un archivo que cargar, se ven en cualquier
+ * pantalla y acompañan al tamaño del texto.
+ *
+ * Van SIEMPRE con el nombre del idioma al lado, nunca solas. Una bandera
+ * nombra un país, no una lengua --el español no es sólo de España, y el inglés
+ * no es sólo del Reino Unido--, así que sola obliga a adivinar. Con el nombre
+ * al lado suma lo que tiene que sumar: que se encuentre más rápido.
+ */
+export const BANDERA_DE_IDIOMA: Record<Idioma, string> = {
+  es: '🇪🇸',
+  en: '🇬🇧',
+}
+
 /** La cookie donde queda la elección explícita. Un año. */
 export const COOKIE_DE_IDIOMA = 'jc_idioma'
 export const DURACION_DE_COOKIE = 60 * 60 * 24 * 365

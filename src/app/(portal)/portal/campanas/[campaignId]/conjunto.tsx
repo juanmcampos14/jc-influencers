@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -49,6 +49,7 @@ export function Conjunto({
   objetivoDeAlcance: number | null
 }) {
   const t = useTranslations('portal')
+  const idioma = useLocale()
   const router = useRouter()
   const [pendiente, startTransition] = React.useTransition()
   const [descartando, setDescartando] = React.useState<string | null>(null)
@@ -95,7 +96,7 @@ export function Conjunto({
     })
   }
 
-  const veredicto = armarVeredicto(squad.length, porCluster, objetivoDeAlcance, alcance, t)
+  const veredicto = armarVeredicto(squad.length, porCluster, objetivoDeAlcance, alcance, t, idioma)
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
@@ -118,8 +119,8 @@ export function Conjunto({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-ink-900">{item.influencer.displayName}</p>
                     <p className="truncate text-xs text-ink-500">
-                      {perfil?.handle ? `@${perfil.handle}` : '—'} · {formatFollowers(perfil?.followers)} ·{' '}
-                      {formatPercent(perfil?.engagementRate)}
+                      {perfil?.handle ? `@${perfil.handle}` : '—'} · {formatFollowers(perfil?.followers, idioma)} ·{' '}
+                      {formatPercent(perfil?.engagementRate, idioma)}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-1">
                       {item.clusterLabel ? <Badge tone="blue">{item.clusterLabel}</Badge> : null}
@@ -205,7 +206,7 @@ export function Conjunto({
           <CardBody className="space-y-4">
             <div>
               <p className="text-xs text-ink-500">{t('alcanceCombinado')}</p>
-              <p className="cifra text-2xl text-ink-900">{formatFollowers(alcance)}</p>
+              <p className="cifra text-2xl text-ink-900">{formatFollowers(alcance, idioma)}</p>
               <p className="text-[11px] text-ink-500">
                 Suma de seguidores. Es una estimación, no gente alcanzada.
                 {sinSeguidores > 0
@@ -227,7 +228,7 @@ export function Conjunto({
                     />
                   </div>
                   <p className="mt-1 text-[11px] tabular-nums text-ink-500">
-                    Objetivo: {formatFollowers(objetivoDeAlcance)}
+                    Objetivo: {formatFollowers(objetivoDeAlcance, idioma)}
                   </p>
                 </div>
               ) : null}
@@ -311,6 +312,8 @@ function armarVeredicto(
    * poder traducir la haría más difícil de leer y de probar.
    */
   t: (clave: string, valores?: Record<string, string | number>) => string,
+  /* Por el mismo motivo que el traductor: acá no se puede usar un hook. */
+  idioma: string,
 ): string | null {
   if (cuantos === 0) return null
 
@@ -321,7 +324,7 @@ function armarVeredicto(
   }
 
   if (objetivo !== null && alcance < objetivo) {
-    return t('faltaAlcance', { actual: formatFollowers(alcance), objetivo: formatFollowers(objetivo) })
+    return t('faltaAlcance', { actual: formatFollowers(alcance, idioma), objetivo: formatFollowers(objetivo, idioma) })
   }
 
   const desviados = porCluster.filter(
