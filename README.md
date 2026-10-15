@@ -123,7 +123,7 @@ Notas:
 | [Integraciones](docs/07-integraciones.md) | Email y almacenamiento: cómo conectar los proveedores reales |
 | [Privacidad](docs/08-privacidad.md) | Datos personales, retención y qué debe validar un asesor legal |
 | [Modelo de amenazas](docs/09-modelo-amenazas.md) | Qué se defiende y cómo |
-| [Despliegue en Vercel + Supabase](docs/10-despliegue-vercel-supabase.md) | Paso a paso para producción |
+| [Despliegue en Vercel + Neon](docs/10-despliegue-vercel-neon.md) | Paso a paso para producción |
 | [Identidad visual por cliente](docs/11-identidad-visual.md) | Cómo se personaliza el espacio de cada cliente |
 | [Decisiones técnicas (ADR)](docs/adr/) | Por qué cada decisión importante |
 

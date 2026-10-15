@@ -70,10 +70,25 @@ async function main(): Promise<void> {
     await client.query('BEGIN')
     const blind = await client.query<{ n: string }>('SELECT count(*)::text AS n FROM clients')
     await client.query('COMMIT')
+    /*
+     * Que la conexión esté cifrada no alcanza: hay que verificar CONTRA QUIÉN.
+     * `sslmode=require` cifra pero no comprueba la identidad del servidor, y
+     * eso deja la puerta abierta a un intermediario. Por eso acá se exige
+     * `verify-full` --o la CA fijada de Supabase, que cumple lo mismo--.
+     */
+    const esSupabase = /supabase\.(com|co)/.test(url)
+    const esLocal = /localhost|127\.0\.0\.1/.test(url)
+    const verifyFull = /sslmode=verify-full/.test(url)
     checks.push({
       name: 'La conexión a la base verifica el certificado del servidor',
-      ok: /supabase\.(com|co)/.test(url) ? sslFor(url) !== undefined : true,
-      detail: /supabase\.(com|co)/.test(url) ? 'TLS verificado contra la CA de Supabase' : 'base local sin TLS',
+      ok: esLocal ? true : esSupabase ? sslFor(url) !== undefined : verifyFull,
+      detail: esLocal
+        ? 'base local, sin TLS'
+        : esSupabase
+          ? 'TLS verificado contra la CA de Supabase'
+          : verifyFull
+            ? 'TLS verificado contra el almacén del sistema (sslmode=verify-full)'
+            : 'la cadena NO pide verify-full: se cifra pero no se verifica la identidad',
     })
 
     checks.push({

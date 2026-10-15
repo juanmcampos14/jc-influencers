@@ -4,13 +4,19 @@ import { join } from 'node:path'
 /**
  * TLS hacia la base de datos.
  *
- * El pooler de Supabase presenta un certificado firmado por su propia CA, que no
- * está entre las de confianza del sistema. La salida fácil sería
- * `rejectUnauthorized: false`, pero eso acepta CUALQUIER certificado y deja la
- * conexión abierta a un intermediario. En vez de eso se fija la CA de Supabase:
- * el certificado se sigue verificando, sólo que contra la CA correcta.
+ * **Hoy la base está en Neon**, cuyos certificados los firma una autoridad
+ * pública: alcanza con el almacén de confianza del sistema, y la verificación
+ * de identidad la pide la propia cadena de conexión con `sslmode=verify-full`.
+ * Para esos hosts esta función devuelve `undefined` a propósito --no hay nada
+ * que fijar-- y el driver verifica igual.
  *
- * Si la CA rota, se puede pasar la nueva por `DATABASE_CA_CERT` sin desplegar.
+ * El caso de Supabase se mantiene porque su pooler presenta un certificado
+ * firmado por su propia CA, que no está entre las del sistema. La salida fácil
+ * habría sido `rejectUnauthorized: false`, pero eso acepta CUALQUIER
+ * certificado y deja la conexión abierta a un intermediario; en vez de eso se
+ * fija la CA correcta y se sigue verificando.
+ *
+ * Si esa CA rota, se puede pasar la nueva por `DATABASE_CA_CERT` sin desplegar.
  */
 
 const CA_FILE = 'supabase-root-2021.crt'
@@ -39,7 +45,10 @@ export type SslConfig = { ca: string; rejectUnauthorized: true } | undefined
 
 /**
  * Configuración TLS para una cadena de conexión.
- * Sólo se aplica a Supabase; contra un Postgres local no hay TLS que verificar.
+ *
+ * Sólo fija una CA propia para Supabase. Contra Neon y contra un Postgres local
+ * devuelve `undefined`: en el primero verifica el sistema --con el
+ * `sslmode=verify-full` de la cadena-- y en el segundo no hay TLS que verificar.
  */
 export function sslFor(connectionString: string): SslConfig {
   if (!/supabase\.(com|co)/.test(connectionString)) return undefined

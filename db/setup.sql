@@ -1,13 +1,20 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- Preparación de una base Supabase para JC Influencers.
+-- Preparación de la base para JC Influencers.
 --
--- Correr UNA VEZ en el SQL Editor de Supabase, ANTES de la primera migración.
--- Reemplazar CAMBIAR_ESTA_CLAVE por una contraseña larga y aleatoria:
---     openssl rand -base64 36
+-- Correr UNA VEZ, ANTES de la primera migración, con el usuario dueño de la
+-- base (en Neon, `neondb_owner`).
 --
--- Por qué hace falta: el rol `postgres` de Supabase tiene BYPASSRLS, así que si
--- la aplicación se conectara con él, las políticas de Row-Level Security no se
--- aplicarían y perderíamos la tercera barrera de aislamiento entre clientes.
+-- Por qué hace falta un rol aparte: el dueño de la base tiene **BYPASSRLS**
+-- --verificado en Neon el 15/10/2026: `neondb_owner` lo trae puesto-- así que
+-- si la aplicación se conectara con él, las políticas de Row-Level Security no
+-- se aplicarían y el aislamiento entre clientes desaparecería **sin un solo
+-- síntoma**: todo andaría igual, sólo que cada cliente vería lo de los demás.
+--
+-- Por eso `jc_app` se crea con SQL y con NOBYPASSRLS explícito. En Neon, un rol
+-- creado desde la consola web hereda `neon_superuser`, que SÍ trae BYPASSRLS:
+-- crearlo desde ahí rompería exactamente lo que este archivo protege.
+--
+-- La contraseña se pasa por `:clave` (psql) o se sustituye antes de ejecutar.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DO $$
@@ -29,11 +36,17 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO jc_app;
 
--- Supabase usa el rol `postgres` para migrar; que sus objetos hereden el permiso.
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO jc_app;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
-  GRANT USAGE, SELECT ON SEQUENCES TO jc_app;
+-- Las migraciones corren con el dueño; que sus objetos hereden el permiso.
+DO $$
+DECLARE duenio text := current_user;
+BEGIN
+  EXECUTE format(
+    'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public
+       GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO jc_app', duenio);
+  EXECUTE format(
+    'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public
+       GRANT USAGE, SELECT ON SEQUENCES TO jc_app', duenio);
+END $$;
 
 -- La aplicación no toca la tabla de control de migraciones.
 DO $$
@@ -42,7 +55,3 @@ BEGIN
     EXECUTE 'REVOKE ALL ON TABLE public._prisma_migrations FROM jc_app';
   END IF;
 END $$;
-
--- Comprobación: tiene que devolver bypassrls = false.
-SELECT rolname, rolsuper AS superusuario, rolbypassrls AS bypassrls
-FROM pg_roles WHERE rolname IN ('jc_app', 'postgres');

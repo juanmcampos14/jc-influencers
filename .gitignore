@@ -20,3 +20,6 @@ coverage
 .DS_Store
 .env*
 .vercel
+
+# Resto del CLI de Supabase, que ya no se usa.
+db/.temp/
