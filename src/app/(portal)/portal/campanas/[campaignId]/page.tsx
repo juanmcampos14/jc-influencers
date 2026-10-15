@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { getTranslations } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
@@ -36,6 +37,7 @@ export default async function PortalCampaignPage({
   const { campaignId } = await params
   const { vista: vistaPedida, foco, pagina } = await searchParams
   const ctx = await requireContext()
+  const t = await getTranslations('portal')
 
   let campaign
   try {
@@ -104,13 +106,13 @@ export default async function PortalCampaignPage({
         description={campaign.objective ?? campaign.description ?? undefined}
         breadcrumb={
           <Link href="/portal" className="hover:underline">
-            Mis campañas
+            {t('misCampanas')}
           </Link>
         }
         actions={
           canExport ? (
             <Button asChild variant="secondary" size="sm">
-              <a href={`/api/exportar/campana/${campaign.id}`}>Descargar CSV</a>
+              <a href={`/api/exportar/campana/${campaign.id}`}>{t('descargarCsv')}</a>
             </Button>
           ) : null
         }
@@ -120,16 +122,16 @@ export default async function PortalCampaignPage({
         {brief ? (
           <Card>
             <CardHeader>
-              <CardTitle>Qué estamos buscando</CardTitle>
+              <CardTitle>{t('queEstamosBuscando')}</CardTitle>
             </CardHeader>
             <CardBody>
               <dl className="grid gap-3 text-sm sm:grid-cols-4">
                 <div>
-                  <dt className="text-xs text-ink-500">País</dt>
+                  <dt className="text-xs text-ink-500">{t('pais')}</dt>
                   <dd className="text-ink-800">{brief.country ?? '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-ink-500">Seguidores</dt>
+                  <dt className="text-xs text-ink-500">{t('seguidores')}</dt>
                   <dd className="text-ink-800">
                     {brief.followersMin || brief.followersMax
                       ? `${formatNumber(brief.followersMin)} – ${formatNumber(brief.followersMax)}`
@@ -137,11 +139,11 @@ export default async function PortalCampaignPage({
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-ink-500">Engagement mínimo</dt>
+                  <dt className="text-xs text-ink-500">{t('engagementMinimo')}</dt>
                   <dd className="text-ink-800">{brief.engagementRateMin != null ? `${brief.engagementRateMin}%` : '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-ink-500">Fechas</dt>
+                  <dt className="text-xs text-ink-500">{t('fechas')}</dt>
                   <dd className="text-ink-800">
                     {formatDate(campaign.startDate, ctx.user.timezone)} → {formatDate(campaign.endDate, ctx.user.timezone)}
                   </dd>
@@ -149,7 +151,7 @@ export default async function PortalCampaignPage({
               </dl>
               {brief.clusters.length > 0 ? (
                 <div className="mt-4">
-                  <p className="mb-1.5 text-xs font-medium text-ink-500">Distribución propuesta del squad</p>
+                  <p className="mb-1.5 text-xs font-medium text-ink-500">{t('distribucionSquad')}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {brief.clusters.map((cluster) => (
                       <Badge key={cluster.id} tone="blue">
@@ -191,8 +193,8 @@ export default async function PortalCampaignPage({
               <div className="mb-1.5 flex items-center justify-between text-xs">
                 <span className="font-medium text-ink-700">
                   {esperando === 0
-                    ? 'Decidiste todos los perfiles propuestos.'
-                    : `Decidiste ${decididos} de ${summary.total}. Faltan ${esperando}.`}
+                    ? t('decidisteTodos')
+                    : t('decidisteParcial', { decididos, total: summary.total, faltan: esperando })}
                 </span>
                 <span className="tabular-nums text-ink-500">
                   {Math.round((decididos / summary.total) * 100)}%
@@ -204,7 +206,7 @@ export default async function PortalCampaignPage({
                 aria-valuemin={0}
                 aria-valuemax={summary.total}
                 aria-valuenow={decididos}
-                aria-label="Perfiles decididos"
+                aria-label={t('perfilesDecididos')}
               >
                 <div
                   className="h-full rounded-full bg-brand-600 transition-[width]"
@@ -247,13 +249,13 @@ export default async function PortalCampaignPage({
           page={candidacies.page}
           pageCount={candidacies.pageCount}
           total={candidacies.total}
-          unidad="perfiles"
+          unidad={t('unidadPerfiles')}
         />
         ) : null}
 
         {insights.length > 0 ? (
           <section className="space-y-4">
-            <h2 className="text-sm font-semibold text-ink-900">Análisis compartidos por la agencia</h2>
+            <h2 className="text-sm font-semibold text-ink-900">{t('analisisCompartidos')}</h2>
             {insights.map((insight) => (
               <InsightView key={insight.id} insight={insight} timezone={ctx.user.timezone} />
             ))}

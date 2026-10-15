@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
@@ -43,6 +44,7 @@ export function Bandeja({
   decididos: number
   total: number
 }) {
+  const t = useTranslations('portal')
   const router = useRouter()
   const searchParams = useSearchParams()
   const [pendiente, startTransition] = React.useTransition()
@@ -76,7 +78,7 @@ export function Bandeja({
         }).catch(() => null)
 
         if (!resultado) {
-          toast.error('No se pudo guardar la decisión. Reintentá en un momento.')
+          toast.error(t('noSeGuardo'))
           return
         }
         if (!resultado.ok) {
@@ -92,7 +94,7 @@ export function Bandeja({
         router.refresh()
       })
     },
-    [actual, campaignId, router],
+    [actual, campaignId, router, t],
   )
 
   // Atajos: sólo con el foco dentro de la tarjeta y nunca escribiendo un texto.
@@ -119,7 +121,7 @@ export function Bandeja({
     return (
       <Card>
         <CardBody className="py-10 text-center">
-          <p className="text-lg font-medium text-ink-900">No queda nada esperándote.</p>
+          <p className="text-lg font-medium text-ink-900">{t('nadaEsperando')}</p>
           <p className="mt-1 text-sm text-ink-500">
             {decididos === total
               ? `Decidiste los ${total} perfiles propuestos.`
@@ -175,26 +177,26 @@ export function Bandeja({
 
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
-              <dt className="text-xs text-ink-500">Seguidores</dt>
+              <dt className="text-xs text-ink-500">{t('seguidores')}</dt>
               <dd className="cifra text-lg text-ink-900">{formatFollowers(perfil?.followers)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-ink-500">Engagement</dt>
+              <dt className="text-xs text-ink-500">{t('engagement')}</dt>
               <dd className="cifra text-lg text-ink-900">{formatPercent(perfil?.engagementRate)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-ink-500">Red</dt>
+              <dt className="text-xs text-ink-500">{t('red')}</dt>
               <dd className="text-sm text-ink-800">{perfil?.platform?.toLowerCase() ?? '—'}</dd>
             </div>
             <div>
-              <dt className="text-xs text-ink-500">Entregas propuestas</dt>
+              <dt className="text-xs text-ink-500">{t('entregasPropuestas')}</dt>
               <dd className="text-sm text-ink-800">{actual.deliverablesSummary ?? '—'}</dd>
             </div>
           </dl>
 
           {actual.agencyRationale ? (
             <div className="rounded-lg border border-ink-200 bg-ink-50 p-3">
-              <p className="text-xs font-medium text-ink-700">Por qué te lo proponemos</p>
+              <p className="text-xs font-medium text-ink-700">{t('porQueTeLoProponemos')}</p>
               <p className="mt-1 text-sm leading-relaxed text-ink-800">{actual.agencyRationale}</p>
             </div>
           ) : null}
@@ -203,11 +205,11 @@ export function Bandeja({
             pidiendoMotivo ? (
               <div className="space-y-2 rounded-lg border border-rose-200 bg-rose-50 p-3">
                 <Field
-                  label="Por qué lo descartás"
+                  label={t('porQueLoDescartas')}
                   htmlFor="motivo"
                   required
                   errors={errorMotivo ? [errorMotivo] : undefined}
-                  hint="Le sirve a la agencia para traerte un reemplazo que sí encaje."
+                  hint={t('pistaDescarte')}
                 >
                   <Textarea
                     id="motivo"
@@ -238,7 +240,7 @@ export function Bandeja({
                       setErrorMotivo(null)
                     }}
                   >
-                    Cancelar
+                    {t('cancelar')}
                   </Button>
                 </div>
               </div>
@@ -246,20 +248,20 @@ export function Bandeja({
               <div className="flex flex-wrap gap-2">
                 <Button disabled={pendiente} onClick={() => decidir('APPROVED', null)}>
                   <Check className="size-4" aria-hidden="true" />
-                  Aprobar
+                  {t('aprobar')}
                 </Button>
                 <Button variant="secondary" disabled={pendiente} onClick={() => decidir('NEEDS_REVIEW', null)}>
                   <HelpCircle className="size-4" aria-hidden="true" />
-                  Pedir más info
+                  {t('pedirMasInfo')}
                 </Button>
                 <Button variant="ghost" disabled={pendiente} onClick={() => setPidiendoMotivo(true)}>
                   <X className="size-4" aria-hidden="true" />
-                  Descartar
+                  {t('descartar')}
                 </Button>
               </div>
             )
           ) : (
-            <p className="text-xs text-ink-500">Tu acceso es de lectura: podés mirar, pero no decidir.</p>
+            <p className="text-xs text-ink-500">{t('accesoDeLectura')}</p>
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ink-100 pt-3">
@@ -271,7 +273,7 @@ export function Bandeja({
             </Link>
             {canApprove ? (
               <p className="text-[11px] text-ink-400">
-                Atajos: A aprobar · D descartar · ? más info · Z volver
+                {t('atajos')}
               </p>
             ) : null}
           </div>

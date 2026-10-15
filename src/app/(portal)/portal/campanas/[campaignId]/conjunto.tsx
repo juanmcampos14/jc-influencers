@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -47,6 +48,7 @@ export function Conjunto({
   /** Del objetivo de la campaña, si existe. Null = no se dibuja la barra. */
   objetivoDeAlcance: number | null
 }) {
+  const t = useTranslations('portal')
   const router = useRouter()
   const [pendiente, startTransition] = React.useTransition()
   const [descartando, setDescartando] = React.useState<string | null>(null)
@@ -79,7 +81,7 @@ export function Conjunto({
       }).catch(() => null)
 
       if (!resultado) {
-        toast.error('No se pudo guardar la decisión.')
+        toast.error(t('noSeGuardo'))
         return
       }
       if (!resultado.ok) {
@@ -93,7 +95,7 @@ export function Conjunto({
     })
   }
 
-  const veredicto = armarVeredicto(squad.length, porCluster, objetivoDeAlcance, alcance)
+  const veredicto = armarVeredicto(squad.length, porCluster, objetivoDeAlcance, alcance, t)
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
@@ -129,7 +131,7 @@ export function Conjunto({
                 {descartando === item.id ? (
                   <div className="mt-2 space-y-2">
                     <Field
-                      label="Por qué lo descartás"
+                      label={t('porQueLoDescartas')}
                       htmlFor={`motivo-${item.id}`}
                       required
                       errors={errorMotivo ? [errorMotivo] : undefined}
@@ -152,10 +154,10 @@ export function Conjunto({
                         disabled={pendiente || motivo.trim().length === 0}
                         onClick={() => decidir(item, 'REJECTED', motivo)}
                       >
-                        Confirmar el descarte
+                        {t('confirmarDescarte')}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => setDescartando(null)} disabled={pendiente}>
-                        Cancelar
+                        {t('cancelar')}
                       </Button>
                     </div>
                   </div>
@@ -168,7 +170,7 @@ export function Conjunto({
                       onClick={() => decidir(item, 'APPROVED', null)}
                     >
                       <Check className="size-4" aria-hidden="true" />
-                      {elegido ? 'En el equipo' : 'Sumar al equipo'}
+                      {elegido ? t('enElEquipo') : t('sumarAlEquipo')}
                     </Button>
                     <Button
                       size="sm"
@@ -180,7 +182,7 @@ export function Conjunto({
                       }}
                     >
                       <X className="size-4" aria-hidden="true" />
-                      <span className="sr-only">Descartar</span>
+                      <span className="sr-only">{t('descartar')}</span>
                     </Button>
                   </div>
                 ) : null}
@@ -193,16 +195,16 @@ export function Conjunto({
       <aside className="lg:sticky lg:top-6 lg:self-start">
         <Card>
           <CardHeader>
-            <CardTitle>El equipo</CardTitle>
+            <CardTitle>{t('elEquipo')}</CardTitle>
             <p className="text-xs text-ink-500">
               {squad.length === 0
-                ? 'Todavía no aprobaste a nadie.'
-                : `${squad.length} ${squad.length === 1 ? 'perfil aprobado' : 'perfiles aprobados'}.`}
+                ? t('nadieAprobado')
+                : (squad.length === 1 ? t('perfilAprobado', { n: squad.length }) : t('perfilesAprobados', { n: squad.length }))}
             </p>
           </CardHeader>
           <CardBody className="space-y-4">
             <div>
-              <p className="text-xs text-ink-500">Alcance combinado</p>
+              <p className="text-xs text-ink-500">{t('alcanceCombinado')}</p>
               <p className="cifra text-2xl text-ink-900">{formatFollowers(alcance)}</p>
               <p className="text-[11px] text-ink-500">
                 Suma de seguidores. Es una estimación, no gente alcanzada.
@@ -233,7 +235,7 @@ export function Conjunto({
 
             {porCluster.length > 0 ? (
               <div>
-                <p className="mb-1.5 text-xs text-ink-500">Mezcla contra lo que pedía el brief</p>
+                <p className="mb-1.5 text-xs text-ink-500">{t('mezclaContraBrief')}</p>
                 <ul className="space-y-2">
                   {porCluster.map((cluster) => (
                     <li key={cluster.id}>
@@ -268,7 +270,7 @@ export function Conjunto({
 
             {squad.length > 0 ? (
               <div>
-                <p className="mb-1.5 text-xs text-ink-500">Quiénes están</p>
+                <p className="mb-1.5 text-xs text-ink-500">{t('quienesEstan')}</p>
                 <ul className="space-y-1">
                   {squad.map((item) => (
                     <li key={item.id} className="flex items-center justify-between gap-2 text-xs">
@@ -303,25 +305,31 @@ function armarVeredicto(
   porCluster: Array<{ label: string; cuantos: number; targetPercent: number; porcentaje: number }>,
   objetivo: number | null,
   alcance: number,
+  /*
+   * El traductor llega por parámetro porque esto no es un componente: un hook
+   * acá no se puede usar, y mover la lógica adentro del componente sólo para
+   * poder traducir la haría más difícil de leer y de probar.
+   */
+  t: (clave: string, valores?: Record<string, string | number>) => string,
 ): string | null {
   if (cuantos === 0) return null
 
   const vacios = porCluster.filter((cluster) => cluster.cuantos === 0 && cluster.targetPercent > 0)
   if (vacios.length > 0) {
     const nombres = vacios.map((cluster) => cluster.label).join(', ')
-    return `El brief pedía ${nombres} y todavía no hay nadie de ese perfil en el equipo.`
+    return t('faltaPerfil', { nombres })
   }
 
   if (objetivo !== null && alcance < objetivo) {
-    return `Falta alcance: vas ${formatFollowers(alcance)} de ${formatFollowers(objetivo)}.`
+    return t('faltaAlcance', { actual: formatFollowers(alcance), objetivo: formatFollowers(objetivo) })
   }
 
   const desviados = porCluster.filter(
     (cluster) => cluster.targetPercent > 0 && Math.abs(cluster.porcentaje - cluster.targetPercent) > 20,
   )
   if (desviados.length > 0) {
-    return `La mezcla se corrió de lo que pedía el brief en ${desviados.map((c) => c.label).join(', ')}.`
+    return t('mezclaCorrida', { nombres: desviados.map((c) => c.label).join(', ') })
   }
 
-  return 'El equipo respeta la mezcla del brief.'
+  return t('respetaLaMezcla')
 }

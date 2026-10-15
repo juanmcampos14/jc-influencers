@@ -15,6 +15,38 @@ import type { AgencyRole, ClientRole } from '../src/generated/prisma/enums'
 
 const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD ?? 'Demo.2026!seguro'
 
+/**
+ * Candado: el seed no corre contra una base que no sea local.
+ *
+ * Pasó de verdad el 15/10/2026. Después de mudar la base a Neon, `DATABASE_URL`
+ * dejó de apuntar al Postgres de Docker y un `npm run db:seed` --el mismo
+ * comando de siempre, escrito sin pensar-- metió tres clientes, doce usuarios y
+ * cinco influencers FICTICIOS en la base de producción. Se limpió, pero el
+ * comando no tenía por qué permitirlo.
+ *
+ * `SEED_FORZAR=1` lo saltea, para el caso raro de querer datos de demostración
+ * en un entorno remoto de pruebas. Tiene que costar escribirlo.
+ */
+function exigirBaseLocal(): void {
+  const url = process.env.DATABASE_URL ?? ''
+  const esLocal = /localhost|127\.0\.0\.1|host\.docker\.internal/.test(url)
+  if (esLocal || process.env.SEED_FORZAR === '1') return
+
+  const host = (() => {
+    try {
+      return new URL(url).hostname
+    } catch {
+      return '(ilegible)'
+    }
+  })()
+  throw new Error(
+    `Este seed crea datos FICTICIOS y la base apuntada no es local: ${host}.\n` +
+      'Si de verdad querés sembrar ahí, volvé a correrlo con SEED_FORZAR=1.',
+  )
+}
+
+exigirBaseLocal()
+
 type AgencyUserSeed = { email: string; name: string; role: AgencyRole; clientSlugs: string[] }
 type ClientUserSeed = { email: string; name: string; clientSlug: string; role: ClientRole; extras?: string[] }
 
