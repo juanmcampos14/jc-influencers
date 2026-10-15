@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
 import { requireContext } from '@/lib/auth/current'
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic'
 export default async function BrandPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params
   const ctx = await requireContext()
+  const t = await getTranslations('clientes')
 
   const { client, brand } = await loadPage(async () => {
     assertCan(ctx, 'brand.manage', clientId)
@@ -24,13 +26,13 @@ export default async function BrandPage({ params }: { params: Promise<{ clientId
   return (
     <>
       <PageHeader
-        title={`Identidad visual · ${client.name}`}
+        title={t('marcaTitulo', { nombre: client.name })}
         variant="nombre"
-        description="Define cómo se ve el espacio de este cliente. Se aplica a su portal, no al panel interno de la agencia."
+        description={t('marcaBajada')}
         breadcrumb={
           <span className="flex gap-1">
             <Link href="/clientes" className="hover:underline">
-              Clientes
+              {t('titulo')}
             </Link>
             <span>/</span>
             <Link href={`/clientes/${clientId}`} className="hover:underline">

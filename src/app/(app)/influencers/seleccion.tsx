@@ -106,7 +106,7 @@ export function SeleccionDeInfluencers({
               onConfirm={() =>
                 ejecutar(
                   () => estadoDeInfluencersAction({ ids, destino: 'ARCHIVED' }),
-                  { singular: 'influencer archivado', plural: 'influencers archivados', verbo: 'archivó' },
+                  { singular: 'influencer archivado', plural: 'influencers archivados', ninguno: 'No se archivó ninguno.' },
                   limpiar,
                 )
               }
@@ -121,7 +121,7 @@ export function SeleccionDeInfluencers({
               onConfirm={() =>
                 ejecutar(
                   () => estadoDeInfluencersAction({ ids, destino: 'ACTIVE' }),
-                  { singular: 'influencer activado', plural: 'influencers activados', verbo: 'activó' },
+                  { singular: 'influencer activado', plural: 'influencers activados', ninguno: 'No se activó ninguno.' },
                   limpiar,
                 )
               }
@@ -141,7 +141,7 @@ export function SeleccionDeInfluencers({
               onConfirm={() =>
                 ejecutar(
                   () => borrarInfluencersAction({ ids }),
-                  { singular: 'influencer borrado', plural: 'influencers borrados', verbo: 'borró' },
+                  { singular: 'influencer borrado', plural: 'influencers borrados', ninguno: 'No se borró ninguno.' },
                   limpiar,
                 )
               }

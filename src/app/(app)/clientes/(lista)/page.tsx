@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { getLocale, getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
 import { Card } from '@/components/ui/card'
@@ -35,6 +36,8 @@ export default async function ClientsPage({
 }) {
   const params = await searchParams
   const ctx = await requireContext()
+  const t = await getTranslations('clientes')
+  const idioma = await getLocale()
   const [clients, pendientes] = await loadPage(() =>
     Promise.all([listClients(ctx), pendientesPorCliente(ctx)]),
   )
@@ -61,7 +64,7 @@ export default async function ClientsPage({
       case 'accesos':
         return signo * (a.userCount - b.userCount)
       default:
-        return signo * a.name.localeCompare(b.name, 'es')
+        return signo * a.name.localeCompare(b.name, idioma)
     }
   })
 
@@ -72,36 +75,36 @@ export default async function ClientsPage({
   return (
     <>
       <PageHeader
-        title="Clientes"
-        description="Cada cliente es un espacio aislado. Los usuarios del cliente sólo ven lo suyo."
+        title={t('titulo')}
+        description={t('bajada')}
         actions={canManage ? <NewClientDialog /> : null}
       />
       <div className="space-y-4 px-5 py-6 sm:px-8">
         <StatStrip>
-          <Stat label={verArchivados ? 'Clientes archivados' : 'Clientes activos'} value={visibles.length} />
-          <Stat label="Campañas activas" value={campanasActivas} />
+          <Stat label={verArchivados ? t('statArchivados') : t('statActivos')} value={visibles.length} />
+          <Stat label={t('statCampanasActivas')} value={campanasActivas} />
           <Stat
-            label="Esperando decisión"
+            label={t('statEsperandoDecision')}
             value={totalPendientes}
             tone="accent"
-            hint="Perfiles que el cliente ya ve"
+            hint={t('statEsperandoDecisionAyuda')}
           />
           {/*
             * "Accesos" y no "Usuarios": son membresías, y una persona que
             * trabaja en dos clientes cuenta dos veces.
             */}
-          <Stat label="Accesos de cliente" value={visibles.reduce((s, c) => s + c.userCount, 0)} />
+          <Stat label={t('statAccesos')} value={visibles.reduce((s, c) => s + c.userCount, 0)} />
         </StatStrip>
 
         {archivados.length > 0 ? (
           <p className="text-xs text-ink-500">
             {verArchivados ? (
               <Link href={hrefCon('/clientes', params, { estado: null })} className="underline underline-offset-4">
-                Volver a los clientes activos
+                {t('volverActivos')}
               </Link>
             ) : (
               <Link href={hrefCon('/clientes', params, { estado: 'archivados' })} className="underline underline-offset-4">
-                Ver {archivados.length} {archivados.length === 1 ? 'cliente archivado' : 'clientes archivados'}
+                {t('verArchivados', { cantidad: archivados.length })}
               </Link>
             )}
           </p>
@@ -111,12 +114,8 @@ export default async function ClientsPage({
           {ordenados.length === 0 ? (
             <EmptyState
               action={canManage ? <NewClientDialog /> : null}
-              title={canManage ? 'Todavía no hay clientes' : 'Todavía no tenés clientes asignados'}
-              description={
-                canManage
-                  ? 'Creá el primero con «Nuevo cliente». Cada uno abre su propio espacio, con sus campañas, sus usuarios y su identidad visual.'
-                  : 'Un administrador de agencia puede darte acceso a los clientes en los que trabajás.'
-              }
+              title={canManage ? t('vacioTitulo') : t('sinAsignadosTitulo')}
+              description={canManage ? t('vacioBajada') : t('sinAsignadosBajada')}
             />
           ) : (
             <SeleccionDeClientes idsDeLaPagina={canManage ? ordenados.map((client) => client.id) : []}>
@@ -124,24 +123,24 @@ export default async function ClientsPage({
               <Table>
                 <thead>
                   <tr>
-                    {canManage ? <Th className="w-10"><span className="sr-only">Elegir</span></Th> : null}
+                    {canManage ? <Th className="w-10"><span className="sr-only">{t('elegir')}</span></Th> : null}
                     <ThOrdenable columna={COLUMNAS[0]!} orden={orden} base="/clientes" params={params}>
-                      Cliente
+                      {t('colCliente')}
                     </ThOrdenable>
-                    <Th>País y mercados</Th>
+                    <Th>{t('colPaisMercados')}</Th>
                     {/* "2 / 7" bajo un encabezado que decía sólo "Campañas" no
                         dejaba saber si el primero eran las activas o el total. */}
                     <ThOrdenable columna={COLUMNAS[1]!} orden={orden} base="/clientes" params={params} className="text-right" alineado="derecha">
-                      Campañas activas / total
+                      {t('colCampanas')}
                     </ThOrdenable>
                     <ThOrdenable columna={COLUMNAS[2]!} orden={orden} base="/clientes" params={params} className="text-right" alineado="derecha">
-                      Esperando decisión
+                      {t('statEsperandoDecision')}
                     </ThOrdenable>
                     <ThOrdenable columna={COLUMNAS[3]!} orden={orden} base="/clientes" params={params} className="text-right" alineado="derecha">
-                      Accesos
+                      {t('colAccesos')}
                     </ThOrdenable>
-                    <Th>Identidad visual</Th>
-                    <Th>Permisos</Th>
+                    <Th>{t('colIdentidad')}</Th>
+                    <Th>{t('colPermisos')}</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -170,7 +169,7 @@ export default async function ClientsPage({
                           >
                             {client.name}
                           </Link>
-                          {client.status === 'ARCHIVED' ? <Badge tone="slate">Archivado</Badge> : null}
+                          {client.status === 'ARCHIVED' ? <Badge tone="slate">{t('archivado')}</Badge> : null}
                         </span>
                         {/* El slug es un identificador técnico: se ve en el
                             detalle, no hace falta repetirlo en la lista. */}
@@ -199,7 +198,7 @@ export default async function ClientsPage({
                             href="/usuarios"
                             className="text-amber-700 underline decoration-amber-300 underline-offset-4 hover:decoration-amber-700"
                           >
-                            Sin accesos
+                            {t('sinAccesos')}
                           </Link>
                         ) : (
                           client.userCount
@@ -207,27 +206,27 @@ export default async function ClientsPage({
                       </Td>
                       <Td className="text-xs">
                         {client.brandColor ? (
-                          <span className="text-ink-600">Propia</span>
+                          <span className="text-ink-600">{t('identidadPropia')}</span>
                         ) : (
                           <Link
                             href={`/clientes/${client.id}/marca`}
                             className="text-amber-700 underline decoration-amber-300 underline-offset-4 hover:decoration-amber-700"
                           >
-                            Sin configurar
+                            {t('identidadSinConfigurar')}
                           </Link>
                         )}
                       </Td>
                       <Td>
                         <div className="flex flex-wrap gap-1">
                           {client.allowClientUserInvites ? (
-                            <Badge tone="blue">Puede invitar</Badge>
+                            <Badge tone="blue">{t('puedeInvitar')}</Badge>
                           ) : (
-                            <Badge tone="slate">Sin invitaciones</Badge>
+                            <Badge tone="slate">{t('sinInvitaciones')}</Badge>
                           )}
                           {client.allowClientExports ? (
-                            <Badge tone="blue">Exporta</Badge>
+                            <Badge tone="blue">{t('exporta')}</Badge>
                           ) : (
-                            <Badge tone="slate">Sin exportar</Badge>
+                            <Badge tone="slate">{t('sinExportar')}</Badge>
                           )}
                         </div>
                       </Td>

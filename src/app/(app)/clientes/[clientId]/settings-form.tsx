@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -20,6 +21,7 @@ export function ClientSettingsForm({
   allowClientUserInvites: boolean
   allowClientExports: boolean
 }) {
+  const t = useTranslations('clientes')
   const router = useRouter()
   const [invites, setInvites] = useState(allowClientUserInvites)
   const [exports, setExports] = useState(allowClientExports)
@@ -38,7 +40,7 @@ export function ClientSettingsForm({
         toast.error(result.message)
         return
       }
-      toast.success('Permisos actualizados.')
+      toast.success(t('permisosActualizados'))
       router.refresh()
     })
   }
@@ -50,21 +52,19 @@ export function ClientSettingsForm({
       <label className="flex items-start gap-2 text-sm text-ink-700">
         <Checkbox checked={invites} onChange={(event) => setInvites(event.target.checked)} className="mt-0.5" />
         <span>
-          El administrador del cliente puede invitar compañeros de su empresa
-          <span className="block text-xs text-ink-500">Nunca puede otorgar roles internos de la agencia.</span>
+          {t('permisoInvitar')}
+          <span className="block text-xs text-ink-500">{t('permisoInvitarAyuda')}</span>
         </span>
       </label>
       <label className="flex items-start gap-2 text-sm text-ink-700">
         <Checkbox checked={exports} onChange={(event) => setExports(event.target.checked)} className="mt-0.5" />
         <span>
-          Puede descargar exportaciones
-          <span className="block text-xs text-ink-500">
-            La exportación sólo incluye los campos que su rol puede ver.
-          </span>
+          {t('permisoExportar')}
+          <span className="block text-xs text-ink-500">{t('permisoExportarAyuda')}</span>
         </span>
       </label>
       <Button size="sm" onClick={save} disabled={!dirty || pending}>
-        {pending ? 'Guardando…' : 'Guardar cambios'}
+        {pending ? t('guardando') : t('guardarCambios')}
       </Button>
     </div>
   )

@@ -1,6 +1,7 @@
 "use client"
 
 import type { CSSProperties } from 'react'
+import { useTranslations } from 'next-intl'
 import type { ResolvedTheme } from '@/lib/domain/theme'
 import { FondoDeMarca } from '@/components/fondo-de-marca'
 
@@ -29,13 +30,14 @@ export function BrandPreview({
   muralUrl?: string | null
   fondoOpacidad?: number
 }) {
+  const t = useTranslations('clientes')
   // Misma regla que en el portal: un logo de trazo claro necesita fondo.
   const needsBackdrop = logoUrl !== null && !logoIsDark && theme.mode === 'LIGHT'
   return (
     <div className="rounded-xl border border-ink-200 bg-surface">
       <div className="flex items-center justify-between border-b border-ink-200 px-4 py-2.5">
-        <p className="text-sm font-semibold text-ink-900">Así lo ve {clientName}</p>
-        <span className="text-xs text-ink-500">{theme.mode === 'DARK' ? 'Modo oscuro' : 'Modo claro'}</span>
+        <p className="text-sm font-semibold text-ink-900">{t('vistaAsiLoVe', { nombre: clientName })}</p>
+        <span className="text-xs text-ink-500">{theme.mode === 'DARK' ? t('vistaModoOscuro') : t('vistaModoClaro')}</span>
       </div>
 
       <div
@@ -90,10 +92,10 @@ export function BrandPreview({
               className="mb-1 rounded-md px-2 py-1.5 text-xs font-medium"
               style={{ backgroundColor: 'var(--jc-primary-soft)', color: 'var(--jc-primary)' }}
             >
-              Mis campañas
+              {t('vistaMisCampanas')}
             </div>
             <div className="rounded-md px-2 py-1.5 text-xs" style={{ color: 'var(--jc-muted)' }}>
-              Cerrar sesión
+              {t('vistaCerrarSesion')}
             </div>
           </aside>
 
@@ -102,10 +104,10 @@ export function BrandPreview({
               className="text-base font-semibold"
               style={{ fontFamily: 'var(--jc-font-heading)', color: 'var(--jc-text)' }}
             >
-              Lanzamiento de temporada
+              {t('vistaCampana')}
             </h3>
             <p className="mb-3 text-xs" style={{ color: 'var(--jc-muted)' }}>
-              Perfiles propuestos para revisar y aprobar.
+              {t('vistaBajada')}
             </p>
 
             <div
@@ -129,7 +131,7 @@ export function BrandPreview({
                   className="rounded-md px-2 py-0.5 text-[11px] font-medium"
                   style={{ backgroundColor: 'var(--jc-primary-soft)', color: 'var(--jc-primary)' }}
                 >
-                  Pendiente
+                  {t('vistaPendiente')}
                 </span>
               </div>
 
@@ -138,9 +140,9 @@ export function BrandPreview({
                 style={{ backgroundColor: 'var(--jc-bg-2)', borderRadius: 'calc(var(--jc-radius) - 4px)' }}
               >
                 {[
-                  ['Seguidores', '31,6 k'],
-                  ['Engagement', '1,5%'],
-                  ['Fit', '★★★★★'],
+                  [t('vistaSeguidores'), t('vistaSeguidoresValor')],
+                  [t('vistaEngagement'), t('vistaEngagementValor')],
+                  [t('vistaFit'), '★★★★★'],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <p className="text-[10px]" style={{ color: 'var(--jc-muted)' }}>
@@ -154,7 +156,7 @@ export function BrandPreview({
               </div>
 
               <p className="mb-2 text-[11px]" style={{ color: 'var(--jc-text-2)' }}>
-                Encaja con el cluster principal y con el rango de seguidores del brief.
+                {t('vistaRazon')}
               </p>
 
               <div className="flex gap-1.5">
@@ -164,7 +166,7 @@ export function BrandPreview({
                   className="rounded-md px-2.5 py-1 text-[11px] font-medium"
                   style={{ backgroundColor: 'var(--jc-primary)', color: 'var(--jc-on-primary)' }}
                 >
-                  Aprobar
+                  {t('vistaAprobar')}
                 </button>
                 <button
                   type="button"
@@ -176,7 +178,7 @@ export function BrandPreview({
                     border: '1px solid var(--jc-border-strong)',
                   }}
                 >
-                  A revisar
+                  {t('vistaARevisar')}
                 </button>
               </div>
             </div>
@@ -190,10 +192,10 @@ export function BrandPreview({
               }}
             >
               <p className="mb-1 text-xs font-semibold" style={{ color: 'var(--jc-text)' }}>
-                Qué estamos buscando
+                {t('vistaQueBuscamos')}
               </p>
               <p className="text-[11px]" style={{ color: 'var(--jc-muted)' }}>
-                ARG · 10.000 a 50.000 seguidores · engagement mínimo 3%
+                {t('vistaBrief')}
               </p>
             </div>
           </main>

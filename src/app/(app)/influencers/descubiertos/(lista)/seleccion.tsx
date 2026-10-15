@@ -45,7 +45,7 @@ export function SeleccionDeDescubiertos({
           onConfirm={() =>
             ejecutar(
               () => importarDescubiertosAction({ ids }),
-              { singular: 'perfil pasado al padrón', plural: 'perfiles pasados al padrón', verbo: 'importó' },
+              { singular: 'perfil pasado al padrón', plural: 'perfiles pasados al padrón', ninguno: 'No se importó ninguno.' },
               limpiar,
             )
           }

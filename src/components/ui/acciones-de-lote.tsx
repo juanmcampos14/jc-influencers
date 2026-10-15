@@ -26,7 +26,7 @@ export function useAccionDeLote() {
   const ejecutar = React.useCallback(
     (
       correr: () => Promise<{ ok: true; data: ResultadoDeLote } | { ok: false; message: string } | null>,
-      textos: { singular: string; plural: string; verbo: string },
+      textos: { singular: string; plural: string; ninguno: string },
       alTerminar?: () => void,
     ) => {
       startTransition(async () => {
@@ -48,7 +48,7 @@ export function useAccionDeLote() {
           toast.error(
             omitidos.length === 1 && detalle
               ? `${detalle.nombre}: ${detalle.motivo}`
-              : `No se ${textos.verbo} ninguno. ${omitidos.length} quedaron afuera.`,
+              : `${textos.ninguno} ${omitidos.length} quedaron afuera.`,
             { description: omitidos.length > 1 ? listar(omitidos) : undefined, duration: 8000 },
           )
           return

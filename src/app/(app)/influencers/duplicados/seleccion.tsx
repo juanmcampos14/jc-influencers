@@ -46,7 +46,7 @@ export function SeleccionDeDuplicados({
         onConfirm={() =>
           ejecutar(
             () => fusionarDuplicadosAction({ ids }),
-            { singular: 'par fusionado', plural: 'pares fusionados', verbo: 'fusionó' },
+            { singular: 'par fusionado', plural: 'pares fusionados', ninguno: 'No se fusionó ninguno.' },
             limpiar,
           )
         }
@@ -65,7 +65,7 @@ export function SeleccionDeDuplicados({
         onConfirm={() =>
           ejecutar(
             () => descartarDuplicadosAction({ ids }),
-            { singular: 'par descartado', plural: 'pares descartados', verbo: 'descartó' },
+            { singular: 'par descartado', plural: 'pares descartados', ninguno: 'No se descartó ninguno.' },
             limpiar,
           )
         }

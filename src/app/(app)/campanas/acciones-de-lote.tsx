@@ -37,7 +37,7 @@ export function SeleccionDeCampanas({
           onConfirm={() =>
             ejecutar(
               () => cerrarCampanasAction({ ids, destino: 'CLOSED' }),
-              { singular: 'campaña cerrada', plural: 'campañas cerradas', verbo: 'cerró' },
+              { singular: 'campaña cerrada', plural: 'campañas cerradas', ninguno: 'No se cerró ninguna.' },
               limpiar,
             )
           }
@@ -57,7 +57,7 @@ export function SeleccionDeCampanas({
           onConfirm={() =>
             ejecutar(
               () => cerrarCampanasAction({ ids, destino: 'CANCELLED' }),
-              { singular: 'campaña cancelada', plural: 'campañas canceladas', verbo: 'canceló' },
+              { singular: 'campaña cancelada', plural: 'campañas canceladas', ninguno: 'No se canceló ninguna.' },
               limpiar,
             )
           }

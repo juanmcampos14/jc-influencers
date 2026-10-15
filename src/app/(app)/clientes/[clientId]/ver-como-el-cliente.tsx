@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Eye } from 'lucide-react'
@@ -16,6 +17,7 @@ import { entrarEnVistaPreviaAction } from '../../actions/vista-previa'
  * de más es peor que no tener ninguna, porque confirma algo falso.
  */
 export function VerComoElCliente({ clientId, nombre }: { clientId: string; nombre: string }) {
+  const t = useTranslations('clientes')
   const router = useRouter()
   const [pendiente, startTransition] = React.useTransition()
 
@@ -28,7 +30,7 @@ export function VerComoElCliente({ clientId, nombre }: { clientId: string; nombr
         startTransition(async () => {
           const resultado = await entrarEnVistaPreviaAction({ clientId }).catch(() => null)
           if (!resultado?.ok) {
-            toast.error(resultado && !resultado.ok ? resultado.message : 'No se pudo abrir la vista previa.')
+            toast.error(resultado && !resultado.ok ? resultado.message : t('noSeAbrioVistaPrevia'))
             return
           }
           router.push('/portal')
@@ -36,7 +38,7 @@ export function VerComoElCliente({ clientId, nombre }: { clientId: string; nombr
       }
     >
       <Eye className="size-4" aria-hidden="true" />
-      {pendiente ? 'Abriendo…' : `Ver como ${nombre}`}
+      {pendiente ? t('abriendo') : t('verComo', { nombre })}
     </Button>
   )
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { getLocale, getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/app-shell'
@@ -29,6 +30,8 @@ export const dynamic = 'force-dynamic'
 export default async function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params
   const ctx = await requireContext()
+  const t = await getTranslations('clientes')
+  const idioma = await getLocale()
 
   let client
   try {
@@ -56,7 +59,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
         description={client.description ?? undefined}
         breadcrumb={
           <Link href="/clientes" className="hover:underline">
-            Clientes
+            {t('titulo')}
           </Link>
         }
         actions={
@@ -66,7 +69,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
               <Button asChild variant={brand.status === 'APPROVED' ? 'secondary' : 'primary'} size="sm">
                 <Link href={`/clientes/${clientId}/marca`}>
                   <Palette className="size-4" aria-hidden="true" />
-                  {brand.status === 'APPROVED' ? 'Identidad visual' : 'Darle su identidad visual'}
+                  {brand.status === 'APPROVED' ? t('identidadVisual') : t('darleIdentidad')}
                 </Link>
               </Button>
             ) : null}
@@ -75,37 +78,37 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
       />
       <div className="grid gap-6 px-5 py-6 sm:px-8 lg:grid-cols-3">
         <StatStrip>
-          <Stat label="Campañas activas" value={resumen.totals.activeCampaigns} />
+          <Stat label={t('statCampanasActivas')} value={resumen.totals.activeCampaigns} />
           <Stat
-            label="Esperando al cliente"
+            label={t('statEsperandoCliente')}
             value={resumen.totals.awaitingClient}
             tone="accent"
-            hint="Ya lo ve el cliente"
+            hint={t('statEsperandoClienteAyuda')}
           />
-          <Stat label="Aprobados" value={resumen.totals.approved} tone="good" />
-          <Stat label="Perfiles propuestos" value={resumen.totals.proposedProfiles} />
+          <Stat label={t('statAprobados')} value={resumen.totals.approved} tone="good" />
+          <Stat label={t('statPerfilesPropuestos')} value={resumen.totals.proposedProfiles} />
         </StatStrip>
 
         <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>Campañas</CardTitle>
+              <CardTitle>{t('campanas')}</CardTitle>
             {campaigns.items.length < campaigns.total ? (
               <CardDescription>
-                Las {campaigns.items.length} más recientes de {campaigns.total}.{' '}
+                {t('campanasRecientes', { mostradas: campaigns.items.length, total: campaigns.total })}{' '}
                 <Link href={`/campanas?cliente=${clientId}`} className="underline underline-offset-2">
-                  Ver todas
+                  {t('verTodas')}
                 </Link>
               </CardDescription>
             ) : null}
             </CardHeader>
             {campaigns.items.length === 0 ? (
               <EmptyState
-                title="Sin campañas"
-                description="Cuando crees la primera va a aparecer acá, con sus perfiles y su brief."
+                title={t('sinCampanasTitulo')}
+                description={t('sinCampanasBajada')}
                 action={
                   <Button asChild variant="secondary" size="sm">
-                    <Link href="/campanas">Ir a Campañas</Link>
+                    <Link href="/campanas">{t('irACampanas')}</Link>
                   </Button>
                 }
               />
@@ -114,11 +117,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                 <Table>
                   <thead>
                     <tr>
-                      <Th>Campaña</Th>
-                      <Th>Estado</Th>
-                      <Th className="text-right">Perfiles</Th>
-                      <Th className="text-right">Aprobados</Th>
-                      <Th>Fechas</Th>
+                      <Th>{t('colCampana')}</Th>
+                      <Th>{t('colEstado')}</Th>
+                      <Th className="text-right">{t('colPerfiles')}</Th>
+                      <Th className="text-right">{t('colAprobados')}</Th>
+                      <Th>{t('colFechas')}</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -135,7 +138,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                         <Td className="text-right tabular-nums">{campaign.candidacyCount}</Td>
                         <Td className="text-right tabular-nums">{campaign.approvedCount}</Td>
                         <Td className="whitespace-nowrap text-xs text-ink-600">
-                          {formatDate(campaign.startDate, ctx.user.timezone)} → {formatDate(campaign.endDate, ctx.user.timezone)}
+                          {formatDate(campaign.startDate, ctx.user.timezone, idioma)} → {formatDate(campaign.endDate, ctx.user.timezone, idioma)}
                         </Td>
                       </Tr>
                     ))}
@@ -147,15 +150,15 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
 
           <Card>
             <CardHeader>
-              <CardTitle>Usuarios del cliente</CardTitle>
+              <CardTitle>{t('usuariosDelCliente')}</CardTitle>
             </CardHeader>
             {users.length === 0 ? (
               <EmptyState
-                title="Sin usuarios"
-                description="Sin nadie del lado del cliente, nadie puede aprobar los perfiles que le propongas."
+                title={t('sinUsuariosTitulo')}
+                description={t('sinUsuariosBajada')}
                 action={
                   <Button asChild variant="secondary" size="sm">
-                    <Link href="/usuarios">Invitar a alguien</Link>
+                    <Link href="/usuarios">{t('invitarAAlguien')}</Link>
                   </Button>
                 }
               />
@@ -164,10 +167,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                 <Table>
                   <thead>
                     <tr>
-                      <Th>Persona</Th>
-                      <Th>Rol</Th>
-                      <Th>Estado</Th>
-                      <Th>Último acceso</Th>
+                      <Th>{t('colPersona')}</Th>
+                      <Th>{t('colRol')}</Th>
+                      <Th>{t('colEstado')}</Th>
+                      <Th>{t('colUltimoAcceso')}</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -182,12 +185,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                           <Td>{membership ? CLIENT_ROLE_LABELS[membership.role] : '—'}</Td>
                           <Td>
                             {user.status === 'ACTIVE' ? (
-                              <Badge tone="emerald" dot>Activo</Badge>
+                              <Badge tone="emerald" dot>{t('activo')}</Badge>
                             ) : (
-                              <Badge tone="rose" dot>Desactivado</Badge>
+                              <Badge tone="rose" dot>{t('desactivado')}</Badge>
                             )}
                           </Td>
-                          <Td className="text-xs text-ink-600">{formatDate(user.lastLoginAt, ctx.user.timezone)}</Td>
+                          <Td className="text-xs text-ink-600">{formatDate(user.lastLoginAt, ctx.user.timezone, idioma)}</Td>
                         </Tr>
                       )
                     })}
@@ -201,32 +204,32 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Datos</CardTitle>
+              <CardTitle>{t('datos')}</CardTitle>
             </CardHeader>
             <CardBody>
               <dl className="space-y-2 text-sm">
                 <div>
-                  <dt className="text-xs text-ink-500">Identificador</dt>
+                  <dt className="text-xs text-ink-500">{t('identificador')}</dt>
                   <dd className="font-mono text-xs text-ink-800">{client.slug}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-ink-500">Razón social</dt>
+                  <dt className="text-xs text-ink-500">{t('razonSocial')}</dt>
                   <dd className="text-ink-800">{client.legalName ?? '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-ink-500">País</dt>
+                  <dt className="text-xs text-ink-500">{t('pais')}</dt>
                   <dd className="text-ink-800">{client.country ?? '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-ink-500">Mercados</dt>
+                  <dt className="text-xs text-ink-500">{t('mercados')}</dt>
                   <dd className="text-ink-800">{client.markets.length > 0 ? client.markets.join(', ') : '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-ink-500">Moneda</dt>
+                  <dt className="text-xs text-ink-500">{t('moneda')}</dt>
                   <dd className="text-ink-800">{client.defaultCurrency}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-ink-500">Zona horaria</dt>
+                  <dt className="text-xs text-ink-500">{t('zonaHoraria')}</dt>
                   <dd className="text-ink-800">{client.timezone}</dd>
                 </div>
               </dl>
@@ -236,10 +239,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
           {can(ctx, 'brand.manage', clientId) ? (
             <Card>
               <CardHeader>
-                <CardTitle>Identidad visual</CardTitle>
-                <p className="text-xs text-ink-500">
-                  Define cómo se ve el espacio de este cliente cuando entra a su portal.
-                </p>
+                <CardTitle>{t('identidadVisual')}</CardTitle>
+                <p className="text-xs text-ink-500">{t('identidadBajadaFicha')}</p>
               </CardHeader>
               <CardBody className="space-y-3">
                 <div className="flex items-center gap-3">
@@ -250,16 +251,16 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                   />
                   <div className="min-w-0">
                     <p className="text-sm text-ink-800">
-                      {brand.status === 'APPROVED' ? 'Identidad propia aplicada' : 'Usando el tema neutro de JC'}
+                      {brand.status === 'APPROVED' ? t('identidadPropiaAplicada') : t('usandoNeutro')}
                     </p>
                     <p className="truncate text-xs text-ink-500">
-                      {brand.sourceUrl ?? (brand.status === 'APPROVED' ? 'configurada a mano' : 'sin configurar')}
+                      {brand.sourceUrl ?? (brand.status === 'APPROVED' ? t('configuradaAMano') : t('sinConfigurarMinuscula'))}
                     </p>
                   </div>
                 </div>
                 <Button asChild size="sm" variant="secondary">
                   <Link href={`/clientes/${clientId}/marca`}>
-                    {brand.status === 'APPROVED' ? 'Editar identidad' : 'Configurar identidad'}
+                    {brand.status === 'APPROVED' ? t('editarIdentidad') : t('configurarIdentidad')}
                   </Link>
                 </Button>
               </CardBody>
@@ -269,7 +270,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
           {canManage ? (
             <Card>
               <CardHeader>
-                <CardTitle>Visibilidad y permisos</CardTitle>
+                <CardTitle>{t('visibilidadYPermisos')}</CardTitle>
               </CardHeader>
               <CardBody>
                 <ClientSettingsForm

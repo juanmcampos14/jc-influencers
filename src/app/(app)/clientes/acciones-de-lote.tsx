@@ -1,6 +1,7 @@
 "use client"
 
 import { Archive, ArchiveRestore } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Seleccion, CasillaDeFila } from '@/components/ui/seleccion'
 import { BotonDeLote, useAccionDeLote } from '@/components/ui/acciones-de-lote'
 import { archivarClientesAction } from '../actions/lote'
@@ -22,29 +23,29 @@ export function SeleccionDeClientes({
   idsDeLaPagina: string[]
   children: React.ReactNode
 }) {
+  const t = useTranslations('clientes')
   const { ejecutar, pendiente } = useAccionDeLote()
 
   return (
-    <Seleccion idsDeLaPagina={idsDeLaPagina} etiqueta="elegidos" acciones={(ids, limpiar) => (
+    <Seleccion idsDeLaPagina={idsDeLaPagina} etiqueta={t('elegidos')} acciones={(ids, limpiar) => (
       <>
         <BotonDeLote
           pendiente={pendiente}
           confirmacion={{
-            title: `Archivar ${ids.length === 1 ? 'el cliente' : `${ids.length} clientes`}`,
-            description:
-              'Salen de la lista y de los selectores de espacio de trabajo. No se borra nada: sus campañas y su historial quedan intactos, y podés reactivarlos cuando quieras.',
-            confirmLabel: 'Archivar',
+            title: t('archivarTitulo', { cantidad: ids.length }),
+            description: t('archivarBajada'),
+            confirmLabel: t('archivar'),
           }}
           onConfirm={() =>
             ejecutar(
               () => archivarClientesAction({ ids, destino: 'ARCHIVED' }),
-              { singular: 'cliente archivado', plural: 'clientes archivados', verbo: 'archivó' },
+              { singular: t('archivadoSingular'), plural: t('archivadoPlural'), ninguno: t('archivadoNinguno') },
               limpiar,
             )
           }
         >
           <Archive className="size-4" aria-hidden="true" />
-          Archivar
+          {t('archivar')}
         </BotonDeLote>
         <BotonDeLote
           variant="ghost"
@@ -52,13 +53,13 @@ export function SeleccionDeClientes({
           onConfirm={() =>
             ejecutar(
               () => archivarClientesAction({ ids, destino: 'ACTIVE' }),
-              { singular: 'cliente reactivado', plural: 'clientes reactivados', verbo: 'reactivó' },
+              { singular: t('reactivadoSingular'), plural: t('reactivadoPlural'), ninguno: t('reactivadoNinguno') },
               limpiar,
             )
           }
         >
           <ArchiveRestore className="size-4" aria-hidden="true" />
-          Reactivar
+          {t('reactivar')}
         </BotonDeLote>
       </>
     )}>

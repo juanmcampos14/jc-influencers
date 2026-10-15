@@ -1,5 +1,7 @@
+import { getTranslations } from 'next-intl/server'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 
-export default function Loading() {
-  return <PageSkeleton title="Clientes" description="Cada cliente es un espacio aislado. Los usuarios del cliente sólo ven lo suyo." stats={false} />
+export default async function Loading() {
+  const t = await getTranslations('clientes')
+  return <PageSkeleton title={t('titulo')} description={t('bajada')} stats={false} />
 }

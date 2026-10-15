@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -29,15 +30,20 @@ type Source = 'WEBSITE' | 'INSTAGRAM' | 'UPLOAD' | 'MANUAL'
 /** Lo que se puede elegir en el selector de fuente. */
 type PickableSource = Exclude<Source, 'MANUAL'>
 
-const COLOR_FIELDS: Array<{ key: keyof ThemeColors; label: string; hint: string }> = [
-  { key: 'primary', label: 'Color de marca', hint: 'Botones, enlaces y acentos.' },
-  { key: 'onPrimary', label: 'Texto sobre la marca', hint: 'Se calcula solo, pero se puede forzar.' },
-  { key: 'accent', label: 'Acento', hint: 'Estados y detalles secundarios.' },
-  { key: 'background', label: 'Fondo', hint: 'El lienzo de las pantallas.' },
-  { key: 'surface', label: 'Superficie', hint: 'Tarjetas y tablas.' },
-  { key: 'text', label: 'Texto', hint: 'El texto principal.' },
-  { key: 'muted', label: 'Texto secundario', hint: 'Descripciones y ayudas.' },
-  { key: 'border', label: 'Bordes', hint: 'Separadores y contornos.' },
+/*
+ * Vive afuera del componente, así que no puede leer traducciones: guarda la
+ * clave y el texto se resuelve al pintar. Lo de arriba era un `label` ya
+ * escrito, y en inglés salía en castellano.
+ */
+const COLOR_FIELDS: Array<{ key: keyof ThemeColors; clave: string }> = [
+  { key: 'primary', clave: 'colorPrimary' },
+  { key: 'onPrimary', clave: 'colorOnPrimary' },
+  { key: 'accent', clave: 'colorAccent' },
+  { key: 'background', clave: 'colorBackground' },
+  { key: 'surface', clave: 'colorSurface' },
+  { key: 'text', clave: 'colorText' },
+  { key: 'muted', clave: 'colorMuted' },
+  { key: 'border', clave: 'colorBorder' },
 ]
 
 export function BrandStudio({
@@ -51,6 +57,8 @@ export function BrandStudio({
   brand: BrandDto
   instagramAvailable: boolean
 }) {
+  const t = useTranslations('clientes')
+  const idioma = useLocale()
   const router = useRouter()
   /**
    * Fuente elegida en el selector. Nunca vale 'MANUAL': ese estado significa
@@ -127,7 +135,7 @@ export function BrandStudio({
       if (data.fontHints[0]) setFontBody(data.fontHints[0])
       if (data.fontHints[1] ?? data.fontHints[0]) setFontHeading(data.fontHints[1] ?? data.fontHints[0] ?? '')
       setRemoveLogo(false)
-      toast.success('Propuesta lista. Revisala y ajustá lo que haga falta.')
+      toast.success(t('propuestaLista'))
     })
   }
 
@@ -163,7 +171,7 @@ export function BrandStudio({
 
       const result = await saveBrandAction(formData).catch(() => null)
       if (!result) {
-        const mensaje = 'No se pudo guardar la identidad. Reintentá; si vuelve a pasar, avisale al equipo.'
+        const mensaje = t('noSeGuardo')
         setError(mensaje)
         toast.error(mensaje)
         return
@@ -177,8 +185,8 @@ export function BrandStudio({
       else
         toast.success(
           status === 'APPROVED'
-            ? `Listo. ${clientName} ya ve su espacio con esta identidad.`
-            : 'Borrador guardado. Todavía no lo ve el cliente.',
+            ? t('aplicada', { nombre: clientName })
+            : t('borradorGuardado'),
         )
       setProposal(null)
       router.refresh()
@@ -189,7 +197,7 @@ export function BrandStudio({
     startMural(async () => {
       const result = await drawMuralAction({ clientId }).catch(() => null)
       if (!result) {
-        toast.error('No se pudo dibujar el mural. Reintentá en un momento.')
+        toast.error(t('muralNoSeDibujo'))
         return
       }
       if (!result.ok) {
@@ -198,10 +206,10 @@ export function BrandStudio({
       }
       if (result.data.status !== 'READY') {
         // El intento quedó registrado con su motivo; no se finge que salió bien.
-        toast.error(result.data.motivo ?? 'El modelo no devolvió un dibujo utilizable.')
+        toast.error(result.data.motivo ?? t('muralNoDibujo'))
         return
       }
-      toast.success(result.data.concepto ?? 'Mural listo.')
+      toast.success(result.data.concepto ?? t('muralListo'))
       router.refresh()
     })
   }
@@ -210,10 +218,10 @@ export function BrandStudio({
     startMural(async () => {
       const result = await removeMuralAction({ clientId }).catch(() => null)
       if (!result?.ok) {
-        toast.error(result && !result.ok ? result.message : 'No se pudo quitar el mural.')
+        toast.error(result && !result.ok ? result.message : t('muralNoSeQuito'))
         return
       }
-      toast.success('Se quitó el mural.')
+      toast.success(t('muralQuitado'))
       router.refresh()
     })
   }
@@ -225,7 +233,7 @@ export function BrandStudio({
         toast.error(result.message)
         return
       }
-      toast.success('Se volvió al tema neutro de JC.')
+      toast.success(t('volvioAlNeutro'))
       router.refresh()
     })
   }
@@ -235,10 +243,8 @@ export function BrandStudio({
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>1 · De dónde sacamos la identidad</CardTitle>
-            <p className="text-xs text-ink-500">
-              Analizamos el material y proponemos una paleta. Después la ajustás a mano.
-            </p>
+            <CardTitle>{t('paso1')}</CardTitle>
+            <p className="text-xs text-ink-500">{t('paso1Bajada')}</p>
           </CardHeader>
           <CardBody className="space-y-4">
             {/*
@@ -252,21 +258,21 @@ export function BrandStudio({
               * mandaba otra.
               */}
             <div className="flex flex-wrap items-end gap-3">
-              <Field label="Fuente" htmlFor="source" className="min-w-56 flex-1">
+              <Field label={t('fuente')} htmlFor="source" className="min-w-56 flex-1">
                 <Select
                   id="source"
                   value={source}
                   onChange={(event) => setSource(event.target.value as PickableSource)}
                 >
-                  <option value="WEBSITE">Sitio web del cliente</option>
-                  <option value="INSTAGRAM">Instagram del cliente</option>
-                  <option value="UPLOAD">Subir el logo o una captura</option>
+                  <option value="WEBSITE">{t('fuenteWeb')}</option>
+                  <option value="INSTAGRAM">{t('fuenteInstagram')}</option>
+                  <option value="UPLOAD">{t('fuenteSubir')}</option>
                 </Select>
               </Field>
-              <Field label="Modo" htmlFor="mode" className="w-40">
+              <Field label={t('modo')} htmlFor="mode" className="w-40">
                 <Select id="mode" value={mode} onChange={(event) => setMode(event.target.value as 'LIGHT' | 'DARK')}>
-                  <option value="LIGHT">Claro</option>
-                  <option value="DARK">Oscuro</option>
+                  <option value="LIGHT">{t('modoClaro')}</option>
+                  <option value="DARK">{t('modoOscuro')}</option>
                 </Select>
               </Field>
             </div>
@@ -276,7 +282,7 @@ export function BrandStudio({
 
               {source === 'INSTAGRAM' ? (
                 <>
-                  <Field label="Usuario de Instagram" htmlFor="handle" required>
+                  <Field label={t('usuarioInstagram')} htmlFor="handle" required>
                     <Input
                       id="handle"
                       name="handle"
@@ -287,14 +293,11 @@ export function BrandStudio({
                     />
                   </Field>
                   {!instagramAvailable ? (
-                    <InfoNote>
-                      Para leer un perfil de Instagram hace falta el proveedor de scouting configurado. Mientras tanto,
-                      usá el sitio web o subí el logo.
-                    </InfoNote>
+                    <InfoNote>{t('instagramNoDisponible')}</InfoNote>
                   ) : null}
                 </>
               ) : source === 'UPLOAD' ? (
-                <Field label="Archivo" htmlFor="file" hint="PNG, JPG o WebP. Máximo 10 MB." required>
+                <Field label={t('archivo')} htmlFor="file" hint={t('archivoAyuda')} required>
                   <Input
                     id="file"
                     name="file"
@@ -310,7 +313,7 @@ export function BrandStudio({
                   />
                 </Field>
               ) : (
-                <Field label="Dirección del sitio" htmlFor="website" required>
+                <Field label={t('direccionSitio')} htmlFor="website" required>
                   <Input
                     id="website"
                     name="website"
@@ -323,7 +326,7 @@ export function BrandStudio({
               )}
 
               <Button type="submit" disabled={pending}>
-                {pending ? 'Analizando…' : 'Analizar y proponer'}
+                {pending ? t('analizando') : t('analizar')}
               </Button>
             </form>
 
@@ -332,13 +335,11 @@ export function BrandStudio({
             {proposal ? (
               <div className="space-y-3 rounded-lg border border-ink-200 p-3">
                 <p className="text-sm font-medium text-ink-800">
-                  {proposal.siteTitle ? `Encontramos "${proposal.siteTitle}"` : 'Propuesta generada'}
+                  {proposal.siteTitle ? t('encontramos', { titulo: proposal.siteTitle }) : t('propuestaGenerada')}
                 </p>
                 {proposal.colors.length > 0 ? (
                   <div>
-                    <p className="mb-1.5 text-xs text-ink-500">
-                      Colores detectados. Tocá uno para usarlo como color de marca.
-                    </p>
+                    <p className="mb-1.5 text-xs text-ink-500">{t('coloresDetectados')}</p>
                     <div className="flex flex-wrap gap-2">
                       {proposal.colors.map((color) => (
                         <button
@@ -370,7 +371,7 @@ export function BrandStudio({
                 ) : null}
                 {proposal.fontHints.length > 0 ? (
                   <p className="text-xs text-ink-600">
-                    Tipografías detectadas: {proposal.fontHints.join(', ')}
+                    {t('tipografiasDetectadas', { lista: proposal.fontHints.join(', ') })}
                   </p>
                 ) : null}
                 {proposal.warnings.map((warning) => (
@@ -383,14 +384,16 @@ export function BrandStudio({
 
         <Card>
           <CardHeader>
-            <CardTitle>2 · Ajuste fino</CardTitle>
+            <CardTitle>{t('paso2')}</CardTitle>
           </CardHeader>
           <CardBody className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
-              {COLOR_FIELDS.map((field) => (
+              {COLOR_FIELDS.map((field) => {
+                const etiqueta = t(field.clave)
+                return (
                 <div key={field.key}>
                   <label className="mb-1 block text-xs font-medium text-ink-700" htmlFor={`color-${field.key}`}>
-                    {field.label}
+                    {etiqueta}
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -405,16 +408,17 @@ export function BrandStudio({
                       onChange={(event) => setColors((current) => ({ ...current, [field.key]: event.target.value }))}
                       className="font-mono text-xs"
                       maxLength={7}
-                      aria-label={`${field.label} en hexadecimal`}
+                      aria-label={t('enHexadecimal', { campo: etiqueta })}
                     />
                   </div>
-                  <p className="mt-0.5 text-[11px] text-ink-500">{field.hint}</p>
+                  <p className="mt-0.5 text-[11px] text-ink-500">{t(`${field.clave}Ayuda`)}</p>
                 </div>
-              ))}
+                )
+              })}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="Tipografía de títulos" htmlFor="fontHeading" hint="Nombre de Google Fonts.">
+              <Field label={t('tipografiaTitulos')} htmlFor="fontHeading" hint={t('tipografiaTitulosAyuda')}>
                 <Input
                   id="fontHeading"
                   value={fontHeading}
@@ -423,7 +427,7 @@ export function BrandStudio({
                   maxLength={40}
                 />
               </Field>
-              <Field label="Tipografía de texto" htmlFor="fontBody" hint="Vacío usa la del sistema.">
+              <Field label={t('tipografiaTexto')} htmlFor="fontBody" hint={t('tipografiaTextoAyuda')}>
                 <Input
                   id="fontBody"
                   value={fontBody}
@@ -432,7 +436,7 @@ export function BrandStudio({
                   maxLength={40}
                 />
               </Field>
-              <Field label={`Esquinas (${radius}px)`} htmlFor="radius">
+              <Field label={t('esquinas', { px: radius })} htmlFor="radius">
                 <input
                   id="radius"
                   type="range"
@@ -447,16 +451,16 @@ export function BrandStudio({
 
             <div>
               <label className="mb-1 block text-xs font-medium text-ink-700" htmlFor="logo">
-                Logo
+                {t('logo')}
               </label>
               <div className="flex flex-wrap items-center gap-3">
                 {logoPreview && !removeLogo ? (
                   <span className="flex h-12 items-center rounded-lg border border-ink-200 bg-surface px-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={logoPreview} alt="Logo del cliente" className="max-h-8 max-w-32 object-contain" />
+                    <img src={logoPreview} alt={t('logoAlt')} className="max-h-8 max-w-32 object-contain" />
                   </span>
                 ) : (
-                  <span className="text-xs text-ink-500">Sin logo</span>
+                  <span className="text-xs text-ink-500">{t('sinLogo')}</span>
                 )}
                 <Input
                   id="logo"
@@ -480,7 +484,7 @@ export function BrandStudio({
                       setLogoFile(null)
                     }}
                   >
-                    Quitar
+                    {t('quitar')}
                   </Button>
                 ) : null}
               </div>
@@ -489,10 +493,8 @@ export function BrandStudio({
             <label className="flex items-start gap-2 text-sm text-ink-700">
               <Checkbox checked={safeMode} onChange={(event) => setSafeMode(event.target.checked)} className="mt-0.5" />
               <span>
-                Modo seguro
-                <span className="block text-xs text-ink-500">
-                  Conserva el logo pero usa la paleta neutra de JC. Sirve cuando la marca no da contraste suficiente.
-                </span>
+                {t('modoSeguro')}
+                <span className="block text-xs text-ink-500">{t('modoSeguroAyuda')}</span>
               </span>
             </label>
           </CardBody>
@@ -501,19 +503,13 @@ export function BrandStudio({
         {(proposal?.fondos.length ?? 0) > 0 || fondoVista ? (
           <Card>
             <CardHeader>
-              <CardTitle>3 · Fondo del espacio</CardTitle>
-              <p className="text-xs text-ink-500">
-                Una imagen del sitio del cliente detrás de sus campañas. Se repinta con el color de la marca y se
-                atenúa, así que aporta identidad sin pelearle al texto. Mirala en la previsualización de la derecha
-                antes de aplicar.
-              </p>
+              <CardTitle>{t('paso3')}</CardTitle>
+              <p className="text-xs text-ink-500">{t('paso3Bajada')}</p>
             </CardHeader>
             <CardBody className="space-y-4">
               {(proposal?.fondos.length ?? 0) > 0 ? (
                 <div>
-                  <p className="mb-1.5 text-xs text-ink-500">
-                    Encontradas en el sitio. La primera es la que la marca eligió para presentarse.
-                  </p>
+                  <p className="mb-1.5 text-xs text-ink-500">{t('fondosEncontrados')}</p>
                   <div className="flex flex-wrap gap-2">
                     {proposal?.fondos.map((candidata) => {
                       const elegida = !quitarFondo && fondoUrl === candidata.url
@@ -545,9 +541,9 @@ export function BrandStudio({
               ) : null}
 
               <Field
-                label={`Intensidad (${fondoOpacidad}%)`}
+                label={t('intensidad', { pct: fondoOpacidad })}
                 htmlFor="fondoOpacidad"
-                hint="Una foto oscura sobre modo claro y una clara sobre modo oscuro no toleran lo mismo. Se ajusta mirando."
+                hint={t('intensidadAyuda')}
               >
                 <input
                   id="fondoOpacidad"
@@ -563,23 +559,23 @@ export function BrandStudio({
 
               {fondoVista && !quitarFondo ? (
                 <Button variant="ghost" size="sm" onClick={() => setQuitarFondo(true)}>
-                  Sin fondo
+                  {t('sinFondoBoton')}
                 </Button>
               ) : brand.fondo || proposal?.fondos.length ? (
                 <p className="text-xs text-ink-500">
-                  Sin fondo.{' '}
+                  {t('sinFondo')}{' '}
                   <button
                     type="button"
                     className="underline underline-offset-4"
                     onClick={() => setQuitarFondo(false)}
                   >
-                    Volver a poner el elegido
+                    {t('volverAPonerElegido')}
                   </button>
                 </p>
               ) : null}
 
               {brand.fondo?.sourceUrl && !proposal ? (
-                <p className="text-[11px] text-ink-400">Salió de {brand.fondo.sourceUrl}</p>
+                <p className="text-[11px] text-ink-400">{t('fondoSalioDe', { url: brand.fondo.sourceUrl })}</p>
               ) : null}
             </CardBody>
           </Card>
@@ -587,25 +583,25 @@ export function BrandStudio({
 
         <Card>
           <CardHeader>
-            <CardTitle>4 · Legibilidad</CardTitle>
-            <p className="text-xs text-ink-500">
-              Se mide el contraste real de cada par según WCAG 2.1. Lo que no llega, se corrige solo.
-            </p>
+            <CardTitle>{t('paso4')}</CardTitle>
+            <p className="text-xs text-ink-500">{t('paso4Bajada')}</p>
           </CardHeader>
           <CardBody className="space-y-3">
             {blocking.length === 0 && corrected.length === 0 ? (
-              <p className="text-sm text-emerald-700">
-                Todos los pares superan el contraste mínimo sin necesidad de ajustes.
-              </p>
+              <p className="text-sm text-emerald-700">{t('contrasteOk')}</p>
             ) : null}
             {corrected.length > 0 ? (
               <div>
-                <p className="mb-1 text-sm font-medium text-ink-800">Ajustados automáticamente</p>
+                <p className="mb-1 text-sm font-medium text-ink-800">{t('ajustadosAuto')}</p>
                 <ul className="space-y-0.5 text-xs text-ink-600">
                   {corrected.map((issue) => (
                     <li key={issue.pair}>
-                      {issue.pair}: estaba en {issue.ratio}:1, el mínimo es {issue.minimum}:1. Se ajustó el tono un{' '}
-                      {Math.round(issue.adjustment * 100)}%.
+                      {t('ajustadoDetalle', {
+                        par: issue.pair,
+                        ratio: issue.ratio,
+                        minimo: issue.minimum,
+                        pct: Math.round(issue.adjustment * 100),
+                      })}
                     </li>
                   ))}
                 </ul>
@@ -613,31 +609,33 @@ export function BrandStudio({
             ) : null}
             {blocking.length > 0 ? (
               <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
-                <p className="text-sm font-semibold text-rose-900">No se puede aprobar así</p>
+                <p className="text-sm font-semibold text-rose-900">{t('noSePuedeAprobar')}</p>
                 <ul className="mt-1 space-y-0.5 text-xs text-rose-800">
                   {blocking.map((issue) => (
                     <li key={issue.pair}>
-                      {issue.pair}: {issue.ratio}:1, hace falta {issue.minimum}:1. Para que se lea habría que
-                      cambiar el color un {Math.round(issue.adjustment * 100)}%, con lo que dejaría de ser el de la marca.
+                      {t('bloqueoDetalle', {
+                        par: issue.pair,
+                        ratio: issue.ratio,
+                        minimo: issue.minimum,
+                        pct: Math.round(issue.adjustment * 100),
+                      })}
                     </li>
                   ))}
                 </ul>
-                <p className="mt-1 text-xs text-rose-800">
-                  Elegí colores con más contraste, o activá el modo seguro para conservar el logo con la paleta neutra.
-                </p>
+                <p className="mt-1 text-xs text-rose-800">{t('bloqueoAyuda')}</p>
               </div>
             ) : null}
             <div className="flex flex-wrap gap-3 text-xs text-ink-600">
               <span>
-                Texto sobre fondo:{' '}
+                {t('contrasteTextoFondo')}{' '}
                 <strong className="tabular-nums">{contrastBetween(resolved.colors.text, resolved.colors.background).toFixed(2)}:1</strong>
               </span>
               <span>
-                Marca sobre superficie:{' '}
+                {t('contrasteMarcaSuperficie')}{' '}
                 <strong className="tabular-nums">{contrastBetween(resolved.colors.primary, resolved.colors.surface).toFixed(2)}:1</strong>
               </span>
               <span>
-                Texto del botón:{' '}
+                {t('contrasteBoton')}{' '}
                 <strong className="tabular-nums">{contrastBetween(resolved.colors.onPrimary, resolved.colors.primary).toFixed(2)}:1</strong>
               </span>
             </div>
@@ -646,11 +644,8 @@ export function BrandStudio({
 
         <Card>
           <CardHeader>
-            <CardTitle>5 · Mural del espacio</CardTitle>
-            <p className="text-xs text-ink-500">
-              Un dibujo que la IA hace para esta marca y que se ve translúcido detrás del contenido del portal. Es
-              decoración: no dice nada, así que si no está no falta ningún dato.
-            </p>
+            <CardTitle>{t('paso5')}</CardTitle>
+            <p className="text-xs text-ink-500">{t('paso5Bajada')}</p>
           </CardHeader>
           <CardBody className="space-y-3">
             {brand.mural ? (
@@ -662,65 +657,62 @@ export function BrandStudio({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(brand.mural.svg)))}`}
-                    alt={brand.mural.alt ?? 'Mural de la marca'}
+                    alt={brand.mural.alt ?? t('muralAlt')}
                     className="size-full object-contain"
                   />
                 </span>
                 <div className="min-w-0 space-y-1">
-                  <p className="text-sm text-ink-800">{brand.mural.alt ?? 'Mural dibujado para esta marca.'}</p>
-                  <p className="text-xs text-ink-500">Dibujado el {formatDate(brand.mural.generatedAt)}.</p>
+                  <p className="text-sm text-ink-800">{brand.mural.alt ?? t('muralDescripcionPorDefecto')}</p>
+                  <p className="text-xs text-ink-500">
+                    {t('muralDibujadoEl', { fecha: formatDate(brand.mural.generatedAt, undefined, idioma) })}
+                  </p>
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-ink-500">Todavía no hay mural para esta marca.</p>
+              <p className="text-sm text-ink-500">{t('sinMural')}</p>
             )}
 
             <div className="flex flex-wrap items-center gap-3">
               <Button variant="secondary" onClick={dibujarMural} disabled={dibujando || brand.status !== 'APPROVED'}>
-                {dibujando ? 'Dibujando…' : brand.mural ? 'Dibujar otro' : 'Dibujar el mural'}
+                {dibujando ? t('dibujando') : brand.mural ? t('dibujarOtro') : t('dibujarMural')}
               </Button>
               {brand.mural ? (
                 <Button variant="ghost" size="sm" onClick={quitarMural} disabled={dibujando}>
-                  Quitar el mural
+                  {t('quitarMural')}
                 </Button>
               ) : null}
             </div>
 
             {brand.status !== 'APPROVED' ? (
-              <InfoNote>
-                El mural se dibuja con la paleta que ya está en vivo. Aplicá primero la identidad al espacio del
-                cliente.
-              </InfoNote>
+              <InfoNote>{t('muralNecesitaAprobada')}</InfoNote>
             ) : (
-              <p className="text-xs text-ink-500">
-                Cuesta una llamada al modelo y cuenta contra el tope mensual de gasto en IA.
-              </p>
+              <p className="text-xs text-ink-500">{t('muralCuesta')}</p>
             )}
           </CardBody>
         </Card>
 
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={() => save('APPROVED')} disabled={pending || (blocking.length > 0 && !safeMode)}>
-            {pending ? 'Guardando…' : 'Aplicar al espacio del cliente'}
+            {pending ? t('guardando') : t('aplicar')}
           </Button>
           <Button variant="secondary" onClick={() => save('DRAFT')} disabled={pending}>
-            Guardar borrador
+            {t('guardarBorrador')}
           </Button>
           {brand.status === 'APPROVED' ? (
             <ConfirmButton
-              title="Volver al tema neutro"
-              description={`${clientName} va a ver su espacio con la identidad de JC otra vez. Se borra el logo y la paleta guardada.`}
-              confirmLabel="Volver al neutro"
+              title={t('volverNeutroTitulo')}
+              description={t('volverNeutroBajada', { nombre: clientName })}
+              confirmLabel={t('volverNeutroConfirmar')}
               onConfirm={reset}
               pending={pending}
             >
               <Button variant="ghost" disabled={pending}>
-                Quitar identidad
+                {t('quitarIdentidad')}
               </Button>
             </ConfirmButton>
           ) : null}
           <Badge tone={brand.status === 'APPROVED' ? 'emerald' : 'amber'}>
-            {brand.status === 'APPROVED' ? 'En vivo' : 'Borrador · el cliente todavía no lo ve'}
+            {brand.status === 'APPROVED' ? t('enVivo') : t('borradorNoVisible')}
           </Badge>
         </div>
       </div>
