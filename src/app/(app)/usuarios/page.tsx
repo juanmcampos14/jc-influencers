@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { PageHeader } from '@/components/app-shell'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +29,8 @@ const INVITATION_STATUS: Record<string, { label: string; tone: string }> = {
 
 export default async function UsersPage() {
   const ctx = await requireContext()
+  const t = await getTranslations('usuarios')
+  const idioma = await getLocale()
   const canInvite = can(ctx, 'user.invite', null) || ctx.clients.some((client) => can(ctx, 'user.invite', client.id))
   const canManageMemberships = ctx.allClients && can(ctx, 'membership.manage', null)
 
@@ -43,8 +46,8 @@ export default async function UsersPage() {
   return (
     <>
       <PageHeader
-        title="Usuarios y accesos"
-        description="No hay registro público: el acceso se habilita por invitación."
+        title={t('tituloLargo')}
+        description={t('bajada')}
         actions={
           canInvite ? (
             <InviteDialog
@@ -62,19 +65,19 @@ export default async function UsersPage() {
 
       <div className="space-y-6 px-5 py-6 sm:px-8">
         <StatStrip>
-          <Stat label="Personas con acceso" value={resumen.activas} />
-          <Stat label="Desactivadas" value={resumen.desactivadas} />
-          <Stat label="Invitaciones pendientes" value={resumen.invitacionesPendientes} />
+          <Stat label={t('personasConAcceso')} value={resumen.activas} />
+          <Stat label={t('desactivadas')} value={resumen.desactivadas} />
+          <Stat label={t('invitacionesPendientes')} value={resumen.invitacionesPendientes} />
           <Stat
-            label="Vencen esta semana"
+            label={t('vencenEstaSemana')}
             value={resumen.vencenPronto}
             tone="warn"
-            hint="Después hay que volver a invitar"
+            hint={t('pistaVencen')}
           />
         </StatStrip>
         <Card>
           <CardHeader>
-            <CardTitle>Personas con acceso</CardTitle>
+            <CardTitle>{t('personasConAcceso')}</CardTitle>
             {users.length < resumen.activas + resumen.desactivadas ? (
               <CardDescription>
                 Se listan {users.length} de {resumen.activas + resumen.desactivadas}. Usá el buscador de tu navegador o
@@ -84,22 +87,22 @@ export default async function UsersPage() {
           </CardHeader>
           {users.length === 0 ? (
             <EmptyState
-              title="Sin usuarios"
-              description="El acceso se habilita por invitación: no hay registro público."
+              title={t('sinUsuariosTitulo')}
+              description={t('bajada')}
             />
           ) : (
             <TableWrap>
               <Table>
                 <thead>
                   <tr>
-                    <Th className={columnaFija}>Persona</Th>
-                    <Th>Rol de agencia</Th>
-                    <Th>Clientes</Th>
-                    <Th>Estado</Th>
-                    <Th>Último acceso</Th>
+                    <Th className={columnaFija}>{t('persona')}</Th>
+                    <Th>{t('rolDeAgencia')}</Th>
+                    <Th>{t('clientes')}</Th>
+                    <Th>{t('estado')}</Th>
+                    <Th>{t('ultimoAcceso')}</Th>
                     {canManageMemberships ? (
                       <Th>
-                        <span className="sr-only">Acciones</span>
+                        <span className="sr-only">{t('acciones')}</span>
                       </Th>
                     ) : null}
                   </tr>
@@ -158,18 +161,18 @@ export default async function UsersPage() {
                       </Td>
                       <Td>
                         {user.status === 'ACTIVE' ? (
-                          <Badge tone="emerald" dot>Activo</Badge>
+                          <Badge tone="emerald" dot>{t('activo')}</Badge>
                         ) : (
-                          <Badge tone="rose" dot>Desactivado</Badge>
+                          <Badge tone="rose" dot>{t('desactivado')}</Badge>
                         )}
                       </Td>
                       <Td className="whitespace-nowrap text-xs text-ink-600">
-                        {formatDateTime(user.lastLoginAt, ctx.user.timezone)}
+                        {formatDateTime(user.lastLoginAt, ctx.user.timezone, idioma)}
                       </Td>
                       {canManageMemberships ? (
                         <Td>
                           {user.id === ctx.user.id ? (
-                            <Badge tone="slate">Sos vos</Badge>
+                            <Badge tone="slate">{t('sosVos')}</Badge>
                           ) : (
                             <div className="flex items-center gap-1">
                               <EditarAccesos
@@ -206,24 +209,24 @@ export default async function UsersPage() {
         {canInvite ? (
           <Card>
             <CardHeader>
-              <CardTitle>Invitaciones</CardTitle>
+              <CardTitle>{t('invitaciones')}</CardTitle>
               <p className="text-xs text-ink-500">
                 Cada invitación tiene un token único, de un solo uso y con vencimiento a 7 días.
               </p>
             </CardHeader>
             {invitations.length === 0 ? (
-              <EmptyState title="Sin invitaciones" description="Todavía no enviaste ninguna." />
+              <EmptyState title={t('sinInvitacionesTitulo')} description={t('sinInvitacionesBajada')} />
             ) : (
               <TableWrap>
                 <Table>
                   <thead>
                     <tr>
-                      <Th>Email</Th>
-                      <Th>Destino</Th>
-                      <Th>Estado</Th>
-                      <Th>Vence</Th>
+                      <Th>{t('email')}</Th>
+                      <Th>{t('destino')}</Th>
+                      <Th>{t('estado')}</Th>
+                      <Th>{t('vence')}</Th>
                       <Th>
-                        <span className="sr-only">Acciones</span>
+                        <span className="sr-only">{t('acciones')}</span>
                       </Th>
                     </tr>
                   </thead>
@@ -245,7 +248,7 @@ export default async function UsersPage() {
                             <Badge tone={status.tone}>{status.label}</Badge>
                           </Td>
                           <Td className="whitespace-nowrap text-xs text-ink-600">
-                            {formatDate(invitation.expiresAt, ctx.user.timezone)}
+                            {formatDate(invitation.expiresAt, ctx.user.timezone, idioma)}
                           </Td>
                           <Td>
                             {invitation.status === 'PENDING' ? (

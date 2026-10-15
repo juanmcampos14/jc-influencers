@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { PageHeader } from '@/components/app-shell'
 import { Card, CardBody, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -17,6 +18,8 @@ export const dynamic = 'force-dynamic'
 
 export default async function PanelPage() {
   const ctx = await requireContext()
+  const t = await getTranslations('panel')
+  const idioma = await getLocale()
   /*
    * El panel sigue al selector de espacio de trabajo.
    *
@@ -36,11 +39,11 @@ export default async function PanelPage() {
   return (
     <>
       <PageHeader
-        title={`Hola, ${ctx.user.name.split(' ')[0]}`}
+        title={t('hola', { nombre: ctx.user.name.split(' ')[0] ?? '' })}
         description={
           espacio
             ? `Estado de ${espacio}: campañas activas y lo que está esperando una decisión.`
-            : 'Estado de todos tus clientes: campañas activas y lo que está esperando una decisión.'
+            : t('bajada')
         }
       />
       <div className="space-y-6 px-5 py-6 sm:px-8">
@@ -51,42 +54,42 @@ export default async function PanelPage() {
           */}
         <StatStrip>
           <Stat
-            label="Esperando al cliente"
+            label={t('esperandoAlCliente')}
             value={data.totals.awaitingClient}
             tone="accent"
-            hint="Ya lo ve el cliente"
+            hint={t('yaLoVe')}
           />
           {data.totals.notSharedYet !== null ? (
             <Stat
-              label="Sin compartir"
+              label={t('sinCompartir')}
               value={data.totals.notSharedYet}
               tone="warn"
-              hint="El cliente todavía no los ve"
+              hint={t('todaviaNoLoVe')}
             />
           ) : (
-            <Stat label="Campañas activas" value={data.totals.activeCampaigns} />
+            <Stat label={t('campanasActivas')} value={data.totals.activeCampaigns} />
           )}
-          <Stat label="Aprobados" value={data.totals.approved} tone="good" />
-          <Stat label="Perfiles propuestos" value={data.totals.proposedProfiles} hint="En campañas abiertas" />
+          <Stat label={t('aprobados')} value={data.totals.approved} tone="good" />
+          <Stat label={t('perfilesPropuestos')} value={data.totals.proposedProfiles} hint={t('enCampanasAbiertas')} />
         </StatStrip>
 
         {data.staleMetrics > 0 || data.openDuplicates > 0 ? (
           <InfoNote>
-            <p className="font-medium">Calidad de datos</p>
+            <p className="font-medium">{t('calidadDeDatos')}</p>
             <ul className="mt-1 list-inside list-disc space-y-0.5">
               {data.staleMetrics > 0 ? (
                 <li>
-                  {data.staleMetrics} perfiles con métricas sin medir o desactualizadas (más de 45 días).{' '}
+                  {t('metricasViejas', { n: data.staleMetrics })}{' '}
                   <Link href="/influencers?metrica=desactualizada" className="underline underline-offset-2">
-                    Revisar
+                    {t('revisar')}
                   </Link>
                 </li>
               ) : null}
               {data.openDuplicates > 0 ? (
                 <li>
-                  {data.openDuplicates} posibles duplicados sin resolver.{' '}
+                  {t('duplicadosAbiertos', { n: data.openDuplicates })}{' '}
                   <Link href="/influencers/duplicados" className="underline underline-offset-2">
-                    Revisar
+                    {t('revisar')}
                   </Link>
                 </li>
               ) : null}
@@ -97,7 +100,7 @@ export default async function PanelPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Campañas activas</CardTitle>
+              <CardTitle>{t('campanasActivas')}</CardTitle>
               {data.campaignsShown < data.totals.activeCampaigns ? (
                 <CardDescription>
                   Las {data.campaignsShown} más recientes de {data.totals.activeCampaigns}.{' '}
@@ -113,8 +116,8 @@ export default async function PanelPage() {
             </CardHeader>
             {data.campaigns.length === 0 ? (
               <EmptyState
-                title="No hay campañas activas"
-                description="Cuando crees una campaña o importes el Excel de scouting va a aparecer acá."
+                title={t('sinCampanasTitulo')}
+                description={t('sinCampanasBajada')}
               />
             ) : (
               <ul className="divide-y divide-ink-100">
@@ -134,30 +137,30 @@ export default async function PanelPage() {
                     </div>
                     <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-ink-600">
                       <div className="flex gap-1">
-                        <dt>Perfiles:</dt>
+                        <dt>{t('perfiles')}</dt>
                         <dd className="font-medium text-ink-800">{campaign.total}</dd>
                       </div>
                       <div className="flex gap-1">
-                        <dt>Aprobados:</dt>
+                        <dt>{t('aprobadosDosPuntos')}</dt>
                         <dd className="font-medium text-emerald-700">{campaign.approved}</dd>
                       </div>
                       <div className="flex gap-1">
-                        <dt>Esperando al cliente:</dt>
+                        <dt>{t('esperandoDosPuntos')}</dt>
                         <dd className="font-medium text-amber-700">{campaign.pending}</dd>
                       </div>
                       <div className="flex gap-1">
-                        <dt>Shortlist:</dt>
+                        <dt>{t('shortlist')}</dt>
                         <dd className="font-medium text-ink-800">{campaign.shortlist}</dd>
                       </div>
                       {data.canSeeBudget && (campaign.planned !== null || campaign.committed) ? (
                         <div className="flex gap-1">
-                          <dt>Presupuesto:</dt>
+                          <dt>{t('presupuesto')}</dt>
                           <dd className="font-medium text-ink-800">
-                            {campaign.committed ? formatMoney(campaign.committed, campaign.currency) : 'sin asignar'}
+                            {campaign.committed ? formatMoney(campaign.committed, campaign.currency, idioma) : 'sin asignar'}
                             {campaign.planned !== null ? (
                               <span className="font-normal text-ink-500">
                                 {' '}
-                                de {formatMoney(campaign.planned, campaign.currency)}
+                                de {formatMoney(campaign.planned, campaign.currency, idioma)}
                               </span>
                             ) : null}
                           </dd>
@@ -173,10 +176,10 @@ export default async function PanelPage() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Esperando decisión del cliente</CardTitle>
+                <CardTitle>{t('esperandoDecision')}</CardTitle>
               </CardHeader>
               {data.pendingApprovals.length === 0 ? (
-                <EmptyState title="Nada pendiente" description="No hay perfiles esperando aprobación." />
+                <EmptyState title={t('nadaPendienteTitulo')} description={t('nadaPendienteBajada')} />
               ) : (
                 <ul className="divide-y divide-ink-100">
                   {data.pendingApprovals.map((item) => (
@@ -201,11 +204,11 @@ export default async function PanelPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Influencers por estado</CardTitle>
+                <CardTitle>{t('influencersPorEstado')}</CardTitle>
               </CardHeader>
               <CardBody>
                 {data.byStatus.length === 0 ? (
-                  <p className="text-sm text-ink-500">Todavía no hay candidaturas cargadas.</p>
+                  <p className="text-sm text-ink-500">{t('sinCandidaturas')}</p>
                 ) : (
                   <ul className="flex flex-wrap gap-2">
                     {data.byStatus

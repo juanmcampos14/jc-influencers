@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { getTranslations } from 'next-intl/server'
 import { PageHeader } from '@/components/app-shell'
 import { PantallaCuenta } from '@/components/cuenta/pantalla-cuenta'
 import { requireContext } from '@/lib/auth/current'
@@ -8,11 +9,12 @@ export const dynamic = 'force-dynamic'
 
 export default async function CuentaPage() {
   const ctx = await requireContext()
+  const t = await getTranslations('cuenta')
   return (
     <>
       <PageHeader
-        title="Mi cuenta"
-        description="Con qué email entrás, qué ves, y cómo cambiar tu contraseña."
+        title={t('titulo')}
+        description={t('bajada')}
       />
       <PantallaCuenta ctx={ctx} />
     </>

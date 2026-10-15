@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { PageHeader } from '@/components/app-shell'
 import { Card } from '@/components/ui/card'
 import { Pagination } from '@/components/ui/pagination'
@@ -32,6 +33,8 @@ export default async function AuditPage({
 }) {
   const params = await searchParams
   const ctx = await requireContext()
+  const t = await getTranslations('auditoria')
+  const idioma = await getLocale()
   const clientFilter = params.cliente && ctx.clients.some((c) => c.id === params.cliente) ? params.cliente : null
 
   const page = await loadPage(() =>
@@ -52,34 +55,34 @@ export default async function AuditPage({
   return (
     <>
       <PageHeader
-        title="Auditoría"
-        description="Registro inmutable. La base no permite modificar ni borrar estos eventos."
+        title={t('titulo')}
+        description={t('bajada')}
       />
       <div className="space-y-4 px-5 py-6 sm:px-8">
         <AuditFilters clients={ctx.clients.map((c) => ({ id: c.id, name: c.name }))} />
         <Card>
           {page.items.length === 0 ? (
-            <EmptyState title="Sin eventos" description="No hay eventos que coincidan con el filtro." />
+            <EmptyState title={t('sinEventosTitulo')} description={t('sinEventosBajada')} />
           ) : (
             <>
               <TableWrap>
                 <Table>
                   <thead>
                     <tr>
-                      <Th className={columnaFija}>Fecha</Th>
-                      <Th>Actor</Th>
-                      <Th>Acción</Th>
-                      <Th>Entidad</Th>
+                      <Th className={columnaFija}>{t('fecha')}</Th>
+                      <Th>{t('actor')}</Th>
+                      <Th>{t('accion')}</Th>
+                      <Th>{t('entidad')}</Th>
                       <Th>IP</Th>
-                      <Th>Correlación</Th>
-                      <Th>Cambios</Th>
+                      <Th>{t('correlacion')}</Th>
+                      <Th>{t('cambios')}</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {page.items.map((row) => (
                       <Tr key={row.id}>
                         <Td className={`${columnaFija} whitespace-nowrap text-xs`}>
-                          {formatDateTime(row.occurredAt, ctx.user.timezone)}
+                          {formatDateTime(row.occurredAt, ctx.user.timezone, idioma)}
                         </Td>
                         <Td className="text-xs">
                           <p className="text-ink-800">{row.actorEmail ?? 'sistema'}</p>
@@ -126,7 +129,7 @@ export default async function AuditPage({
                 page={page.page}
                 pageCount={page.pageCount}
                 total={page.total}
-                unidad="eventos"
+                unidad={t('unidadEventos')}
               />
             </>
           )}

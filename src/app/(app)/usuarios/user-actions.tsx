@@ -1,6 +1,7 @@
 "use client"
 
 import { useTransition } from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,7 @@ import { ConfirmButton } from '@/components/ui/confirm'
 import { setUserStatusAction } from '../actions/users'
 
 export function UserActions({ userId, name, active }: { userId: string; name: string; active: boolean }) {
+  const t = useTranslations('usuarios')
   const router = useRouter()
   const [pending, startTransition] = useTransition()
 
@@ -18,7 +20,7 @@ export function UserActions({ userId, name, active }: { userId: string; name: st
         toast.error(result.message)
         return
       }
-      toast.success(active ? 'Usuario desactivado y sesiones cerradas.' : 'Usuario reactivado.')
+      toast.success(active ? t('usuarioDesactivado') : t('usuarioReactivado'))
       router.refresh()
     })
   }
@@ -28,7 +30,7 @@ export function UserActions({ userId, name, active }: { userId: string; name: st
       <ConfirmButton
         title={`Desactivar a ${name}`}
         description="Pierde el acceso en el acto y se cierran todas sus sesiones abiertas. Su historial se conserva."
-        confirmLabel="Desactivar"
+        confirmLabel={t('desactivar')}
         onConfirm={toggle}
         pending={pending}
       >

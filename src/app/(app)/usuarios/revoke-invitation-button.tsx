@@ -1,6 +1,7 @@
 "use client"
 
 import { useTransition } from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,7 @@ import { ConfirmButton } from '@/components/ui/confirm'
 import { revokeInvitationAction } from '../actions/users'
 
 export function RevokeInvitationButton({ invitationId, email }: { invitationId: string; email: string }) {
+  const t = useTranslations('usuarios')
   const router = useRouter()
   const [pending, startTransition] = useTransition()
 
@@ -18,16 +20,16 @@ export function RevokeInvitationButton({ invitationId, email }: { invitationId: 
         toast.error(result.message)
         return
       }
-      toast.success('Invitación revocada. El enlace deja de funcionar.')
+      toast.success(t('invitacionRevocada'))
       router.refresh()
     })
   }
 
   return (
     <ConfirmButton
-      title="Revocar invitación"
+      title={t('revocarInvitacion')}
       description={`El enlace enviado a ${email} deja de funcionar de inmediato.`}
-      confirmLabel="Revocar"
+      confirmLabel={t('revocar')}
       onConfirm={revoke}
       pending={pending}
     >

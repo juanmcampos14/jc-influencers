@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -18,12 +19,17 @@ import { cancelImportAction, confirmImportAction, previewImportAction } from '..
  * Qué le pasó a esa fila. Salía el valor del enum en mayúsculas -- CONFLICT,
  * MULTI_PERSON -- al lado de columnas escritas en castellano.
  */
-const OUTCOMES: Record<string, { label: string; tone: string }> = {
-  CONFLICT: { label: 'Contradicción en el origen', tone: 'rose' },
-  UNPARSEABLE: { label: 'Valor sin normalizar', tone: 'amber' },
-  INCOMPLETE: { label: 'Fila incompleta', tone: 'slate' },
-  MULTI_PERSON: { label: 'Varias personas en la fila', tone: 'violet' },
-  SECTION: { label: 'Encabezado de sección', tone: 'slate' },
+/*
+ * Guarda la CLAVE del texto, no el texto. Este mapa vive fuera del componente
+ * --se arma una sola vez al cargar el módulo-- y ahí todavía no se sabe en qué
+ * idioma se va a leer. Se traduce al dibujar.
+ */
+const OUTCOMES: Record<string, { clave: string; tone: string }> = {
+  CONFLICT: { clave: 'contradiccionOrigen', tone: 'rose' },
+  UNPARSEABLE: { clave: 'valorSinNormalizar', tone: 'amber' },
+  INCOMPLETE: { clave: 'filaIncompleta', tone: 'slate' },
+  MULTI_PERSON: { clave: 'variasPersonas', tone: 'violet' },
+  SECTION: { clave: 'encabezadoSeccion', tone: 'slate' },
 }
 
 export function ImportWizard({
@@ -33,6 +39,8 @@ export function ImportWizard({
   clients: Array<{ id: string; name: string }>
   defaultClientId: string
 }) {
+  const t = useTranslations('importacion')
+  const idioma = useLocale()
   const router = useRouter()
   const [summary, setSummary] = React.useState<ImportSummary | null>(null)
   const [pending, startTransition] = React.useTransition()
@@ -47,7 +55,7 @@ export function ImportWizard({
         return
       }
       setSummary(result.data)
-      toast.success('Archivo leído. Revisá el reporte antes de aplicar.')
+      toast.success(t('archivoLeido'))
     })
   }
 
@@ -75,7 +83,7 @@ export function ImportWizard({
         toast.error(result.message)
         return
       }
-      toast.success('Importación cancelada. No se creó nada.')
+      toast.success(t('importacionCancelada'))
       setSummary(null)
       router.refresh()
     })
@@ -91,7 +99,7 @@ export function ImportWizard({
           <form onSubmit={upload} className="flex flex-wrap items-end gap-4">
             {clients.length > 1 ? (
               <div className="w-56">
-                <Field label="Cliente destino" htmlFor="clientId" required>
+                <Field label={t('clienteDestino')} htmlFor="clientId" required>
                   <Select id="clientId" name="clientId" defaultValue={defaultClientId} required>
                     {clients.map((client) => (
                       <option key={client.id} value={client.id}>
@@ -105,7 +113,7 @@ export function ImportWizard({
               <input type="hidden" name="clientId" value={defaultClientId} />
             )}
             <div className="min-w-64 flex-1">
-              <Field label="Archivo .xlsx" htmlFor="file" hint="Máximo 10 MB." required>
+              <Field label={t('archivoXlsx')} htmlFor="file" hint={t('maximo10mb')} required>
                 <Input
                   id="file"
                   name="file"
@@ -117,7 +125,7 @@ export function ImportWizard({
               </Field>
             </div>
             <Button type="submit" disabled={pending}>
-              {pending ? 'Leyendo…' : 'Previsualizar'}
+              {pending ? 'Leyendo…' : t('previsualizar')}
             </Button>
           </form>
         </CardBody>
@@ -132,28 +140,28 @@ export function ImportWizard({
       <Card>
         <CardHeader>
           <CardTitle>2 · Reporte previo · {summary.filename}</CardTitle>
-          <p className="text-xs text-ink-500">Todavía no se creó nada. Revisá y decidí.</p>
+          <p className="text-xs text-ink-500">{t('nadaCreado')}</p>
         </CardHeader>
         <CardBody className="space-y-5">
           {/* Dos tiras del sistema en vez de un componente copiado con otros
               tamaños y colores. Salen del reporte del propio archivo. */}
           <div className="space-y-3">
             <StatStrip>
-              <Stat label="Personas en el archivo" value={counts.totalRows} />
-              <Stat label="Altas nuevas" value={counts.newInfluencers} tone="good" />
-              <Stat label="Ya existen" value={counts.existingInfluencers} />
-              <Stat label="Posibles duplicados" value={counts.possibleDuplicates} tone="warn" />
+              <Stat label={t('personasEnElArchivo')} value={counts.totalRows} />
+              <Stat label={t('altasNuevas')} value={counts.newInfluencers} tone="good" />
+              <Stat label={t('yaExisten')} value={counts.existingInfluencers} />
+              <Stat label={t('posiblesDuplicados')} value={counts.possibleDuplicates} tone="warn" />
             </StatStrip>
             <StatStrip>
-              <Stat label="Filas incompletas" value={counts.incompleteRows} />
-              <Stat label="Valores sin normalizar" value={counts.unparseableValues} tone="warn" />
-              <Stat label="Contradicciones del origen" value={counts.conflictRows} tone="warn" />
-              <Stat label="Filas con más de una persona" value={counts.multiPersonRows} />
+              <Stat label={t('filasIncompletas')} value={counts.incompleteRows} />
+              <Stat label={t('valoresSinNormalizar')} value={counts.unparseableValues} tone="warn" />
+              <Stat label={t('contradicciones')} value={counts.conflictRows} tone="warn" />
+              <Stat label={t('filasConMasDeUna')} value={counts.multiPersonRows} />
             </StatStrip>
           </div>
 
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-ink-900">Hojas leídas</h3>
+            <h3 className="mb-2 text-sm font-semibold text-ink-900">{t('hojasLeidas')}</h3>
             <ul className="space-y-1 text-sm">
               {summary.sheets.map((sheet) => (
                 <li key={sheet.name} className="flex items-center gap-2">
@@ -166,7 +174,7 @@ export function ImportWizard({
           </div>
 
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-ink-900">Campañas que se van a crear</h3>
+            <h3 className="mb-2 text-sm font-semibold text-ink-900">{t('campanasACrear')}</h3>
             <ul className="space-y-1 text-sm">
               {summary.campaigns.map((campaign) => (
                 <li key={campaign.key} className="text-ink-700">
@@ -177,9 +185,9 @@ export function ImportWizard({
           </div>
 
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-ink-900">Brief detectado</h3>
+            <h3 className="mb-2 text-sm font-semibold text-ink-900">{t('briefDetectado')}</h3>
             <p className="text-sm text-ink-700">
-              Seguidores {formatNumber(summary.brief.followersMin)} – {formatNumber(summary.brief.followersMax)}
+              Seguidores {formatNumber(summary.brief.followersMin, idioma)} – {formatNumber(summary.brief.followersMax, idioma)}
               {summary.brief.engagementRateMin != null ? ` · ER mínimo ${summary.brief.engagementRateMin}%` : ''} ·{' '}
               {summary.brief.niches} nichos · {summary.brief.keywords} palabras clave
             </p>
@@ -225,10 +233,10 @@ export function ImportWizard({
                 <Table>
                   <thead>
                     <tr>
-                      <Th>Hoja</Th>
-                      <Th>Fila</Th>
-                      <Th>Nombre</Th>
-                      <Th>Motivo</Th>
+                      <Th>{t('hoja')}</Th>
+                      <Th>{t('fila')}</Th>
+                      <Th>{t('nombre')}</Th>
+                      <Th>{t('motivo')}</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -258,10 +266,10 @@ export function ImportWizard({
                 <Table>
                   <thead>
                     <tr>
-                      <Th>Tipo</Th>
-                      <Th>Hoja</Th>
-                      <Th>Fila</Th>
-                      <Th>Detalle</Th>
+                      <Th>{t('tipo')}</Th>
+                      <Th>{t('hoja')}</Th>
+                      <Th>{t('fila')}</Th>
+                      <Th>{t('detalle')}</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -269,7 +277,11 @@ export function ImportWizard({
                       <Tr key={index}>
                         <Td>
                           <Badge tone={OUTCOMES[issue.outcome]?.tone ?? 'slate'} title={issue.outcome} dot>
-                            {OUTCOMES[issue.outcome]?.label ?? issue.outcome}
+                            {(() => {
+                              const clave = OUTCOMES[issue.outcome]?.clave
+                              /* Sin clave conocida se muestra el valor crudo: es preferible a un hueco. */
+                              return clave ? t(clave) : issue.outcome
+                            })()}
                           </Badge>
                         </Td>
                         <Td className="text-xs">{issue.sheetName}</Td>
@@ -287,7 +299,7 @@ export function ImportWizard({
 
       <div className="flex flex-wrap gap-3">
         <Button onClick={confirm} disabled={pending}>
-          {pending ? 'Aplicando…' : 'Confirmar e importar'}
+          {pending ? t('aplicando') : t('confirmarEImportar')}
         </Button>
         <Button variant="secondary" onClick={cancel} disabled={pending}>
           Cancelar

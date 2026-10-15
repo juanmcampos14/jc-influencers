@@ -132,9 +132,7 @@ describe('fechas, números y plata siguen al idioma', () => {
    * cuatro, y en una pantalla con plata eso se paga.
    */
   it('cada idioma escribe lo suyo', async () => {
-    const { formatDate, formatFollowers, formatMoney, formatNumber, formatPercent } = await import(
-      '@/lib/util/format'
-    )
+    const { formatDate, formatMoney, formatNumber, formatPercent } = await import('@/lib/util/format')
     const d = new Date('2026-08-31T15:00:00Z')
     const tz = 'America/Argentina/Buenos_Aires'
 

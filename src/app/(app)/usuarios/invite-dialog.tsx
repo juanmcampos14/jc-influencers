@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -31,6 +32,7 @@ export function InviteDialog({
   canInviteAgency: boolean
   isSuperadmin: boolean
 }) {
+  const t = useTranslations('usuarios')
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [kind, setKind] = React.useState<'AGENCY' | 'CLIENT'>(canInviteAgency ? 'AGENCY' : 'CLIENT')
@@ -97,7 +99,7 @@ export function InviteDialog({
         toast.error(result.message)
         return
       }
-      toast.success('Invitación enviada. El enlace vence en 7 días y se usa una sola vez.')
+      toast.success(t('invitacionEnviada'))
       setOpen(false)
       router.refresh()
     })
@@ -107,34 +109,34 @@ export function InviteDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Invitar</Button>
+        <Button>{t('invitar')}</Button>
       </DialogTrigger>
       <DialogContent
-        title="Invitar a una persona"
-        description="Le llega un email con un enlace único. La contraseña la define ella."
+        title={t('invitarTitulo')}
+        description={t('invitarBajada')}
       >
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           {canInviteAgency ? (
-            <Field label="Tipo de acceso" htmlFor="kind">
+            <Field label={t('tipoDeAcceso')} htmlFor="kind">
               <Select id="kind" value={kind} onChange={(event) => setKind(event.target.value as 'AGENCY' | 'CLIENT')}>
-                <option value="AGENCY">Empleado de la agencia</option>
-                <option value="CLIENT">Usuario de un cliente</option>
+                <option value="AGENCY">{t('empleadoDeAgencia')}</option>
+                <option value="CLIENT">{t('usuarioDeCliente')}</option>
               </Select>
             </Field>
           ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Email" htmlFor="email" errors={errors.email} required>
+            <Field label={t('email')} htmlFor="email" errors={errors.email} required>
               <Input id="email" name="email" type="email" required autoFocus maxLength={200} />
             </Field>
-            <Field label="Nombre" htmlFor="name" errors={errors.name} required>
+            <Field label={t('nombre')} htmlFor="name" errors={errors.name} required>
               <Input id="name" name="name" required maxLength={120} />
             </Field>
           </div>
 
           {kind === 'AGENCY' ? (
             <>
-              <Field label="Rol de agencia" htmlFor="agencyRole" required>
+              <Field label={t('rolDeAgencia')} htmlFor="agencyRole" required>
                 <Select
                   id="agencyRole"
                   name="agencyRole"
@@ -150,7 +152,7 @@ export function InviteDialog({
                 </Select>
               </Field>
               <Field
-                label="Clientes asignados"
+                label={t('clientesAsignados')}
                 htmlFor="agencyClientIds"
                 hint="Account managers, scouts y finanzas sólo ven los clientes que les asignes. Los administradores de agencia ven todos."
               >
@@ -165,7 +167,7 @@ export function InviteDialog({
             </>
           ) : (
             <>
-              <Field label="Cliente" htmlFor="clientId" required>
+              <Field label={t('cliente')} htmlFor="clientId" required>
                 <Select id="clientId" name="clientId" required>
                   {invitableClients.map((client) => (
                     <option key={client.id} value={client.id}>
@@ -174,7 +176,7 @@ export function InviteDialog({
                   ))}
                 </Select>
               </Field>
-              <Field label="Rol dentro del cliente" htmlFor="clientRole" required>
+              <Field label={t('rolDentroDelCliente')} htmlFor="clientRole" required>
                 <Select
                   id="clientRole"
                   name="clientRole"
@@ -193,10 +195,9 @@ export function InviteDialog({
           )}
 
           <div>
-            <p className="mb-1 text-sm font-medium text-ink-800">Qué va a poder ver y qué va a poder editar</p>
+            <p className="mb-1 text-sm font-medium text-ink-800">{t('queVaAVerQueVaAEditar')}</p>
             <p className="mb-2 text-xs text-ink-500">
-              El rol deja marcado un punto de partida. Ajustá lo que haga falta: entra con esto, sin tener que
-              volver después a corregirlo.
+              {t('pistaArbolInvitar')}
             </p>
             <ArbolDePermisos
               concedidas={concedidas}
@@ -214,7 +215,7 @@ export function InviteDialog({
               </Button>
             </DialogClose>
             <Button type="submit" disabled={pending}>
-              {pending ? 'Enviando…' : 'Enviar invitación'}
+              {pending ? t('enviando') : t('enviarInvitacion')}
             </Button>
           </div>
         </form>

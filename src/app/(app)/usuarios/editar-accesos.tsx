@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { KeyRound, X } from 'lucide-react'
@@ -49,6 +50,7 @@ export function EditarAccesos({
   acceso: AccesoEditable
   clients: Array<{ id: string; name: string }>
 }) {
+  const t = useTranslations('usuarios')
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [pendiente, startTransition] = React.useTransition()
@@ -141,12 +143,12 @@ export function EditarAccesos({
       </DialogTrigger>
       <DialogContent
         title={`Accesos de ${acceso.name}`}
-        description="Los cambios se aplican en la próxima carga de pantalla de esa persona."
+        description={t('cambiosProximaCarga')}
       >
         <div className="space-y-4">
           {esDeAgencia ? (
             <>
-              <Field label="Rol de agencia" htmlFor="rol">
+              <Field label={t('rolDeAgencia')} htmlFor="rol">
                 <Select id="rol" value={rol} onChange={(event) => setRol(event.target.value)}>
                   {Object.entries(AGENCY_ROLE_LABELS).map(([key, label]) => (
                     <option key={key} value={key}>
@@ -158,9 +160,9 @@ export function EditarAccesos({
 
               {asignaClientes ? (
                 <Field
-                  label="Clientes asignados"
+                  label={t('clientesAsignados')}
                   htmlFor="clientes"
-                  hint="Sólo ve estos. Los administradores de agencia ven todos."
+                  hint={t('pistaClientes')}
                 >
                   {/*
                     * Casillas y no un `select multiple`: en un teléfono el
@@ -186,10 +188,9 @@ export function EditarAccesos({
               )}
 
               <div>
-                <p className="mb-1 text-sm font-medium text-ink-800">Qué puede ver y qué puede editar</p>
+                <p className="mb-1 text-sm font-medium text-ink-800">{t('queVeQueEdita')}</p>
                 <p className="mb-2 text-xs text-ink-500">
-                  El rol deja marcado un punto de partida. Desde acá se ajusta: lo que desmarques queda quitado,
-                  aunque el rol lo dé.
+                  {t('pistaArbol')}
                 </p>
                 <ArbolDePermisos
                   concedidas={concedidas}
@@ -201,7 +202,7 @@ export function EditarAccesos({
             </>
           ) : (
             <div>
-              <p className="mb-2 text-sm text-ink-700">Accesos a espacios de cliente:</p>
+              <p className="mb-2 text-sm text-ink-700">{t('accesosAEspacios')}</p>
               <ul className="space-y-2">
                 {acceso.clientMemberships.map((membership) => (
                   <li
@@ -231,7 +232,7 @@ export function EditarAccesos({
                 ))}
               </ul>
               {acceso.clientMemberships.length === 0 ? (
-                <p className="text-sm text-ink-500">Esta persona no tiene acceso a ningún espacio.</p>
+                <p className="text-sm text-ink-500">{t('sinEspacios')}</p>
               ) : null}
               <p className="mt-3 text-xs text-ink-500">
                 Para darle acceso a otro cliente, invitala a ese espacio desde «Invitar».
@@ -247,7 +248,7 @@ export function EditarAccesos({
             </DialogClose>
             {esDeAgencia ? (
               <Button onClick={guardar} disabled={pendiente}>
-                {pendiente ? 'Guardando…' : 'Guardar accesos'}
+                {pendiente ? t('guardando') : t('guardarAccesos')}
               </Button>
             ) : null}
           </div>
