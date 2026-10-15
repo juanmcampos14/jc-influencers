@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { cn } from '@/lib/util/format'
 import { setVistaCampanaAction } from '@/app/(app)/actions/view-prefs'
@@ -34,6 +35,7 @@ export function SelectorDeVista({
   aprobados: number
   total: number
 }) {
+  const t = useTranslations('portal')
   const [pedida, setPedida] = React.useState<VistaCampana | null>(null)
   const [, startTransition] = React.useTransition()
 
@@ -46,15 +48,15 @@ export function SelectorDeVista({
   const opciones = [
     {
       key: 'bandeja' as const,
-      label: 'Uno por uno',
+      label: t('vistaUnoPorUno'),
       numero: String(pendientes),
-      descripcion: 'Para despachar la cola: un perfil a la vez, con todo lo que hace falta para decidir.',
+      descripcion: t('vistaUnoPorUnoBajada'),
     },
     {
       key: 'conjunto' as const,
-      label: 'El conjunto',
+      label: t('vistaConjunto'),
       numero: `${aprobados}/${total}`,
-      descripcion: 'Para entender el equipo que se está armando, no para decidir de a uno.',
+      descripcion: t('vistaConjuntoBajada'),
     },
   ]
 
@@ -74,7 +76,7 @@ export function SelectorDeVista({
     <div>
       <div
         role="group"
-        aria-label="Cómo querés mirar los perfiles"
+        aria-label={t('comoMirar')}
         className="inline-flex rounded-xl border border-ink-300 bg-surface p-1"
       >
         {opciones.map((opcion) => {

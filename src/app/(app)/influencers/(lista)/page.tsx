@@ -264,7 +264,7 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                   page={page.page}
                   pageCount={page.pageCount}
                   total={page.total}
-                  unidad="influencers"
+                  unidad={t('unidad')}
                 />
               </div>
             </SeleccionDeInfluencers>

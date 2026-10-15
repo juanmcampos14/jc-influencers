@@ -182,7 +182,7 @@ export function AppShell({
           className="rounded-md p-2 text-nav-text hover:bg-nav-2 hover:text-nav-text-strong"
           aria-expanded={open}
           aria-controls="nav-principal"
-          aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
+          aria-label={open ? tNav('cerrarMenu') : tNav('abrirMenu')}
         >
           {open ? <X className="size-5" /> : <Menu className="size-5" />}
         </button>
@@ -194,7 +194,7 @@ export function AppShell({
           'zona-oscura flex w-full shrink-0 flex-col bg-nav lg:w-[248px] lg:sticky lg:top-0 lg:h-screen',
           open ? 'block' : 'hidden lg:flex',
         )}
-        aria-label="Navegación principal"
+        aria-label={tNav('navegacionPrincipal')}
       >
         <div className={cn('hidden px-5 pb-4 pt-5 lg:block', logoUrl && 'text-center')}>
           {marca}
@@ -204,7 +204,7 @@ export function AppShell({
         {clients.length > 0 ? (
           <div className="px-3 pb-3 pt-3 lg:pt-0">
             <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-nav-text-2">
-              Espacio de trabajo
+              {tNav('espacioDeTrabajo')}
             </p>
             {clients.length === 1 && !verTodos ? (
               <p className="rounded-lg bg-nav-2 px-3 py-2 text-sm font-medium text-nav-text-strong">
@@ -259,7 +259,7 @@ export function AppShell({
               </DropdownMenu.Root>
             )}
             <p className="mt-1.5 px-2 text-[11px] leading-snug text-nav-text-2">
-              Se trabaja en un cliente por vez. Los datos nunca se mezclan.
+              {tNav('avisoDeAlcance')}
             </p>
           </div>
         ) : null}

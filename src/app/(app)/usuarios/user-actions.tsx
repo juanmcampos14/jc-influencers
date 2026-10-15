@@ -28,14 +28,14 @@ export function UserActions({ userId, name, active }: { userId: string; name: st
   if (active) {
     return (
       <ConfirmButton
-        title={`Desactivar a ${name}`}
-        description="Pierde el acceso en el acto y se cierran todas sus sesiones abiertas. Su historial se conserva."
+        title={t('desactivarTitulo', { nombre: name })}
+        description={t('desactivarBajada')}
         confirmLabel={t('desactivar')}
         onConfirm={toggle}
         pending={pending}
       >
         <Button size="sm" variant="secondary" disabled={pending}>
-          Desactivar
+          {t('desactivar')}
         </Button>
       </ConfirmButton>
     )
@@ -43,7 +43,7 @@ export function UserActions({ userId, name, active }: { userId: string; name: st
 
   return (
     <Button size="sm" variant="secondary" onClick={toggle} disabled={pending}>
-      Reactivar
+      {t('reactivar')}
     </Button>
   )
 }

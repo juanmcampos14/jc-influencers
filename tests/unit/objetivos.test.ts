@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import type { Frase } from '@/lib/domain/frase'
+import { enCastellano } from '@/lib/i18n/castellano'
 import {
   esVisibleParaCliente,
   evaluarObjetivo,
@@ -28,6 +30,15 @@ const objetivo = (extra: Partial<Objetivo> = {}): Objetivo => ({
   ...extra,
 })
 
+/*
+ * El dominio devuelve la clave y sus valores, no la frase. Estos tests siguen
+ * comprobando lo que se LEE --que diga cuánto falta, que no diga cero-- pero
+ * pasando por las traducciones en castellano: así se verifica además que la
+ * clave y sus valores encajen de verdad.
+ */
+const texto = enCastellano('objetivos')
+const leer = (frase: Frase | null): string => (frase ? texto(frase.clave, frase.valores) : '')
+
 describe('evaluarObjetivo', () => {
   it('sin dato NO es cero por ciento', () => {
     // Una barra en cero se lee como fracaso. Esto significa que nadie cargó
@@ -35,7 +46,7 @@ describe('evaluarObjetivo', () => {
     const r = evaluarObjetivo(objetivo(), VACIO)
     expect(r.estado).toBe('SIN_DATO')
     expect(r.progreso).toBeNull()
-    expect(r.explicacion).toContain('no se puede evaluar')
+    expect(leer(r.explicacion)).toContain('no se puede evaluar')
   })
 
   it('cero medido sí es cero por ciento', () => {
@@ -46,13 +57,13 @@ describe('evaluarObjetivo', () => {
 
   it('marca cumplido al llegar', () => {
     expect(evaluarObjetivo(objetivo(), { ...VACIO, CLICS: 1000 }).estado).toBe('CUMPLIDO')
-    expect(evaluarObjetivo(objetivo(), { ...VACIO, CLICS: 1500 }).explicacion).toContain('por encima')
+    expect(leer(evaluarObjetivo(objetivo(), { ...VACIO, CLICS: 1500 }).explicacion)).toContain('por encima')
   })
 
   it('en camino informa cuánto falta', () => {
     const r = evaluarObjetivo(objetivo(), { ...VACIO, CLICS: 400 })
     expect(r.estado).toBe('EN_CAMINO')
-    expect(r.explicacion).toContain('Faltan 600')
+    expect(leer(r.explicacion)).toContain('Faltan 600')
   })
 
   describe('un tope se cumple no pasándose', () => {
@@ -61,13 +72,13 @@ describe('evaluarObjetivo', () => {
     it('dentro del tope está cumplido aunque el progreso sea bajo', () => {
       const r = evaluarObjetivo(tope, { ...VACIO, INVERSION_EN_TALENTO: 3000 })
       expect(r.estado).toBe('CUMPLIDO')
-      expect(r.explicacion).toContain('60%')
+      expect(leer(r.explicacion)).toContain('60%')
     })
 
     it('pasarse es no alcanzado, y dice por cuánto', () => {
       const r = evaluarObjetivo(tope, { ...VACIO, INVERSION_EN_TALENTO: 6200 })
       expect(r.estado).toBe('NO_ALCANZADO')
-      expect(r.explicacion).toContain('1200')
+      expect(leer(r.explicacion)).toContain('1200')
     })
   })
 
@@ -93,12 +104,12 @@ describe('evaluarObjetivos', () => {
     expect(r.cumplidos).toBe(1)
     expect(r.sinDato).toBe(2)
     // Decir "1 de 3 cumplidos" acá sugeriría que 2 fallaron.
-    expect(r.veredicto).toContain('no tienen datos cargados')
+    expect(leer(r.veredicto)).toContain('no tienen datos cargados')
   })
 
   it('todo cumplido lo dice sin vueltas', () => {
     const r = evaluarObjetivos([objetivo()], { ...VACIO, CLICS: 1200 })
-    expect(r.veredicto).toBe('Todos los objetivos cumplidos.')
+    expect(leer(r.veredicto)).toBe('Todos los objetivos cumplidos.')
   })
 
   it('mientras la campaña corre, ir por debajo es ir en camino', () => {
@@ -110,7 +121,7 @@ describe('evaluarObjetivos', () => {
     )
     expect(r.enCamino).toBe(1)
     expect(r.noAlcanzados).toBe(0)
-    expect(r.veredicto).toContain('en camino')
+    expect(leer(r.veredicto)).toContain('en camino')
   })
 
   it('con la campaña cerrada, ese mismo número es un objetivo que no se alcanzó', () => {
@@ -120,8 +131,8 @@ describe('evaluarObjetivos', () => {
       { cerrada: true },
     )
     expect(r.noAlcanzados).toBe(1)
-    expect(r.veredicto).toContain('no se alcanzó')
-    expect(r.objetivos[1]?.explicacion).toContain('faltaron')
+    expect(leer(r.veredicto)).toContain('no se alcanzó')
+    expect(leer(r.objetivos[1]?.explicacion ?? null)).toContain('faltaron')
   })
 })
 

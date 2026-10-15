@@ -54,8 +54,8 @@ export function AddProfileDialog({ influencerId }: { influencerId: string }) {
         <Button size="sm">{t('cargarMetricas')}</Button>
       </DialogTrigger>
       <DialogContent
-        title="Perfil social y métricas"
-        description="Si el perfil ya existe se actualiza y queda un snapshot con la fecha y la fuente."
+        title={t('metricasTitulo')}
+        description={t('metricasBajada')}
       >
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <Field label={t('campoUrl')} htmlFor="url" errors={errors.url} required>

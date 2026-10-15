@@ -96,7 +96,7 @@ export function EditarFicha({
       </DialogTrigger>
       <DialogContent
         title={`Editar ${ficha.displayName}`}
-        description="Los cambios quedan registrados en la auditoría con tu nombre."
+        description={t('editarBajada')}
       >
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -110,7 +110,7 @@ export function EditarFicha({
               <Input id="primaryHandle" name="primaryHandle" defaultValue={ficha.primaryHandle ?? ''} />
             </Field>
             <Field
-              label="Estado"
+              label={t('colEstado')}
               htmlFor="status"
               hint="«Bloqueado» deja constancia de que no se trabaja más con esta persona."
             >

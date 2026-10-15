@@ -41,8 +41,8 @@ export default async function DuplicatesPage({ searchParams }: { searchParams: P
   return (
     <>
       <PageHeader
-        title="Influencers"
-        description="Perfiles que parecen la misma persona. Detectados por URL normalizada, handle y similitud de nombre. Nunca se fusionan solos."
+        title={t('titulo')}
+        description={t('bajada')}
       />
       <div className="px-5 py-6 sm:px-8">
         <NavDeInfluencers ctx={ctx} activo="/influencers/duplicados" />

@@ -302,7 +302,7 @@ export default async function DescubiertosPage({
             page={resultados.page}
             pageCount={resultados.pageCount}
             total={resultados.total}
-            unidad="perfiles"
+            unidad={t('unidad')}
           />
         ) : null}
       </div>

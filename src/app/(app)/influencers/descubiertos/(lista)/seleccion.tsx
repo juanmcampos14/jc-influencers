@@ -34,7 +34,7 @@ export function SeleccionDeDescubiertos({
   return (
     <Seleccion
       idsDeLaPagina={idsDeLaPagina}
-      etiqueta="elegidos"
+      etiqueta={t('elegidos')}
       acciones={(ids, limpiar) => (
         <BotonDeLote
           pendiente={pendiente}

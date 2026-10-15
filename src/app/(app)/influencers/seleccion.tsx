@@ -77,7 +77,7 @@ export function SeleccionDeInfluencers({
         {campanas.length > 0 ? (
           <>
             <Select
-              aria-label="Campaña de destino"
+              aria-label={t('campanaDeDestino')}
               value={campana}
               onChange={(event) => setCampana(event.target.value)}
               className="h-9 w-56"

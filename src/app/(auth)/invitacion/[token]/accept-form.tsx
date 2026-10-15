@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody } from '@/components/ui/card'
@@ -12,6 +13,7 @@ import { acceptInvitationAction } from '../../actions'
 type Invitation = { name: string; email: string; kind: 'AGENCY' | 'CLIENT'; clientName: string | null; roleLabel: string }
 
 export function AcceptForm({ token, invitation }: { token: string; invitation: Invitation }) {
+  const t = useTranslations('ingreso')
   const router = useRouter()
   const [name, setName] = useState(invitation.name)
   const [password, setPassword] = useState('')
@@ -42,16 +44,16 @@ export function AcceptForm({ token, invitation }: { token: string; invitation: I
   return (
     <Card>
       <CardBody>
-        <h1 className="mb-1 text-base font-semibold text-ink-900">Activá tu cuenta</h1>
+        <h1 className="mb-1 text-base font-semibold text-ink-900">{t('activaTuCuenta')}</h1>
         <p className="mb-5 text-sm text-ink-500">
-          Invitación para <strong className="text-ink-800">{invitation.email}</strong>
+          {t('invitacionPara')} <strong className="text-ink-800">{invitation.email}</strong>
           {invitation.clientName ? (
             <>
-              {' '}
-              en <strong className="text-ink-800">{invitation.clientName}</strong>
+              {t('invitacionEn')}
+              <strong className="text-ink-800">{invitation.clientName}</strong>
             </>
           ) : (
-            ' como usuario de la agencia'
+            t('invitacionComoAgencia')
           )}
           .
         </p>
@@ -61,10 +63,10 @@ export function AcceptForm({ token, invitation }: { token: string; invitation: I
           </div>
         ) : null}
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
-          <Field label="Tu nombre" htmlFor="name" required>
+          <Field label={t('campoTuNombre')} htmlFor="name" required>
             <Input id="name" value={name} onChange={(event) => setName(event.target.value)} required autoFocus />
           </Field>
-          <Field label="Contraseña" htmlFor="password" errors={fieldErrors} required>
+          <Field label={t('campoClave')} htmlFor="password" errors={fieldErrors} required>
             <Input
               id="password"
               type="password"
@@ -76,7 +78,7 @@ export function AcceptForm({ token, invitation }: { token: string; invitation: I
           </Field>
           <PasswordRules value={password} />
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? 'Activando…' : 'Activar mi cuenta'}
+            {pending ? t('activando') : t('activarCuenta')}
           </Button>
         </form>
       </CardBody>

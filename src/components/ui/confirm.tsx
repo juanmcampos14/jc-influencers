@@ -32,7 +32,7 @@ export function ConfirmButton({
         <div className="flex justify-end gap-2">
           <DialogClose asChild>
             <Button variant="secondary" type="button">
-              Cancelar
+              {t('cancelar')}
             </Button>
           </DialogClose>
           <Button

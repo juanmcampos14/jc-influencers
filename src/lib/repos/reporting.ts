@@ -2,7 +2,7 @@ import 'server-only'
 import type { AuthContext } from '@/lib/authz/context'
 import { listarEntregas, type EntregaDto } from './entregas'
 import { listarLinks, type LinkDto } from './links'
-import type { Frase } from '@/lib/domain/dinero'
+import type { Frase } from '@/lib/domain/frase'
 
 /**
  * Lo que la campaña realmente midió.

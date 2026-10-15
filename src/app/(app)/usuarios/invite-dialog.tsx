@@ -154,7 +154,7 @@ export function InviteDialog({
               <Field
                 label={t('clientesAsignados')}
                 htmlFor="agencyClientIds"
-                hint="Account managers, scouts y finanzas sólo ven los clientes que les asignes. Los administradores de agencia ven todos."
+                hint={t('pistaClientesLarga')}
               >
                 <Select id="agencyClientIds" name="agencyClientIds" multiple size={5} className="h-auto">
                   {clients.map((client) => (

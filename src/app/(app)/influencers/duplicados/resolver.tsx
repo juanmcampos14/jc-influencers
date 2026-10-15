@@ -148,9 +148,9 @@ export function ResolverDuplicado({
             </Button>
           </ConfirmButton>
           <ConfirmButton
-            title="Marcar como revisado"
-            description="Confirmás que no son la misma persona. El par deja de aparecer en la lista, pero queda registrado."
-            confirmLabel="Sí, no son duplicados"
+            title={t('marcarRevisadoTitulo')}
+            description={t('marcarRevisadoBajada')}
+            confirmLabel={t('marcarRevisadoConfirmar')}
             tone="primary"
             onConfirm={descartar}
             pending={pendiente}
@@ -164,7 +164,7 @@ export function ResolverDuplicado({
             <ConfirmButton
               title={`Borrar ${absorbido.displayName}`}
               description={`Se borra de la base y no se puede deshacer. Es seguro porque no participó de ninguna campaña: no hay historia que perder. ${sobrevive.displayName} no se toca.`}
-              confirmLabel="Borrar definitivamente"
+              confirmLabel={t('borrarConfirmar')}
               tone="danger"
               onConfirm={borrar}
               pending={pendiente}

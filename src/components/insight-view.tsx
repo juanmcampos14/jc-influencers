@@ -1,4 +1,6 @@
 import { Badge } from '@/components/ui/badge'
+import { intlDe } from '@/lib/util/format'
+import { useLocale, useTranslations } from 'next-intl'
 import type { InsightDto } from '@/lib/repos/ai'
 
 /**
@@ -8,12 +10,8 @@ import type { InsightDto } from '@/lib/repos/ai'
  * recomendación sin procedencia no se puede discutir ni auditar.
  */
 
-const KIND_LABELS: Record<string, string> = {
-  PROFILE_FIT: 'Análisis de perfil',
-  CREATIVE_IDEAS: 'Ideas creativas',
-  CAMPAIGN_ANALYSIS: 'Análisis de campaña',
-  CAMPAIGN_REPORT: 'Reporte de campaña',
-}
+/* El tipo de análisis: su texto sale de `kind<CLAVE>` en las traducciones. */
+const KINDS = ['PROFILE_FIT', 'CREATIVE_IDEAS', 'CAMPAIGN_ANALYSIS', 'CAMPAIGN_REPORT']
 
 function Section({ title, items }: { title: string; items: unknown }) {
   if (!Array.isArray(items) || items.length === 0) return null
@@ -90,23 +88,27 @@ export function InsightView({
    */
   mostrarDetalleTecnico?: boolean
 }) {
+  const t = useTranslations('analisis')
+  const idioma = useLocale()
   const output = insight.output as Record<string, unknown> | null
 
   return (
     <article className="rounded-xl border border-ink-200 bg-surface p-4">
       <header className="mb-2 flex flex-wrap items-center gap-2">
-        <Badge tone="violet">{KIND_LABELS[insight.kind] ?? insight.kind}</Badge>
-        {insight.status === 'FAILED' ? <Badge tone="rose">Falló</Badge> : null}
-        {insight.clientVisible ? <Badge tone="emerald">Compartido con el cliente</Badge> : null}
+        <Badge tone="violet">{KINDS.includes(insight.kind) ? t(`kind${insight.kind}`) : insight.kind}</Badge>
+        {insight.status === 'FAILED' ? <Badge tone="rose">{t('fallo')}</Badge> : null}
+        {insight.clientVisible ? <Badge tone="emerald">{t('compartido')}</Badge> : null}
         <span className="text-xs text-ink-500">
-          {new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone }).format(
-            new Date(insight.createdAt),
-          )}
+          {new Intl.DateTimeFormat(intlDe(idioma), {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+            timeZone: timezone,
+          }).format(new Date(insight.createdAt))}
         </span>
       </header>
 
       {insight.status === 'FAILED' ? (
-        <p className="text-sm text-rose-700">{insight.errorMessage ?? 'No se pudo generar el análisis.'}</p>
+        <p className="text-sm text-rose-700">{insight.errorMessage ?? t('noSeGenero')}</p>
       ) : null}
 
       {insight.kind === 'CAMPAIGN_REPORT' && insight.outputText ? (
@@ -116,15 +118,15 @@ export function InsightView({
       {insight.kind === 'PROFILE_FIT' && output ? (
         <>
           <div className="flex items-center gap-2">
-            <span className="text-amber-600" aria-label={`Fit ${String(output.fitScore)} de 5`}>
+            <span className="text-amber-600" aria-label={t('fitDeCinco', { valor: String(output.fitScore) })}>
               {'★'.repeat(Number(output.fitScore) || 0)}
             </span>
             <p className="text-sm font-medium text-ink-900">{String(output.veredicto ?? '')}</p>
           </div>
-          <Section title="Por qué encaja" items={output.razones} />
-          <Section title="Qué mirar antes de avanzar" items={output.riesgos} />
-          <Section title="Ideas de contenido" items={output.ideasDeContenido} />
-          <Section title="Datos que faltan" items={output.datosFaltantes} />
+          <Section title={t('porQueEncaja')} items={output.razones} />
+          <Section title={t('queMirar')} items={output.riesgos} />
+          <Section title={t('ideasDeContenido')} items={output.ideasDeContenido} />
+          <Section title={t('datosQueFaltan')} items={output.datosFaltantes} />
         </>
       ) : null}
 
@@ -146,18 +148,18 @@ export function InsightView({
               ))}
             </ul>
           ) : null}
-          <Section title="Qué evitar" items={output.queEvitar} />
+          <Section title={t('queEvitar')} items={output.queEvitar} />
         </>
       ) : null}
 
       {insight.kind === 'CAMPAIGN_ANALYSIS' && output ? (
         <>
           <p className="text-sm text-ink-800">{String(output.resumen ?? '')}</p>
-          <Section title="Lo que va bien" items={output.loQueVaBien} />
-          <Section title="Lo que preocupa" items={output.loQuePreocupa} />
-          <Section title="Desvíos del brief" items={output.desviosDelBrief} />
-          <Section title="Próximos pasos" items={output.proximosPasos} />
-          <Section title="Datos que faltan" items={output.datosFaltantes} />
+          <Section title={t('loQueVaBien')} items={output.loQueVaBien} />
+          <Section title={t('loQuePreocupa')} items={output.loQuePreocupa} />
+          <Section title={t('desvios')} items={output.desviosDelBrief} />
+          <Section title={t('proximosPasos')} items={output.proximosPasos} />
+          <Section title={t('datosQueFaltan')} items={output.datosFaltantes} />
         </>
       ) : null}
 
@@ -171,12 +173,12 @@ export function InsightView({
       <footer className="mt-3 border-t border-ink-100 pt-2 text-[11px] text-ink-500">
         {mostrarDetalleTecnico ? (
           <>
-            Generado con {insight.model} · versión de instrucciones {insight.promptVersion}
-            {insight.costUsd !== null ? ` · costo US$ ${insight.costUsd.toFixed(4)}` : ''}
-            {insight.inputsSummary ? ` · datos usados: ${JSON.stringify(insight.inputsSummary)}` : ''}
+            {t('pieTecnico', { modelo: insight.model, version: insight.promptVersion })}
+            {insight.costUsd !== null ? t('pieCosto', { monto: insight.costUsd.toFixed(4) }) : ''}
+            {insight.inputsSummary ? t('pieDatos', { datos: JSON.stringify(insight.inputsSummary) }) : ''}
           </>
         ) : (
-          'Generado con inteligencia artificial a partir de los datos de la campaña.'
+          t('pieSimple')
         )}
       </footer>
     </article>

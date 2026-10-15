@@ -6,13 +6,14 @@ import { NotFoundError, ValidationError } from '@/lib/authz/errors'
 import { AUDIT, recordAudit } from '@/lib/audit'
 import {
   esVisibleParaCliente,
+  claveDeMetrica,
   evaluarObjetivos,
-  METRICA_LABEL,
   type Mediciones,
   type Metrica,
   type Objetivo,
   type ResumenDeObjetivos,
 } from '@/lib/domain/objetivos'
+import { enCastellano } from '@/lib/i18n/castellano'
 import { actorOf, scoped } from './base'
 import { resumirResultados } from './reporting'
 
@@ -282,16 +283,25 @@ export function contextoDeObjetivos(resumen: ObjetivosDeCampana): string {
     return 'La campaña no tiene objetivos definidos. No inventes uno ni digas si "estuvo bien": contá qué pasó.'
   }
 
+  /*
+   * El prompt se escribe en castellano, siempre: es para el modelo, no para una
+   * pantalla. El dominio devuelve claves, así que acá se resuelven contra las
+   * traducciones en castellano en vez de copiar el texto a mano.
+   */
+  const texto = enCastellano('objetivos')
   const lineas = resumen.objetivos.map((objetivo) => {
     const sentido = objetivo.direction === 'COMO_MUCHO' ? 'no pasar de' : 'al menos'
-    const base = `- ${METRICA_LABEL[objetivo.metric]}: ${sentido} ${objetivo.target}`
+    const base = `- ${texto(claveDeMetrica(objetivo.metric))}: ${sentido} ${objetivo.target}`
     if (objetivo.estado === 'SIN_DATO') {
       return `${base} → SIN DATO. Nadie cargó esa métrica. NO es cero y no es un incumplimiento.`
     }
-    return `${base} → ${objetivo.actual} (${objetivo.estado}). ${objetivo.explicacion}`
+    const explicacion = texto(objetivo.explicacion.clave, objetivo.explicacion.valores)
+    return `${base} → ${objetivo.actual} (${objetivo.estado}). ${explicacion}`
   })
 
-  if (resumen.veredicto) lineas.push(`\nVeredicto calculado: ${resumen.veredicto}`)
+  if (resumen.veredicto) {
+    lineas.push(`\nVeredicto calculado: ${texto(resumen.veredicto.clave, resumen.veredicto.valores)}`)
+  }
   lineas.push(
     resumen.cerrada
       ? 'La campaña está CERRADA: lo que quedó por debajo del objetivo no se alcanzó.'

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from 'react'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ import { PasswordRules } from '@/components/password-rules'
 import { completeResetAction } from '../../actions'
 
 export function ResetForm({ token }: { token: string }) {
+  const t = useTranslations('ingreso')
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<string[]>([])
@@ -30,7 +32,7 @@ export function ResetForm({ token }: { token: string }) {
         return
       }
       if (!result.data.ok) {
-        setError(result.data.message ?? 'El enlace no es válido.')
+        setError(result.data.message ?? t('enlaceNoValido'))
         return
       }
       setDone(true)
@@ -42,10 +44,8 @@ export function ResetForm({ token }: { token: string }) {
     return (
       <Card>
         <CardBody>
-          <h1 className="mb-2 text-base font-semibold text-ink-900">Contraseña actualizada</h1>
-          <p className="text-sm text-ink-600">
-            Ya podés ingresar con tu contraseña nueva. Cerramos todas las sesiones abiertas por seguridad.
-          </p>
+          <h1 className="mb-2 text-base font-semibold text-ink-900">{t('claveActualizadaTitulo')}</h1>
+          <p className="text-sm text-ink-600">{t('claveActualizadaBajada')}</p>
         </CardBody>
       </Card>
     )
@@ -54,15 +54,15 @@ export function ResetForm({ token }: { token: string }) {
   return (
     <Card>
       <CardBody>
-        <h1 className="mb-1 text-base font-semibold text-ink-900">Definí tu contraseña</h1>
-        <p className="mb-5 text-sm text-ink-500">Este enlace se puede usar una sola vez.</p>
+        <h1 className="mb-1 text-base font-semibold text-ink-900">{t('definiTuClave')}</h1>
+        <p className="mb-5 text-sm text-ink-500">{t('enlaceUnaVez')}</p>
         {error ? (
           <div className="mb-4">
             <ErrorState title={error} />
           </div>
         ) : null}
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
-          <Field label="Contraseña nueva" htmlFor="password" errors={fieldErrors} required>
+          <Field label={t('campoClaveNueva')} htmlFor="password" errors={fieldErrors} required>
             <Input
               id="password"
               type="password"
@@ -75,12 +75,12 @@ export function ResetForm({ token }: { token: string }) {
           </Field>
           <PasswordRules value={password} />
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? 'Guardando…' : 'Guardar contraseña'}
+            {pending ? t('guardando') : t('guardarClave')}
           </Button>
         </form>
         <div className="mt-4 text-center">
           <Link href="/login" className="text-sm text-ink-700 underline decoration-ink-300 underline-offset-4 hover:decoration-ink-900">
-            Volver
+            {t('volver')}
           </Link>
         </div>
       </CardBody>

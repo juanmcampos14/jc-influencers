@@ -1,3 +1,5 @@
+import type { Frase } from './frase'
+
 /**
  * Objetivos de campaña, y si se cumplieron.
  *
@@ -49,31 +51,19 @@ export type ObjetivoEvaluado = Objetivo & {
   /** 0 a 100, o null si no se puede calcular. Puede pasarse de 100. */
   progreso: number | null
   /** Una frase que explica el estado. Es lo que se lee, más que el número. */
-  explicacion: string
+  explicacion: Frase
 }
 
-export const METRICA_LABEL: Record<Metrica, string> = {
-  ALCANCE_ESTIMADO: 'Alcance estimado del squad',
-  ALCANCE_REAL: 'Alcance real de las publicaciones',
-  VISUALIZACIONES: 'Visualizaciones',
-  INTERACCIONES: 'Interacciones',
-  CLICS: 'Clics a la web',
-  PUBLICACIONES: 'Publicaciones al aire',
-  PERFILES_APROBADOS: 'Perfiles aprobados',
-  INVERSION_EN_TALENTO: 'Inversión en talento',
-}
-
-/** De dónde sale cada número. Sin esto, ninguno se puede defender. */
-export const METRICA_FUENTE: Record<Metrica, string> = {
-  ALCANCE_ESTIMADO: 'Suma de seguidores de los perfiles aprobados. Es una estimación, no gente alcanzada.',
-  ALCANCE_REAL: 'Alcance que informó cada publicación, cargado a mano por la agencia.',
-  VISUALIZACIONES: 'Visualizaciones que informó cada publicación, cargadas a mano.',
-  INTERACCIONES: 'Me gusta, comentarios, compartidos y guardados de las publicaciones cargadas.',
-  CLICS: 'Clics en los links medidos. Es lo único de esta lista que medimos nosotros.',
-  PUBLICACIONES: 'Entregas marcadas como publicadas.',
-  PERFILES_APROBADOS: 'Perfiles que el cliente aprobó.',
-  INVERSION_EN_TALENTO: 'Suma del cachet acordado con los perfiles confirmados.',
-}
+/**
+ * El nombre de cada métrica y de dónde sale su número.
+ *
+ * Los dos viven en `messages/*.json` bajo `objetivos`: `metrica<X>` y
+ * `fuente<X>`. Sin la segunda, ningún objetivo se puede defender --"alcance
+ * estimado" y "alcance real" parecen lo mismo-- así que es texto de producto,
+ * no un comentario.
+ */
+export const claveDeMetrica = (metrica: Metrica): string => `metrica${metrica}`
+export const claveDeFuente = (metrica: Metrica): string => `fuente${metrica}`
 
 /**
  * Métricas que se pueden mostrar en el portal del cliente.
@@ -103,7 +93,6 @@ export function evaluarObjetivo(
   contexto: ContextoDeEvaluacion = { cerrada: false },
 ): ObjetivoEvaluado {
   const actual = mediciones[objetivo.metric]
-  const etiqueta = METRICA_LABEL[objetivo.metric].toLowerCase()
 
   if (actual === null) {
     return {
@@ -111,7 +100,7 @@ export function evaluarObjetivo(
       actual: null,
       estado: 'SIN_DATO',
       progreso: null,
-      explicacion: `Todavía no se puede evaluar: nadie cargó ${etiqueta}.`,
+      explicacion: { clave: 'expSinDato', valores: { metrica: objetivo.metric } },
     }
   }
 
@@ -121,7 +110,7 @@ export function evaluarObjetivo(
       actual,
       estado: 'SIN_DATO',
       progreso: null,
-      explicacion: 'El objetivo está en cero, así que no hay nada contra qué comparar.',
+      explicacion: { clave: 'expObjetivoEnCero' },
     }
   }
 
@@ -135,8 +124,8 @@ export function evaluarObjetivo(
       estado: cumplido ? 'CUMPLIDO' : 'NO_ALCANZADO',
       progreso: usado,
       explicacion: cumplido
-        ? `Dentro del tope: se usó el ${Math.round(usado)}%.`
-        : `Se pasó del tope por ${redondear(actual - objetivo.target)}.`,
+        ? { clave: 'expDentroDelTope', valores: { pct: Math.round(usado) } }
+        : { clave: 'expSePaso', valores: { exceso: redondear(actual - objetivo.target) } },
     }
   }
 
@@ -149,8 +138,8 @@ export function evaluarObjetivo(
       progreso,
       explicacion:
         progreso >= 110
-          ? `Cumplido, y por encima: ${Math.round(progreso)}% del objetivo.`
-          : 'Cumplido.',
+          ? { clave: 'expPorEncima', valores: { pct: Math.round(progreso) } }
+          : { clave: 'expCumplido' },
     }
   }
 
@@ -161,8 +150,8 @@ export function evaluarObjetivo(
     estado: contexto.cerrada ? 'NO_ALCANZADO' : 'EN_CAMINO',
     progreso,
     explicacion: contexto.cerrada
-      ? `Quedó en ${Math.round(progreso)}% del objetivo: faltaron ${falta}.`
-      : `Va ${Math.round(progreso)}% del objetivo. Faltan ${falta}.`,
+      ? { clave: 'expQuedoEn', valores: { pct: Math.round(progreso), falta } }
+      : { clave: 'expVaEn', valores: { pct: Math.round(progreso), falta } },
   }
 }
 
@@ -179,7 +168,7 @@ export type ResumenDeObjetivos = {
    * El veredicto de la campaña en una frase. Null cuando no hay objetivos: el
    * producto no opina sobre una campaña que nadie se propuso medir.
    */
-  veredicto: string | null
+  veredicto: Frase | null
 }
 
 export function evaluarObjetivos(
@@ -211,7 +200,7 @@ function veredictoDe(
   enCamino: number,
   noAlcanzados: number,
   sinDato: number,
-): string | null {
+): Frase | null {
   if (total === 0) return null
 
   /*
@@ -220,15 +209,16 @@ function veredictoDe(
    * fácil de que un reporte diga lo contrario de lo que pasó.
    */
   if (sinDato > total / 2) {
-    return `Todavía no se puede opinar: ${sinDato} de ${total} objetivos no tienen datos cargados.`
+    return { clave: 'verSinDatos', valores: { sinDato, total } }
   }
-  if (cumplidos === total) return 'Todos los objetivos cumplidos.'
+  if (cumplidos === total) return { clave: 'verTodosCumplidos' }
   if (noAlcanzados === 0 && enCamino > 0) {
-    return `${cumplidos} de ${total} cumplidos, el resto en camino.`
+    return { clave: 'verRestoEnCamino', valores: { cumplidos, total } }
   }
   if (noAlcanzados > 0) {
-    const falta = noAlcanzados === 1 ? '1 objetivo no se alcanzó' : `${noAlcanzados} objetivos no se alcanzaron`
-    return sinDato > 0 ? `${falta}, y ${sinDato} sin datos para evaluar.` : `${falta}.`
+    return sinDato > 0
+      ? { clave: 'verNoAlcanzadosConSinDato', valores: { cantidad: noAlcanzados, sinDato } }
+      : { clave: 'verNoAlcanzados', valores: { cantidad: noAlcanzados } }
   }
-  return `${cumplidos} de ${total} cumplidos.`
+  return { clave: 'verCumplidosDeTotal', valores: { cumplidos, total } }
 }

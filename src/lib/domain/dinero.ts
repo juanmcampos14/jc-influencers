@@ -8,6 +8,10 @@
  * cada total viaja con la cuenta de cuántos datos le faltan.
  */
 
+import type { Frase } from './frase'
+
+export type { Frase }
+
 export type ModoDeFee = 'PERCENT' | 'FIXED' | 'NONE'
 
 export type TerminosDeCampana = {
@@ -22,15 +26,6 @@ export type LineaDeTalento = {
   /** Lo acordado con este influencer. Null significa "todavía no se acordó". */
   monto: number | null
 }
-
-/**
- * Una frase pendiente de escribir: la clave y sus valores.
- *
- * Esto es dominio puro y lo corre el servidor. Cuando devolvía la frase hecha
- * --"el porcentaje de la agencia"-- esa frase llegaba tal cual a la pantalla en
- * inglés. La arma quien pinta, en el idioma de quien mira.
- */
-export type Frase = { clave: string; valores?: Record<string, string | number> }
 
 export type Cuentas = {
   /** Suma de lo acordado con los influencers que YA tienen número. */

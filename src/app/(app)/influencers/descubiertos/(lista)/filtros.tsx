@@ -116,7 +116,7 @@ export function FiltrosDeDescubiertos({ filtros }: { filtros: FiltrosDeBase }) {
               id="palabras"
               name="palabras"
               defaultValue={(filtros.palabras ?? []).join(', ')}
-              placeholder="gastronomía, vino"
+              placeholder={t('filtroPalabrasPista')}
             />
           </div>
 

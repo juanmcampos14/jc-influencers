@@ -46,7 +46,7 @@ export default async function ImportPage() {
     <>
       <PageHeader
         title={t('importarDesdeExcel')}
-        description="Se lee el archivo completo, hoja por hoja. Primero ves un reporte y después decidís si aplicarlo."
+        description={t('bajada')}
       />
       <div className="space-y-6 px-5 py-6 sm:px-8">
         <ImportWizard

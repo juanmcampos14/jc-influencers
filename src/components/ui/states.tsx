@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/util/format'
 
 export function EmptyState({
@@ -43,8 +44,9 @@ export function Skeleton({ className }: { className?: string }) {
 }
 
 export function TableSkeleton({ rows = 6 }: { rows?: number }) {
+  const t = useTranslations('general')
   return (
-    <div className="space-y-2 p-5" aria-busy="true" aria-label="Cargando">
+    <div className="space-y-2 p-5" aria-busy="true" aria-label={t('cargando2')}>
       {Array.from({ length: rows }).map((_, index) => (
         <Skeleton key={index} className="h-9 w-full" />
       ))}
