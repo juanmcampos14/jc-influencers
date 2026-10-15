@@ -1,0 +1,38 @@
+{
+  "general": {
+    "saltarAlContenido": "Skip to content",
+    "cargando": "Loading…"
+  },
+  "idioma": {
+    "etiqueta": "Language",
+    "es": "Español",
+    "en": "English",
+    "cambiado": "Language changed"
+  },
+  "navegacion": {
+    "panel": "Dashboard",
+    "clientes": "Clients",
+    "campanas": "Campaigns",
+    "influencers": "Influencers",
+    "importacion": "Import",
+    "usuarios": "Users",
+    "auditoria": "Audit log",
+    "miCuenta": "My account",
+    "cerrarSesion": "Sign out",
+    "panelDeAgencia": "Agency workspace",
+    "espacioDeTrabajo": "Workspace",
+    "todosLosClientes": "All clients",
+    "avisoDeAlcance": "You work on one client at a time. Data is never mixed.",
+    "misCampanas": "My campaigns"
+  },
+  "ingreso": {
+    "titulo": "Sign in",
+    "bajada": "Use the email you were given access with.",
+    "email": "Email",
+    "contrasena": "Password",
+    "entrar": "Sign in",
+    "noPuedoEntrar": "I can't sign in",
+    "sinRegistro": "Access is granted by the agency. There is no public sign-up.",
+    "lema": "Influencer marketing campaign management"
+  }
+}

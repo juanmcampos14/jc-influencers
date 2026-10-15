@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import createNextIntlPlugin from 'next-intl/plugin'
 import { STATIC_SECURITY_HEADERS } from './src/lib/security/csp'
 
 const isProd = process.env.NODE_ENV === 'production'
@@ -30,4 +31,10 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig
+/*
+ * El idioma no va en la URL: esta aplicación vive detrás de un login y no hay
+ * nada que indexar. Ver `src/i18n/idiomas.ts`.
+ */
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
+
+export default withNextIntl(nextConfig)

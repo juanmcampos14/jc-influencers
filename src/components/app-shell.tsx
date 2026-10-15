@@ -21,6 +21,8 @@ import {
   Users,
   X,
 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import { SelectorDeIdioma } from '@/components/idioma/selector-de-idioma'
 import { cn } from '@/lib/util/format'
 import { FondoDeMarca } from '@/components/fondo-de-marca'
 import { switchClientAction } from '@/app/(app)/actions/session'
@@ -48,7 +50,21 @@ const ICONOS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   auditoria: ClipboardList,
 }
 
-export type NavItem = { href: string; label: string; badge?: number; icon?: NavIcon }
+/**
+ * Un lugar del menú.
+ *
+ * Lleva una CLAVE de traducción, no el texto: el menú lo arma el servidor según
+ * los permisos de cada persona, y ahí todavía no sabe en qué idioma se va a
+ * leer. `label` queda para lo que no se traduce --el nombre de un cliente, por
+ * ejemplo--.
+ */
+export type NavItem = {
+  href: string
+  labelKey?: string
+  label?: string
+  badge?: number
+  icon?: NavIcon
+}
 export type ShellClient = { id: string; name: string }
 
 /** Iniciales para el avatar de quien está usando la aplicación. */
@@ -107,6 +123,7 @@ export function AppShell({
   fondoOpacidad?: number
   children: React.ReactNode
 }) {
+  const tNav = useTranslations('navegacion')
   const pathname = usePathname()
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
@@ -272,7 +289,8 @@ export function AppShell({
                     />
                   ) : null}
                   <Icono className="size-4 shrink-0" aria-hidden="true" />
-                  <span className="flex-1 truncate">{item.label}</span>
+                  {/* La clave manda; `label` es para lo que no se traduce. */}
+                  <span className="flex-1 truncate">{item.labelKey ? tNav(item.labelKey) : item.label}</span>
                   {item.badge && item.badge > 0 ? (
                     <span className="rounded-full bg-nav-active-text px-1.5 py-px text-[11px] font-bold text-nav">
                       {item.badge}
@@ -316,15 +334,23 @@ export function AppShell({
             )}
           >
             <Settings className="size-4" aria-hidden="true" />
-            Mi cuenta
+            {tNav('miCuenta')}
           </Link>
+
+          {/*
+            El idioma se elige acá, junto a la cuenta: es una preferencia de la
+            persona, no una opción de la pantalla en la que está.
+          */}
+          <div className="mt-2 border-t border-nav-2 px-3 pt-2.5">
+            <SelectorDeIdioma />
+          </div>
           <form action={logoutAction} className="mt-0.5">
             <button
               type="submit"
               className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-nav-text hover:bg-nav-2 hover:text-nav-text-strong"
             >
               <LogOut className="size-4" aria-hidden="true" />
-              Cerrar sesión
+              {tNav('cerrarSesion')}
             </button>
           </form>
         </div>

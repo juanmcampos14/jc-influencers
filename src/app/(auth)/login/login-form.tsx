@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { useTranslations } from 'next-intl'
 import { Card, CardBody } from '@/components/ui/card'
 import { Field, Input } from '@/components/ui/field'
 import { ErrorState } from '@/components/ui/states'
@@ -36,11 +37,13 @@ export function LoginForm() {
     })
   }
 
+  const t = useTranslations('ingreso')
+
   return (
     <Card>
       <CardBody>
-        <h1 className="mb-1 text-base font-semibold text-ink-900">Ingresar</h1>
-        <p className="mb-5 text-sm text-ink-500">Usá el email con el que te dieron acceso.</p>
+        <h1 className="mb-1 text-base font-semibold text-ink-900">{t('titulo')}</h1>
+        <p className="mb-5 text-sm text-ink-500">{t('bajada')}</p>
 
         {error ? (
           <div className="mb-4">
@@ -49,20 +52,20 @@ export function LoginForm() {
         ) : null}
 
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
-          <Field label="Email" htmlFor="email" required>
+          <Field label={t('email')} htmlFor="email" required>
             <Input id="email" name="email" type="email" autoComplete="username" required autoFocus />
           </Field>
-          <Field label="Contraseña" htmlFor="password" required>
+          <Field label={t('contrasena')} htmlFor="password" required>
             <Input id="password" name="password" type="password" autoComplete="current-password" required />
           </Field>
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? 'Ingresando…' : 'Ingresar'}
+            {pending ? `${t('entrar')}…` : t('entrar')}
           </Button>
         </form>
 
         <div className="mt-4 text-center">
           <Link href="/recuperar" className="text-sm text-ink-700 underline decoration-ink-300 underline-offset-4 hover:decoration-ink-900">
-            No puedo entrar
+            {t('noPuedoEntrar')}
           </Link>
         </div>
       </CardBody>

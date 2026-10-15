@@ -1,0 +1,38 @@
+{
+  "general": {
+    "saltarAlContenido": "Saltar al contenido",
+    "cargando": "Cargando…"
+  },
+  "idioma": {
+    "etiqueta": "Idioma",
+    "es": "Español",
+    "en": "English",
+    "cambiado": "Idioma cambiado"
+  },
+  "navegacion": {
+    "panel": "Panel",
+    "clientes": "Clientes",
+    "campanas": "Campañas",
+    "influencers": "Influencers",
+    "importacion": "Importación",
+    "usuarios": "Usuarios",
+    "auditoria": "Auditoría",
+    "miCuenta": "Mi cuenta",
+    "cerrarSesion": "Cerrar sesión",
+    "panelDeAgencia": "Panel de agencia",
+    "espacioDeTrabajo": "Espacio de trabajo",
+    "todosLosClientes": "Todos los clientes",
+    "avisoDeAlcance": "Se trabaja en un cliente por vez. Los datos nunca se mezclan.",
+    "misCampanas": "Mis campañas"
+  },
+  "ingreso": {
+    "titulo": "Ingresar",
+    "bajada": "Usá el email con el que te dieron acceso.",
+    "email": "Email",
+    "contrasena": "Contraseña",
+    "entrar": "Ingresar",
+    "noPuedoEntrar": "No puedo entrar",
+    "sinRegistro": "El acceso lo habilita la agencia. No hay registro público.",
+    "lema": "Gestión de campañas de marketing de influencers"
+  }
+}

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { Anton, Inter } from 'next/font/google'
 import { Toaster } from 'sonner'
+import { NextIntlClientProvider } from 'next-intl'
+import { getLocale, getTranslations } from 'next-intl/server'
 import './globals.css'
 
 /**
@@ -34,17 +36,25 @@ export const viewport: Viewport = {
   themeColor: '#0c0d10',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  /*
+   * El idioma se resuelve por pedido (ver `src/i18n/request.ts`) y se escribe
+   * en `<html lang>`: sin eso, un lector de pantalla lee el inglés con fonética
+   * española, y el navegador ofrece traducir una página que ya está traducida.
+   */
+  const locale = await getLocale()
+  const t = await getTranslations('general')
+
   return (
-    <html lang="es-AR" className={`${inter.variable} ${anton.variable}`}>
+    <html lang={locale} className={`${inter.variable} ${anton.variable}`}>
       <body className="min-h-screen antialiased">
         <a
           href="#contenido"
           className="sr-only-focusable absolute left-3 top-3 z-50 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-on-brand"
         >
-          Saltar al contenido
+          {t('saltarAlContenido')}
         </a>
-        {children}
+        <NextIntlClientProvider>{children}</NextIntlClientProvider>
         <Toaster position="top-right" richColors closeButton />
       </body>
     </html>
