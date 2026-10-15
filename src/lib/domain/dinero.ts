@@ -23,6 +23,15 @@ export type LineaDeTalento = {
   monto: number | null
 }
 
+/**
+ * Una frase pendiente de escribir: la clave y sus valores.
+ *
+ * Esto es dominio puro y lo corre el servidor. Cuando devolvía la frase hecha
+ * --"el porcentaje de la agencia"-- esa frase llegaba tal cual a la pantalla en
+ * inglés. La arma quien pinta, en el idioma de quien mira.
+ */
+export type Frase = { clave: string; valores?: Record<string, string | number> }
+
 export type Cuentas = {
   /** Suma de lo acordado con los influencers que YA tienen número. */
   inversionEnTalento: number
@@ -33,11 +42,11 @@ export type Cuentas = {
   /** Lo que cobra la agencia, o null si el modo elegido no permite calcularlo. */
   feeDeAgencia: number | null
   /** Cómo se explica ese fee, en una frase. */
-  explicacionDelFee: string
+  explicacionDelFee: Frase | null
   /** Lo que el cliente paga en total, o null si falta algo para saberlo. */
   totalAlCliente: number | null
   /** Qué falta para que `totalAlCliente` sea un número y no una estimación. */
-  faltaParaCotizar: string[]
+  faltaParaCotizar: Frase[]
 }
 
 const sumar = (valores: Array<number | null>): number =>
@@ -48,42 +57,43 @@ export function calcularCuentas(terminos: TerminosDeCampana, lineas: LineaDeTale
   const inversionEnTalento = sumar(conNumero.map((linea) => linea.monto))
   const talentosSinNumero = lineas.length - conNumero.length
 
-  const faltaParaCotizar: string[] = []
+  const faltaParaCotizar: Frase[] = []
   if (talentosSinNumero > 0) {
-    faltaParaCotizar.push(
-      `${talentosSinNumero} ${talentosSinNumero === 1 ? 'perfil' : 'perfiles'} sin cachet acordado`,
-    )
+    faltaParaCotizar.push({ clave: 'faltaCachet', valores: { cantidad: talentosSinNumero } })
   }
 
   let feeDeAgencia: number | null = null
-  let explicacionDelFee = ''
+  let explicacionDelFee: Frase | null = null
 
   switch (terminos.feeMode) {
     case 'PERCENT':
       if (terminos.feePercent === null) {
-        explicacionDelFee = 'Falta definir el porcentaje.'
-        faltaParaCotizar.push('el porcentaje de la agencia')
+        explicacionDelFee = { clave: 'feeSinPorcentaje' }
+        faltaParaCotizar.push({ clave: 'faltaPorcentaje' })
       } else {
         feeDeAgencia = (inversionEnTalento * terminos.feePercent) / 100
-        explicacionDelFee = `${terminos.feePercent}% sobre la inversión en talento`
-        if (talentosSinNumero > 0) {
-          // El fee se calcula sobre lo que hay. Se dice, porque va a crecer.
-          explicacionDelFee += ` (sobre los ${conNumero.length} que ya tienen número)`
-        }
+        explicacionDelFee =
+          talentosSinNumero > 0
+            ? // El fee se calcula sobre lo que hay. Se dice, porque va a crecer.
+              {
+                clave: 'feePorcentajeParcial',
+                valores: { pct: terminos.feePercent, conNumero: conNumero.length },
+              }
+            : { clave: 'feePorcentaje', valores: { pct: terminos.feePercent } }
       }
       break
     case 'FIXED':
       if (terminos.feeFixed === null) {
-        explicacionDelFee = 'Falta definir el monto.'
-        faltaParaCotizar.push('el monto fijo de la agencia')
+        explicacionDelFee = { clave: 'feeSinMonto' }
+        faltaParaCotizar.push({ clave: 'faltaMontoFijo' })
       } else {
         feeDeAgencia = terminos.feeFixed
-        explicacionDelFee = 'Monto fijo, no depende de la inversión'
+        explicacionDelFee = { clave: 'feeMontoFijo' }
       }
       break
     case 'NONE':
       feeDeAgencia = 0
-      explicacionDelFee = 'Sin fee en esta campaña'
+      explicacionDelFee = { clave: 'feeSinFee' }
       break
   }
 

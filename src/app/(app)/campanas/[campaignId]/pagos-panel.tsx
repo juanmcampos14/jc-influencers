@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Check, FileText, Paperclip, Plus, Trash2, Undo2 } from 'lucide-react'
@@ -21,11 +22,8 @@ import {
   marcarPagadoAction,
 } from '../../actions/pagos'
 
-const DIRECCIONES = {
-  AGENCY_IN: 'El cliente nos paga',
-  TALENT_OUT: 'Le pagamos al influencer',
-  EXPENSE_OUT: 'Otro gasto de la campaña',
-} as const
+/* El texto de cada dirección sale de `direccion<CLAVE>` en las traducciones. */
+const DIRECCIONES = ['AGENCY_IN', 'TALENT_OUT', 'EXPENSE_OUT'] as const
 
 /**
  * La plata de la campaña.
@@ -47,13 +45,18 @@ export function PagosPanel({
   campaignId: string
   puedeEditar: boolean
 }) {
+  const t = useTranslations('pagos')
+  const idioma = useLocale()
   const router = useRouter()
   const [pendiente, startTransition] = React.useTransition()
   const [abierto, setAbierto] = React.useState(false)
   const formRef = React.useRef<HTMLFormElement>(null)
 
   const { cuentas, saldos, terminos } = plan
-  const plata = (valor: number | null) => (valor === null ? '—' : formatMoney(valor, plan.currency))
+  const plata = (valor: number | null) => (valor === null ? '—' : formatMoney(valor, plan.currency, idioma))
+  /** Una frase del dominio, escrita en el idioma de quien mira. */
+  const frase = (f: { clave: string; valores?: Record<string, string | number> } | null) =>
+    f ? t(f.clave, f.valores) : undefined
 
   function guardarTerminos(formData: FormData) {
     startTransition(async () => {
@@ -69,10 +72,10 @@ export function PagosPanel({
       }).catch(() => null)
 
       if (!resultado?.ok) {
-        toast.error(resultado && !resultado.ok ? resultado.message : 'No se pudo guardar.')
+        toast.error(resultado && !resultado.ok ? resultado.message : t('noSeGuardo'))
         return
       }
-      toast.success('Términos guardados.')
+      toast.success(t('terminosGuardados'))
       router.refresh()
     })
   }
@@ -82,10 +85,10 @@ export function PagosPanel({
     startTransition(async () => {
       const resultado = await crearMovimientoAction(formData).catch(() => null)
       if (!resultado?.ok) {
-        toast.error(resultado && !resultado.ok ? resultado.message : 'No se pudo registrar el movimiento.')
+        toast.error(resultado && !resultado.ok ? resultado.message : t('noSeRegistro'))
         return
       }
-      toast.success('Movimiento registrado.')
+      toast.success(t('movimientoRegistrado'))
       formRef.current?.reset()
       setAbierto(false)
       router.refresh()
@@ -96,10 +99,10 @@ export function PagosPanel({
     startTransition(async () => {
       const resultado = await marcarPagadoAction({ paymentId, campaignId, pagado }).catch(() => null)
       if (!resultado?.ok) {
-        toast.error(resultado && !resultado.ok ? resultado.message : 'No se pudo actualizar.')
+        toast.error(resultado && !resultado.ok ? resultado.message : t('noSeActualizo'))
         return
       }
-      toast.success(pagado ? 'Marcado como pagado.' : 'Vuelve a estar pendiente.')
+      toast.success(pagado ? t('marcadoPagado') : t('vuelvePendiente'))
       router.refresh()
     })
   }
@@ -108,10 +111,10 @@ export function PagosPanel({
     startTransition(async () => {
       const resultado = await borrarMovimientoAction({ paymentId, campaignId }).catch(() => null)
       if (!resultado?.ok) {
-        toast.error(resultado && !resultado.ok ? resultado.message : 'No se pudo borrar.')
+        toast.error(resultado && !resultado.ok ? resultado.message : t('noSeBorro'))
         return
       }
-      toast.success('Movimiento borrado.')
+      toast.success(t('movimientoBorrado'))
       router.refresh()
     })
   }
@@ -119,60 +122,59 @@ export function PagosPanel({
   return (
     <div className="space-y-4">
       <StatStrip>
-        <Stat label="Inversión en talento" value={plata(cuentas.inversionEnTalento)} hint={`${plan.talento.length} confirmados`} />
-        <Stat label="Fee de la agencia" value={plata(cuentas.feeDeAgencia)} hint={cuentas.explicacionDelFee} />
         <Stat
-          label="Total al cliente"
+          label={t('statInversion')}
+          value={plata(cuentas.inversionEnTalento)}
+          hint={t('confirmados', { cantidad: plan.talento.length })}
+        />
+        <Stat label={t('statFee')} value={plata(cuentas.feeDeAgencia)} hint={frase(cuentas.explicacionDelFee)} />
+        <Stat
+          label={t('statTotalCliente')}
           value={plata(cuentas.totalAlCliente)}
           tone={cuentas.faltaParaCotizar.length > 0 ? 'warn' : 'good'}
-          hint={cuentas.faltaParaCotizar.length > 0 ? 'Falta información' : 'Listo para cotizar'}
+          hint={cuentas.faltaParaCotizar.length > 0 ? t('faltaInformacion') : t('listoParaCotizar')}
         />
         <Stat
-          label="Nos deben"
+          label={t('statNosDeben')}
           value={plata(saldos.AGENCY_IN.pendiente)}
           tone={saldos.AGENCY_IN.pendiente > 0 ? 'warn' : undefined}
-          hint={`${plata(saldos.AGENCY_IN.pagado)} ya cobrado`}
+          hint={t('yaCobrado', { monto: plata(saldos.AGENCY_IN.pagado) })}
         />
         <Stat
-          label="Debemos al talento"
+          label={t('statDebemos')}
           value={plata(saldos.TALENT_OUT.pendiente)}
           tone={saldos.TALENT_OUT.pendiente > 0 ? 'warn' : undefined}
-          hint={`${plata(saldos.TALENT_OUT.pagado)} ya pagado`}
+          hint={t('yaPagado', { monto: plata(saldos.TALENT_OUT.pagado) })}
         />
       </StatStrip>
 
       {cuentas.faltaParaCotizar.length > 0 ? (
         <InfoNote>
-          <p className="font-medium">Todavía no se puede cotizar del todo.</p>
+          <p className="font-medium">{t('noSePuedeCotizar')}</p>
           <ul className="mt-1 list-inside list-disc">
             {cuentas.faltaParaCotizar.map((falta) => (
-              <li key={falta}>{falta}</li>
+              <li key={falta.clave}>{t(falta.clave, falta.valores)}</li>
             ))}
           </ul>
-          <p className="mt-1 text-xs">
-            Lo que falta no se cuenta como cero: los totales de arriba son sobre lo que ya está cargado.
-          </p>
+          <p className="mt-1 text-xs">{t('faltaNoEsCero')}</p>
         </InfoNote>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Cómo se cotiza esta campaña</CardTitle>
-          <p className="text-xs text-ink-500">
-            Sólo lo ve la agencia. Los perfiles cuentan como costo recién cuando están confirmados: sumar los que
-            están en screening infla la cotización con gente que capaz nunca participe.
-          </p>
+          <CardTitle>{t('comoSeCotiza')}</CardTitle>
+          <p className="text-xs text-ink-500">{t('comoSeCotizaBajada')}</p>
         </CardHeader>
         <CardBody>
           <form action={guardarTerminos} className="grid gap-4 sm:grid-cols-3">
-            <Field label="La agencia cobra" htmlFor="feeMode">
+            <Field label={t('campoFeeMode')} htmlFor="feeMode">
               <Select id="feeMode" name="feeMode" defaultValue={terminos.feeMode} disabled={!puedeEditar}>
-                <option value="PERCENT">Un % de la inversión en talento</option>
-                <option value="FIXED">Un monto fijo</option>
-                <option value="NONE">No cobra fee acá</option>
+                <option value="PERCENT">{t('feeModePercent')}</option>
+                <option value="FIXED">{t('feeModeFixed')}</option>
+                <option value="NONE">{t('feeModeNone')}</option>
               </Select>
             </Field>
-            <Field label="Porcentaje" htmlFor="feePercent" hint="Sólo si cobra por porcentaje.">
+            <Field label={t('campoPorcentaje')} htmlFor="feePercent" hint={t('porcentajeAyuda')}>
               <Input
                 id="feePercent"
                 name="feePercent"
@@ -182,7 +184,7 @@ export function PagosPanel({
                 disabled={!puedeEditar}
               />
             </Field>
-            <Field label="Monto fijo" htmlFor="feeFixed" hint="Sólo si cobra un fijo.">
+            <Field label={t('campoMontoFijo')} htmlFor="feeFixed" hint={t('montoFijoAyuda')}>
               <Input
                 id="feeFixed"
                 name="feeFixed"
@@ -191,7 +193,7 @@ export function PagosPanel({
                 disabled={!puedeEditar}
               />
             </Field>
-            <Field label="Producción" htmlFor="productionCost" hint="Edición, envíos, viáticos.">
+            <Field label={t('campoProduccion')} htmlFor="productionCost" hint={t('produccionAyuda')}>
               <Input
                 id="productionCost"
                 name="productionCost"
@@ -200,7 +202,7 @@ export function PagosPanel({
                 disabled={!puedeEditar}
               />
             </Field>
-            <Field label="Pauta" htmlFor="adSpend" hint="Plata para amplificar el contenido.">
+            <Field label={t('campoPauta')} htmlFor="adSpend" hint={t('pautaAyuda')}>
               <Input
                 id="adSpend"
                 name="adSpend"
@@ -209,16 +211,16 @@ export function PagosPanel({
                 disabled={!puedeEditar}
               />
             </Field>
-            <Field label="Condiciones de pago" htmlFor="terms" hint="50% al confirmar, 50% contra publicación…">
+            <Field label={t('campoCondiciones')} htmlFor="terms" hint={t('condicionesAyuda')}>
               <Input id="terms" name="terms" defaultValue={terminos.terms ?? ''} disabled={!puedeEditar} />
             </Field>
-            <Field label="Notas internas" htmlFor="notes" className="sm:col-span-3">
+            <Field label={t('campoNotasInternas')} htmlFor="notes" className="sm:col-span-3">
               <Textarea id="notes" name="notes" rows={2} defaultValue={terminos.notes ?? ''} disabled={!puedeEditar} />
             </Field>
             {puedeEditar ? (
               <div className="sm:col-span-3">
                 <Button type="submit" disabled={pendiente}>
-                  {pendiente ? 'Guardando…' : 'Guardar términos'}
+                  {pendiente ? t('guardando') : t('guardarTerminos')}
                 </Button>
               </div>
             ) : null}
@@ -228,25 +230,22 @@ export function PagosPanel({
 
       <Card>
         <CardHeader>
-          <CardTitle>Por influencer</CardTitle>
-          <p className="text-xs text-ink-500">Lo acordado sale de la ficha de cada perfil en la campaña.</p>
+          <CardTitle>{t('porInfluencer')}</CardTitle>
+          <p className="text-xs text-ink-500">{t('porInfluencerBajada')}</p>
         </CardHeader>
         <CardBody className="p-0">
           {plan.talento.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-ink-500">
-              Todavía no hay perfiles confirmados. Cuando los haya, acá se ve cuánto se le acordó a cada uno y cuánto
-              se le pagó.
-            </p>
+            <p className="px-5 py-6 text-sm text-ink-500">{t('sinConfirmados')}</p>
           ) : (
             <TableWrap>
               <Table>
                 <thead>
                   <tr>
-                    <Th>Influencer</Th>
-                    <Th className="text-right">Acordado</Th>
-                    <Th className="text-right">Pagado</Th>
-                    <Th className="text-right">Pendiente</Th>
-                    <Th>Estado</Th>
+                    <Th>{t('colInfluencer')}</Th>
+                    <Th className="text-right">{t('colAcordado')}</Th>
+                    <Th className="text-right">{t('colPagado')}</Th>
+                    <Th className="text-right">{t('colPendiente')}</Th>
+                    <Th>{t('colEstado')}</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -257,24 +256,26 @@ export function PagosPanel({
                         <Td className="font-medium text-ink-900">{linea.nombre}</Td>
                         <Td className="text-right tabular-nums">
                           {linea.acordado === null ? (
-                            <span className="text-amber-700">sin acordar</span>
+                            <span className="text-amber-700">{t('sinAcordar')}</span>
                           ) : (
-                            formatMoney(linea.acordado, plan.currency)
+                            formatMoney(linea.acordado, plan.currency, idioma)
                           )}
                         </Td>
-                        <Td className="text-right tabular-nums">{formatMoney(linea.pagado, plan.currency)}</Td>
                         <Td className="text-right tabular-nums">
-                          {formatMoney(linea.pendiente, plan.currency)}
+                          {formatMoney(linea.pagado, plan.currency, idioma)}
+                        </Td>
+                        <Td className="text-right tabular-nums">
+                          {formatMoney(linea.pendiente, plan.currency, idioma)}
                         </Td>
                         <Td>
                           {linea.acordado === null ? (
-                            <Badge tone="amber">Falta el cachet</Badge>
+                            <Badge tone="amber">{t('faltaElCachet')}</Badge>
                           ) : falta !== null && falta <= 0 && linea.pagado > 0 ? (
-                            <Badge tone="emerald">Saldado</Badge>
+                            <Badge tone="emerald">{t('saldado')}</Badge>
                           ) : linea.pagado > 0 ? (
-                            <Badge tone="blue">Pago parcial</Badge>
+                            <Badge tone="blue">{t('pagoParcial')}</Badge>
                           ) : (
-                            <Badge tone="slate">Sin pagar</Badge>
+                            <Badge tone="slate">{t('sinPagar')}</Badge>
                           )}
                         </Td>
                       </Tr>
@@ -289,43 +290,41 @@ export function PagosPanel({
 
       <Card>
         <CardHeader>
-          <CardTitle>Movimientos</CardTitle>
-          <p className="text-xs text-ink-500">
-            Cada cobro y cada pago, con su factura. Lo cancelado no suma ni como deuda ni como pago.
-          </p>
+          <CardTitle>{t('movimientos')}</CardTitle>
+          <p className="text-xs text-ink-500">{t('movimientosBajada')}</p>
         </CardHeader>
         <CardBody className="space-y-3">
           {puedeEditar ? (
             <>
               <Button size="sm" variant="secondary" onClick={() => setAbierto((v) => !v)}>
                 <Plus className="size-4" aria-hidden="true" />
-                {abierto ? 'Cerrar' : 'Registrar un movimiento'}
+                {abierto ? t('cerrarFormulario') : t('registrarMovimiento')}
               </Button>
 
               {abierto ? (
                 <form ref={formRef} action={crear} className="grid gap-3 rounded-lg border border-ink-200 p-4 sm:grid-cols-3">
-                  <Field label="Qué pasó" htmlFor="direction" required>
+                  <Field label={t('campoQuePaso')} htmlFor="direction" required>
                     <Select id="direction" name="direction" required>
-                      {Object.entries(DIRECCIONES).map(([valor, etiqueta]) => (
+                      {DIRECCIONES.map((valor) => (
                         <option key={valor} value={valor}>
-                          {etiqueta}
+                          {t(`direccion${valor}`)}
                         </option>
                       ))}
                     </Select>
                   </Field>
-                  <Field label="Monto" htmlFor="amount" required hint={`En ${plan.currency}.`}>
+                  <Field label={t('campoMonto')} htmlFor="amount" required hint={t('montoAyuda', { moneda: plan.currency })}>
                     <Input id="amount" name="amount" inputMode="decimal" required />
                   </Field>
-                  <Field label="Estado" htmlFor="status" required>
+                  <Field label={t('colEstado')} htmlFor="status" required>
                     <Select id="status" name="status" defaultValue="PENDING" required>
-                      <option value="PENDING">Pendiente</option>
-                      <option value="PAID">Ya pagado</option>
+                      <option value="PENDING">{t('estadoPendiente')}</option>
+                      <option value="PAID">{t('estadoYaPagado')}</option>
                     </Select>
                   </Field>
-                  <Field label="Concepto" htmlFor="concept" required className="sm:col-span-2">
-                    <Input id="concept" name="concept" placeholder="Anticipo 50%" required maxLength={200} />
+                  <Field label={t('campoConcepto')} htmlFor="concept" required className="sm:col-span-2">
+                    <Input id="concept" name="concept" placeholder={t('conceptoPista')} required maxLength={200} />
                   </Field>
-                  <Field label="Influencer" htmlFor="candidacyId" hint="Si el movimiento es de alguien en particular.">
+                  <Field label={t('campoInfluencer')} htmlFor="candidacyId" hint={t('influencerAyuda')}>
                     <Select id="candidacyId" name="candidacyId" defaultValue="">
                       <option value="">—</option>
                       {plan.talento.map((linea) => (
@@ -335,16 +334,16 @@ export function PagosPanel({
                       ))}
                     </Select>
                   </Field>
-                  <Field label="Vence" htmlFor="dueDate">
+                  <Field label={t('campoVence')} htmlFor="dueDate">
                     <Input id="dueDate" name="dueDate" type="date" />
                   </Field>
-                  <Field label="Nº de factura o comprobante" htmlFor="reference">
+                  <Field label={t('campoReferencia')} htmlFor="reference">
                     <Input id="reference" name="reference" maxLength={120} />
                   </Field>
-                  <Field label="Método" htmlFor="method" hint="Transferencia, efectivo, canje…">
+                  <Field label={t('campoMetodo')} htmlFor="method" hint={t('metodoAyuda')}>
                     <Input id="method" name="method" maxLength={80} />
                   </Field>
-                  <Field label="Factura adjunta" htmlFor="documento" hint="PDF o imagen." className="sm:col-span-2">
+                  <Field label={t('campoFactura')} htmlFor="documento" hint={t('facturaAyuda')} className="sm:col-span-2">
                     <Input
                       id="documento"
                       name="documento"
@@ -353,12 +352,12 @@ export function PagosPanel({
                       className="h-auto py-1.5"
                     />
                   </Field>
-                  <Field label="Notas" htmlFor="notes" className="sm:col-span-3">
+                  <Field label={t('campoNotas')} htmlFor="notes" className="sm:col-span-3">
                     <Textarea id="notes" name="notes" rows={2} />
                   </Field>
                   <div className="sm:col-span-3">
                     <Button type="submit" disabled={pendiente}>
-                      {pendiente ? 'Guardando…' : 'Registrar'}
+                      {pendiente ? t('guardando') : t('registrar')}
                     </Button>
                   </div>
                 </form>
@@ -367,19 +366,19 @@ export function PagosPanel({
           ) : null}
 
           {plan.movimientos.length === 0 ? (
-            <p className="text-sm text-ink-500">Todavía no hay movimientos registrados.</p>
+            <p className="text-sm text-ink-500">{t('sinMovimientos')}</p>
           ) : (
             <TableWrap>
               <Table>
                 <thead>
                   <tr>
-                    <Th>Concepto</Th>
-                    <Th>Qué pasó</Th>
-                    <Th className="text-right">Monto</Th>
-                    <Th>Estado</Th>
-                    <Th>Fechas</Th>
-                    <Th>Factura</Th>
-                    {puedeEditar ? <Th className="text-right">Acciones</Th> : null}
+                    <Th>{t('colConcepto')}</Th>
+                    <Th>{t('colQuePaso')}</Th>
+                    <Th className="text-right">{t('colMonto')}</Th>
+                    <Th>{t('colEstado')}</Th>
+                    <Th>{t('colFechas')}</Th>
+                    <Th>{t('colFactura')}</Th>
+                    {puedeEditar ? <Th className="text-right">{t('colAcciones')}</Th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -389,25 +388,27 @@ export function PagosPanel({
                         <span className="font-medium text-ink-900">{movimiento.concept}</span>
                         {movimiento.quien ? <p className="text-xs text-ink-500">{movimiento.quien}</p> : null}
                         {movimiento.reference ? (
-                          <p className="text-xs text-ink-500">Nº {movimiento.reference}</p>
+                          <p className="text-xs text-ink-500">{t('numeroDe', { valor: movimiento.reference })}</p>
                         ) : null}
                       </Td>
-                      <Td className="text-xs text-ink-600">{DIRECCIONES[movimiento.direction]}</Td>
-                      <Td className="text-right tabular-nums">{formatMoney(movimiento.amount, movimiento.currency)}</Td>
+                      <Td className="text-xs text-ink-600">{t(`direccion${movimiento.direction}`)}</Td>
+                      <Td className="text-right tabular-nums">
+                        {formatMoney(movimiento.amount, movimiento.currency, idioma)}
+                      </Td>
                       <Td>
                         {movimiento.status === 'PAID' ? (
-                          <Badge tone="emerald">Pagado</Badge>
+                          <Badge tone="emerald">{t('badgePagado')}</Badge>
                         ) : movimiento.status === 'CANCELLED' ? (
-                          <Badge tone="slate">Cancelado</Badge>
+                          <Badge tone="slate">{t('badgeCancelado')}</Badge>
                         ) : (
-                          <Badge tone="amber">Pendiente</Badge>
+                          <Badge tone="amber">{t('badgePendiente')}</Badge>
                         )}
                       </Td>
                       <Td className="whitespace-nowrap text-xs text-ink-600">
                         {movimiento.paidAt
-                          ? `Pagado ${formatDate(movimiento.paidAt)}`
+                          ? t('pagadoEl', { fecha: formatDate(movimiento.paidAt, undefined, idioma) })
                           : movimiento.dueDate
-                            ? `Vence ${formatDate(movimiento.dueDate)}`
+                            ? t('venceEl', { fecha: formatDate(movimiento.dueDate, undefined, idioma) })
                             : '—'}
                       </Td>
                       <Td className="text-xs">
@@ -422,7 +423,7 @@ export function PagosPanel({
                         ) : (
                           <span className="inline-flex items-center gap-1 text-ink-400">
                             <Paperclip className="size-3.5" aria-hidden="true" />
-                            sin adjuntar
+                            {t('sinAdjuntar')}
                           </span>
                         )}
                       </Td>
@@ -438,25 +439,25 @@ export function PagosPanel({
                               {movimiento.status === 'PAID' ? (
                                 <>
                                   <Undo2 className="size-4" aria-hidden="true" />
-                                  Deshacer
+                                  {t('deshacer')}
                                 </>
                               ) : (
                                 <>
                                   <Check className="size-4" aria-hidden="true" />
-                                  Pagado
+                                  {t('marcarPagado')}
                                 </>
                               )}
                             </Button>
                             <ConfirmButton
-                              title="Borrar el movimiento"
-                              description="Esto no se deshace, y si tenía una factura adjunta también se borra. Si el pago no se hizo, marcalo como pendiente en vez de borrarlo: el historial sirve."
-                              confirmLabel="Borrar"
+                              title={t('borrarTitulo')}
+                              description={t('borrarBajada')}
+                              confirmLabel={t('borrar')}
                               onConfirm={() => borrar(movimiento.id)}
                               pending={pendiente}
                             >
                               <Button size="sm" variant="ghost" disabled={pendiente}>
                                 <Trash2 className="size-4" aria-hidden="true" />
-                                <span className="sr-only">Borrar</span>
+                                <span className="sr-only">{t('borrar')}</span>
                               </Button>
                             </ConfirmButton>
                           </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Archive, Copy, Link2, Plus, Trash2 } from 'lucide-react'
@@ -21,31 +22,31 @@ import {
   guardarEntregaAction,
 } from '../../actions/reporting'
 
-const TIPOS = {
-  STORY: 'Historia',
-  REEL: 'Reel',
-  POST: 'Posteo',
-  TIKTOK: 'TikTok',
-  VIDEO: 'Video',
-  YOUTUBE_VIDEO: 'Video de YouTube',
-  LIVE: 'Vivo',
-  OTHER: 'Otro',
-} as const
+/*
+ * Formatos, estados y fuentes: acá viven los valores y su orden; el texto sale
+ * de `tipo<X>`, `estado<X>` y `fuente<X>` en las traducciones.
+ */
+const TIPOS = [
+  'STORY',
+  'REEL',
+  'POST',
+  'TIKTOK',
+  'VIDEO',
+  'YOUTUBE_VIDEO',
+  'LIVE',
+  'OTHER',
+] as const
 
-const ESTADOS = {
-  PENDING: 'Pendiente',
-  IN_PRODUCTION: 'En producción',
-  FOR_APPROVAL: 'Para aprobar',
-  APPROVED: 'Aprobada',
-  PUBLISHED: 'Publicada',
-  CANCELLED: 'Cancelada',
-} as const
+const ESTADOS = [
+  'PENDING',
+  'IN_PRODUCTION',
+  'FOR_APPROVAL',
+  'APPROVED',
+  'PUBLISHED',
+  'CANCELLED',
+] as const
 
-const FUENTES = {
-  MANUAL: 'Copiado de la app',
-  SCREENSHOT: 'Captura del influencer',
-  PROVIDER: 'Proveedor de datos',
-} as const
+const FUENTES = ['MANUAL', 'SCREENSHOT', 'PROVIDER'] as const
 
 /**
  * Resultados de la campaña.
@@ -69,6 +70,8 @@ export function ReportingPanel({
   talento: Array<{ candidacyId: string; nombre: string }>
   puedeEditar: boolean
 }) {
+  const t = useTranslations('resultados')
+  const idioma = useLocale()
   const router = useRouter()
   const [pendiente, startTransition] = React.useTransition()
   const [abreEntrega, setAbreEntrega] = React.useState(false)
@@ -78,8 +81,8 @@ export function ReportingPanel({
 
   const sobre = (medicion: { con: number }) =>
     resumen.publicaciones.publicadas === 0
-      ? 'sin publicaciones cargadas'
-      : `sobre ${medicion.con} de ${resumen.publicaciones.publicadas}`
+      ? t('sinPublicaciones')
+      : t('sobreDe', { con: medicion.con, total: resumen.publicaciones.publicadas })
 
   function guardarEntrega(formData: FormData) {
     startTransition(async () => {
@@ -88,8 +91,8 @@ export function ReportingPanel({
         campaignId,
         deliverableId: valor('deliverableId'),
         candidacyId: String(formData.get('candidacyId') ?? ''),
-        type: (valor('type') ?? 'POST') as keyof typeof TIPOS,
-        status: (valor('status') ?? 'PUBLISHED') as keyof typeof ESTADOS,
+        type: (valor('type') ?? 'POST') as (typeof TIPOS)[number],
+        status: (valor('status') ?? 'PUBLISHED') as (typeof ESTADOS)[number],
         description: valor('description'),
         url: valor('url'),
         publishedAt: valor('publishedAt'),
@@ -99,14 +102,14 @@ export function ReportingPanel({
         shares: valor('shares'),
         saves: valor('saves'),
         reach: valor('reach'),
-        metricsSource: (valor('metricsSource') ?? null) as keyof typeof FUENTES | null,
+        metricsSource: (valor('metricsSource') ?? null) as (typeof FUENTES)[number] | null,
       }).catch(() => null)
 
       if (!resultado?.ok) {
-        toast.error(resultado && !resultado.ok ? resultado.message : 'No se pudo guardar la entrega.')
+        toast.error(resultado && !resultado.ok ? resultado.message : t('noSeGuardoEntrega'))
         return
       }
-      toast.success('Entrega guardada.')
+      toast.success(t('entregaGuardada'))
       entregaRef.current?.reset()
       setAbreEntrega(false)
       router.refresh()
@@ -129,10 +132,10 @@ export function ReportingPanel({
       }).catch(() => null)
 
       if (!resultado?.ok) {
-        toast.error(resultado && !resultado.ok ? resultado.message : 'No se pudo crear el link.')
+        toast.error(resultado && !resultado.ok ? resultado.message : t('noSeCreoLink'))
         return
       }
-      toast.success('Link creado. Copiálo y pasáselo al influencer.')
+      toast.success(t('linkCreado'))
       linkRef.current?.reset()
       setAbreLink(false)
       router.refresh()
@@ -142,85 +145,78 @@ export function ReportingPanel({
   function copiar(texto: string) {
     navigator.clipboard
       .writeText(texto)
-      .then(() => toast.success('Link copiado.'))
-      .catch(() => toast.error('No se pudo copiar. Seleccionálo a mano.'))
+      .then(() => toast.success(t('linkCopiado')))
+      .catch(() => toast.error(t('noSeCopio')))
   }
 
   return (
     <div className="space-y-4">
       <StatStrip>
         <Stat
-          label="Publicaciones"
+          label={t('statPublicaciones')}
           value={resumen.publicaciones.publicadas}
-          hint={`${resumen.publicaciones.total} entregas cargadas`}
+          hint={t('entregasCargadas', { cantidad: resumen.publicaciones.total })}
         />
         <Stat
-          label="Visualizaciones"
-          value={resumen.views.con === 0 ? null : formatFollowers(resumen.views.total)}
+          label={t('statViews')}
+          value={resumen.views.con === 0 ? null : formatFollowers(resumen.views.total, idioma)}
           hint={sobre(resumen.views)}
           tone={resumen.views.sin > 0 ? 'warn' : undefined}
         />
         <Stat
-          label="Interacciones"
-          value={resumen.interacciones.con === 0 ? null : formatFollowers(resumen.interacciones.total)}
+          label={t('statInteracciones')}
+          value={resumen.interacciones.con === 0 ? null : formatFollowers(resumen.interacciones.total, idioma)}
           hint={sobre(resumen.interacciones)}
         />
         <Stat
-          label="Tasa de interacción"
+          label={t('statTasa')}
           value={resumen.tasaDeInteraccion === null ? null : `${resumen.tasaDeInteraccion.toFixed(2)}%`}
-          hint={resumen.tasaDeInteraccion === null ? 'faltan datos para calcularla' : 'sobre las que tienen ambas'}
+          hint={resumen.tasaDeInteraccion === null ? t('tasaSinDatos') : t('tasaSobreAmbas')}
         />
         <Stat
-          label="Clics medidos"
+          label={t('statClics')}
           value={resumen.clics.links === 0 ? null : resumen.clics.total}
           tone="good"
           hint={
             resumen.clics.links === 0
-              ? 'sin links medidos'
-              : `${resumen.clics.personas} visitantes · ${resumen.clics.bots} bots descartados`
+              ? t('sinLinksMedidos')
+              : t('clicsAyuda', { personas: resumen.clics.personas, bots: resumen.clics.bots })
           }
         />
       </StatStrip>
 
       {resumen.huecos.length > 0 ? (
         <InfoNote>
-          <p className="font-medium">Lo que todavía nadie cargó</p>
+          <p className="font-medium">{t('huecosTitulo')}</p>
           <ul className="mt-1 list-inside list-disc">
             {resumen.huecos.map((hueco) => (
-              <li key={hueco}>{hueco}</li>
+              <li key={hueco.clave}>{t(hueco.clave, hueco.valores)}</li>
             ))}
           </ul>
-          <p className="mt-1 text-xs">
-            Nada de esto se cuenta como cero. Los totales de arriba son sobre lo que sí está cargado, y el reporte con
-            IA lo va a decir igual.
-          </p>
+          <p className="mt-1 text-xs">{t('huecosCierre')}</p>
         </InfoNote>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Links medidos</CardTitle>
-          <p className="text-xs text-ink-500">
-            El link pasa por nosotros antes de llegar al sitio del cliente, así que el clic es un hecho y no algo que
-            nos cuenten. No identifica personas: se cuenta visitantes distintos por día y la dirección IP nunca se
-            guarda.
-          </p>
+          <CardTitle>{t('linksMedidos')}</CardTitle>
+          <p className="text-xs text-ink-500">{t('linksMedidosBajada')}</p>
         </CardHeader>
         <CardBody className="space-y-3">
           {puedeEditar ? (
             <>
               <Button size="sm" variant="secondary" onClick={() => setAbreLink((v) => !v)}>
                 <Plus className="size-4" aria-hidden="true" />
-                {abreLink ? 'Cerrar' : 'Crear un link'}
+                {abreLink ? t('cerrarFormulario') : t('crearLink')}
               </Button>
               {abreLink ? (
                 <form ref={linkRef} action={crearLink} className="grid gap-3 rounded-lg border border-ink-200 p-4 sm:grid-cols-3">
-                  <Field label="A dónde lleva" htmlFor="destination" required className="sm:col-span-2" hint="La dirección completa, con https://">
+                  <Field label={t('campoDestino')} htmlFor="destination" required className="sm:col-span-2" hint={t('destinoAyuda')}>
                     <Input id="destination" name="destination" placeholder="https://lamarca.com/producto" required />
                   </Field>
-                  <Field label="Para quién" htmlFor="candidacyId" hint="Opcional: para medir por influencer.">
+                  <Field label={t('campoParaQuien')} htmlFor="candidacyId" hint={t('paraQuienAyuda')}>
                     <Select id="candidacyId" name="candidacyId" defaultValue="">
-                      <option value="">Toda la campaña</option>
+                      <option value="">{t('todaLaCampana')}</option>
                       {talento.map((linea) => (
                         <option key={linea.candidacyId} value={linea.candidacyId}>
                           {linea.nombre}
@@ -228,24 +224,24 @@ export function ReportingPanel({
                       ))}
                     </Select>
                   </Field>
-                  <Field label="utm_source" htmlFor="source" required hint="De dónde viene: instagram, tiktok…">
+                  <Field label="utm_source" htmlFor="source" required hint={t('utmSourceAyuda')}>
                     <Input id="source" name="source" defaultValue="instagram" required maxLength={60} />
                   </Field>
-                  <Field label="utm_medium" htmlFor="medium" required hint="Qué tipo de tráfico es.">
+                  <Field label="utm_medium" htmlFor="medium" required hint={t('utmMediumAyuda')}>
                     <Input id="medium" name="medium" defaultValue="influencer" required maxLength={60} />
                   </Field>
-                  <Field label="utm_campaign" htmlFor="campaign" required hint="Cómo se llama esta campaña en la analítica del cliente.">
+                  <Field label="utm_campaign" htmlFor="campaign" required hint={t('utmCampaignAyuda')}>
                     <Input id="campaign" name="campaign" required maxLength={60} />
                   </Field>
-                  <Field label="utm_content" htmlFor="content" hint="Para distinguir dos links de la misma campaña.">
+                  <Field label="utm_content" htmlFor="content" hint={t('utmContentAyuda')}>
                     <Input id="content" name="content" maxLength={60} />
                   </Field>
-                  <Field label="Nombre interno" htmlFor="label" className="sm:col-span-2">
-                    <Input id="label" name="label" placeholder="Historia del 12" maxLength={120} />
+                  <Field label={t('campoNombreInterno')} htmlFor="label" className="sm:col-span-2">
+                    <Input id="label" name="label" placeholder={t('nombreInternoPista')} maxLength={120} />
                   </Field>
                   <div className="sm:col-span-3">
                     <Button type="submit" disabled={pendiente}>
-                      {pendiente ? 'Creando…' : 'Crear el link'}
+                      {pendiente ? t('creando') : t('crearElLink')}
                     </Button>
                   </div>
                 </form>
@@ -254,20 +250,18 @@ export function ReportingPanel({
           ) : null}
 
           {resumen.links.length === 0 ? (
-            <p className="text-sm text-ink-500">
-              Todavía no hay links medidos. Sin ellos no se puede saber cuánta gente fue del posteo al sitio.
-            </p>
+            <p className="text-sm text-ink-500">{t('sinLinks')}</p>
           ) : (
             <TableWrap>
               <Table>
                 <thead>
                   <tr>
-                    <Th>Link</Th>
-                    <Th>Para quién</Th>
-                    <Th className="text-right">Clics</Th>
-                    <Th className="text-right">Visitantes</Th>
-                    <Th>Último</Th>
-                    {puedeEditar ? <Th className="text-right">Acciones</Th> : null}
+                    <Th>{t('colLink')}</Th>
+                    <Th>{t('campoParaQuien')}</Th>
+                    <Th className="text-right">{t('colClics')}</Th>
+                    <Th className="text-right">{t('colVisitantes')}</Th>
+                    <Th>{t('colUltimo')}</Th>
+                    {puedeEditar ? <Th className="text-right">{t('colAcciones')}</Th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -280,22 +274,22 @@ export function ReportingPanel({
                             type="button"
                             onClick={() => copiar(link.url)}
                             className="text-ink-500 hover:text-ink-900"
-                            aria-label="Copiar el link"
+                            aria-label={t('copiarLink')}
                           >
                             <Copy className="size-3.5" aria-hidden="true" />
                           </button>
-                          {link.archived ? <Badge tone="slate">Archivado</Badge> : null}
+                          {link.archived ? <Badge tone="slate">{t('archivado')}</Badge> : null}
                         </span>
                         <p className="mt-0.5 truncate text-xs text-ink-500">
                           {link.label ? `${link.label} · ` : ''}
                           {link.utm.source}/{link.utm.medium}/{link.utm.campaign}
                         </p>
                       </Td>
-                      <Td className="text-sm text-ink-600">{link.quien ?? 'Toda la campaña'}</Td>
+                      <Td className="text-sm text-ink-600">{link.quien ?? t('todaLaCampana')}</Td>
                       <Td className="text-right tabular-nums">{link.clics}</Td>
                       <Td className="text-right tabular-nums">{link.personas}</Td>
                       <Td className="whitespace-nowrap text-xs text-ink-600">
-                        {link.ultimoClic ? formatDate(link.ultimoClic) : '—'}
+                        {link.ultimoClic ? formatDate(link.ultimoClic, undefined, idioma) : '—'}
                       </Td>
                       {puedeEditar ? (
                         <Td className="text-right">
@@ -311,7 +305,7 @@ export function ReportingPanel({
                                   archivado: !link.archived,
                                 }).catch(() => null)
                                 if (!r?.ok) {
-                                  toast.error('No se pudo archivar.')
+                                  toast.error(t('noSeArchivo'))
                                   return
                                 }
                                 router.refresh()
@@ -319,7 +313,7 @@ export function ReportingPanel({
                             }
                           >
                             <Archive className="size-4" aria-hidden="true" />
-                            {link.archived ? 'Reactivar' : 'Archivar'}
+                            {link.archived ? t('reactivar') : t('archivar')}
                           </Button>
                         </Td>
                       ) : null}
@@ -334,29 +328,24 @@ export function ReportingPanel({
 
       <Card>
         <CardHeader>
-          <CardTitle>Publicaciones</CardTitle>
-          <p className="text-xs text-ink-500">
-            Qué publicó cada uno y qué midió. Dejá vacío lo que no sepas: un campo vacío significa «nadie lo cargó», y
-            eso es distinto de cero.
-          </p>
+          <CardTitle>{t('publicaciones')}</CardTitle>
+          <p className="text-xs text-ink-500">{t('publicacionesBajada')}</p>
         </CardHeader>
         <CardBody className="space-y-3">
           {puedeEditar ? (
             <>
               <Button size="sm" variant="secondary" onClick={() => setAbreEntrega((v) => !v)} disabled={talento.length === 0}>
                 <Plus className="size-4" aria-hidden="true" />
-                {abreEntrega ? 'Cerrar' : 'Cargar una publicación'}
+                {abreEntrega ? t('cerrarFormulario') : t('cargarPublicacion')}
               </Button>
               {talento.length === 0 ? (
-                <p className="text-xs text-ink-500">
-                  Primero tiene que haber perfiles confirmados en la campaña.
-                </p>
+                <p className="text-xs text-ink-500">{t('primeroConfirmados')}</p>
               ) : null}
 
               {abreEntrega ? (
                 <form ref={entregaRef} action={guardarEntrega} className="grid gap-3 rounded-lg border border-ink-200 p-4 sm:grid-cols-4">
                   <input type="hidden" name="deliverableId" value="" />
-                  <Field label="Quién" htmlFor="candidacyId2" required>
+                  <Field label={t('campoQuien')} htmlFor="candidacyId2" required>
                     <Select id="candidacyId2" name="candidacyId" required>
                       {talento.map((linea) => (
                         <option key={linea.candidacyId} value={linea.candidacyId}>
@@ -365,66 +354,66 @@ export function ReportingPanel({
                       ))}
                     </Select>
                   </Field>
-                  <Field label="Formato" htmlFor="type" required>
+                  <Field label={t('campoFormato')} htmlFor="type" required>
                     <Select id="type" name="type" defaultValue="REEL" required>
-                      {Object.entries(TIPOS).map(([valor, etiqueta]) => (
+                      {TIPOS.map((valor) => (
                         <option key={valor} value={valor}>
-                          {etiqueta}
+                          {t(`tipo${valor}`)}
                         </option>
                       ))}
                     </Select>
                   </Field>
-                  <Field label="Estado" htmlFor="status" required>
+                  <Field label={t('campoEstado')} htmlFor="status" required>
                     <Select id="status" name="status" defaultValue="PUBLISHED" required>
-                      {Object.entries(ESTADOS).map(([valor, etiqueta]) => (
+                      {ESTADOS.map((valor) => (
                         <option key={valor} value={valor}>
-                          {etiqueta}
+                          {t(`estado${valor}`)}
                         </option>
                       ))}
                     </Select>
                   </Field>
-                  <Field label="Cuándo se publicó" htmlFor="publishedAt">
+                  <Field label={t('campoCuando')} htmlFor="publishedAt">
                     <Input id="publishedAt" name="publishedAt" type="date" />
                   </Field>
-                  <Field label="Link de la publicación" htmlFor="url" className="sm:col-span-4">
+                  <Field label={t('campoLinkPublicacion')} htmlFor="url" className="sm:col-span-4">
                     <Input id="url" name="url" placeholder="https://www.instagram.com/reel/…" maxLength={600} />
                   </Field>
 
-                  <Field label="Visualizaciones" htmlFor="views">
+                  <Field label={t('campoViews')} htmlFor="views">
                     <Input id="views" name="views" inputMode="numeric" />
                   </Field>
-                  <Field label="Alcance" htmlFor="reach">
+                  <Field label={t('campoAlcance')} htmlFor="reach">
                     <Input id="reach" name="reach" inputMode="numeric" />
                   </Field>
-                  <Field label="Me gusta" htmlFor="likes">
+                  <Field label={t('campoMeGusta')} htmlFor="likes">
                     <Input id="likes" name="likes" inputMode="numeric" />
                   </Field>
-                  <Field label="Comentarios" htmlFor="comments">
+                  <Field label={t('campoComentarios')} htmlFor="comments">
                     <Input id="comments" name="comments" inputMode="numeric" />
                   </Field>
-                  <Field label="Compartidos" htmlFor="shares">
+                  <Field label={t('campoCompartidos')} htmlFor="shares">
                     <Input id="shares" name="shares" inputMode="numeric" />
                   </Field>
-                  <Field label="Guardados" htmlFor="saves">
+                  <Field label={t('campoGuardados')} htmlFor="saves">
                     <Input id="saves" name="saves" inputMode="numeric" />
                   </Field>
                   <Field
-                    label="De dónde salieron"
+                    label={t('campoFuente')}
                     htmlFor="metricsSource"
                     className="sm:col-span-2"
-                    hint="Obligatorio si cargás algún número: en tres meses nadie se acuerda."
+                    hint={t('fuenteAyuda')}
                   >
                     <Select id="metricsSource" name="metricsSource" defaultValue="MANUAL">
-                      {Object.entries(FUENTES).map(([valor, etiqueta]) => (
+                      {FUENTES.map((valor) => (
                         <option key={valor} value={valor}>
-                          {etiqueta}
+                          {t(`fuente${valor}`)}
                         </option>
                       ))}
                     </Select>
                   </Field>
                   <div className="sm:col-span-4">
                     <Button type="submit" disabled={pendiente}>
-                      {pendiente ? 'Guardando…' : 'Guardar la publicación'}
+                      {pendiente ? t('guardando') : t('guardarPublicacion')}
                     </Button>
                   </div>
                 </form>
@@ -433,22 +422,20 @@ export function ReportingPanel({
           ) : null}
 
           {resumen.entregas.length === 0 ? (
-            <p className="text-sm text-ink-500">
-              Todavía no se cargó ninguna publicación. Hasta que las haya, no hay resultados que reportar.
-            </p>
+            <p className="text-sm text-ink-500">{t('sinEntregas')}</p>
           ) : (
             <TableWrap>
               <Table>
                 <thead>
                   <tr>
-                    <Th>Quién</Th>
-                    <Th>Formato</Th>
-                    <Th>Estado</Th>
-                    <Th className="text-right">Visualiz.</Th>
-                    <Th className="text-right">Interacciones</Th>
-                    <Th>Fuente</Th>
-                    <Th>Link</Th>
-                    {puedeEditar ? <Th className="text-right">Acciones</Th> : null}
+                    <Th>{t('colQuien')}</Th>
+                    <Th>{t('colFormato')}</Th>
+                    <Th>{t('colEstado')}</Th>
+                    <Th className="text-right">{t('colViews')}</Th>
+                    <Th className="text-right">{t('colInteracciones')}</Th>
+                    <Th>{t('colFuente')}</Th>
+                    <Th>{t('colLink')}</Th>
+                    {puedeEditar ? <Th className="text-right">{t('colAcciones')}</Th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -466,28 +453,28 @@ export function ReportingPanel({
                     return (
                       <Tr key={entrega.id}>
                         <Td className="font-medium text-ink-900">{entrega.quien}</Td>
-                        <Td className="text-sm text-ink-600">{TIPOS[entrega.type]}</Td>
+                        <Td className="text-sm text-ink-600">{t(`tipo${entrega.type}`)}</Td>
                         <Td>
                           <Badge tone={entrega.status === 'PUBLISHED' ? 'emerald' : 'slate'}>
-                            {ESTADOS[entrega.status]}
+                            {t(`estado${entrega.status}`)}
                           </Badge>
                         </Td>
                         <Td className="text-right tabular-nums">
                           {entrega.metricas.views === null ? (
-                            <span className="text-ink-400">sin cargar</span>
+                            <span className="text-ink-400">{t('sinCargar')}</span>
                           ) : (
-                            formatFollowers(entrega.metricas.views)
+                            formatFollowers(entrega.metricas.views, idioma)
                           )}
                         </Td>
                         <Td className="text-right tabular-nums">
                           {interacciones === null ? (
-                            <span className="text-ink-400">sin cargar</span>
+                            <span className="text-ink-400">{t('sinCargar')}</span>
                           ) : (
-                            formatFollowers(interacciones)
+                            formatFollowers(interacciones, idioma)
                           )}
                         </Td>
                         <Td className="text-xs text-ink-600">
-                          {entrega.metricsSource ? FUENTES[entrega.metricsSource] : '—'}
+                          {entrega.metricsSource ? t(`fuente${entrega.metricsSource}`) : '—'}
                         </Td>
                         <Td className="text-xs">
                           {entrega.url ? (
@@ -498,18 +485,18 @@ export function ReportingPanel({
                               className="inline-flex items-center gap-1 text-brand-700 underline underline-offset-4"
                             >
                               <Link2 className="size-3.5" aria-hidden="true" />
-                              ver
+                              {t('ver')}
                             </a>
                           ) : (
-                            <span className="text-ink-400">sin link</span>
+                            <span className="text-ink-400">{t('sinLink')}</span>
                           )}
                         </Td>
                         {puedeEditar ? (
                           <Td className="text-right">
                             <ConfirmButton
-                              title="Borrar la publicación"
-                              description="Se pierden las métricas cargadas para esta entrega. Si la publicación se dio de baja, marcala como cancelada en vez de borrarla."
-                              confirmLabel="Borrar"
+                              title={t('borrarTitulo')}
+                              description={t('borrarBajada')}
+                              confirmLabel={t('borrar')}
                               pending={pendiente}
                               onConfirm={() =>
                                 startTransition(async () => {
@@ -518,17 +505,17 @@ export function ReportingPanel({
                                     campaignId,
                                   }).catch(() => null)
                                   if (!r?.ok) {
-                                    toast.error('No se pudo borrar.')
+                                    toast.error(t('noSeBorro'))
                                     return
                                   }
-                                  toast.success('Publicación borrada.')
+                                  toast.success(t('publicacionBorrada'))
                                   router.refresh()
                                 })
                               }
                             >
                               <Button size="sm" variant="ghost" disabled={pendiente}>
                                 <Trash2 className="size-4" aria-hidden="true" />
-                                <span className="sr-only">Borrar</span>
+                                <span className="sr-only">{t('borrar')}</span>
                               </Button>
                             </ConfirmButton>
                           </Td>
@@ -543,10 +530,7 @@ export function ReportingPanel({
         </CardBody>
       </Card>
 
-      <InfoNote>
-        El reporte escrito con IA vive en <strong>Análisis IA</strong> y ahora usa todo esto: los clics medidos, las
-        métricas cargadas y, sobre todo, lo que falta. No calcula conversiones porque nadie las cargó todavía.
-      </InfoNote>
+      <InfoNote>{t.rich('avisoReporteIa', { b: (texto) => <strong>{texto}</strong> })}</InfoNote>
     </div>
   )
 }

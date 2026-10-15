@@ -15,21 +15,23 @@ describe('calcularCuentas', () => {
     expect(cuentas.inversionEnTalento).toBe(1500)
     // El que no tiene número NO cuenta como cero: cuenta como pendiente.
     expect(cuentas.talentosSinNumero).toBe(1)
-    expect(cuentas.faltaParaCotizar).toContain('1 perfil sin cachet acordado')
+    expect(cuentas.faltaParaCotizar).toContainEqual({ clave: 'faltaCachet', valores: { cantidad: 1 } })
   })
 
   it('el fee por porcentaje se calcula sobre lo que hay, y lo aclara', () => {
     const cuentas = calcularCuentas(TERMINOS, [{ monto: 1000 }, { monto: null }])
     expect(cuentas.feeDeAgencia).toBe(200)
-    expect(cuentas.explicacionDelFee).toContain('20%')
-    expect(cuentas.explicacionDelFee).toContain('que ya tienen número')
+    expect(cuentas.explicacionDelFee).toEqual({
+      clave: 'feePorcentajeParcial',
+      valores: { pct: 20, conNumero: 1 },
+    })
   })
 
   it('sin porcentaje definido no inventa un fee de cero', () => {
     const cuentas = calcularCuentas({ ...TERMINOS, feePercent: null }, [{ monto: 1000 }])
     expect(cuentas.feeDeAgencia).toBeNull()
     expect(cuentas.totalAlCliente).toBeNull()
-    expect(cuentas.faltaParaCotizar).toContain('el porcentaje de la agencia')
+    expect(cuentas.faltaParaCotizar).toContainEqual({ clave: 'faltaPorcentaje' })
   })
 
   it('el monto fijo no depende de la inversión', () => {

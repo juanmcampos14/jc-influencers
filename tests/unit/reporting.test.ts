@@ -13,7 +13,7 @@ const base = (): ResumenDeResultados => ({
   interacciones: { total: 450, con: 2, sin: 2 },
   tasaDeInteraccion: 4.5,
   clics: { total: 120, personas: 90, bots: 30, links: 1 },
-  huecos: ['2 de 4 publicaciones no tienen visualizaciones cargadas.'],
+  huecos: [{ clave: 'huecoSinViews', valores: { sin: 2, de: 4 } }],
   entregas: [],
   links: [],
 })

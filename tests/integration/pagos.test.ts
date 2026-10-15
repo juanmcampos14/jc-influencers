@@ -93,7 +93,7 @@ describe('Pagos de una campaña', () => {
     const plan = await getPlan(agencia, campaignId)
     expect(plan.cuentas.feeDeAgencia).toBeNull()
     expect(plan.cuentas.totalAlCliente).toBeNull()
-    expect(plan.cuentas.faltaParaCotizar).toContain('el porcentaje de la agencia')
+    expect(plan.cuentas.faltaParaCotizar).toContainEqual({ clave: 'faltaPorcentaje' })
   })
 
   it('los perfiles que todavía no están confirmados no cuestan plata', async () => {

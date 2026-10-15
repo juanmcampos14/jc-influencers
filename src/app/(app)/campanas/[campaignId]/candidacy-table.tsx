@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -39,18 +40,19 @@ type Permissions = {
   canRunScouting: boolean
 }
 
+/* Vive fuera del componente: guarda la clave y el texto se resuelve al pintar. */
 const ALL_COLUMNS = [
-  { key: 'creador', label: 'Creador' },
-  { key: 'cluster', label: 'Cluster' },
-  { key: 'perfil', label: 'Perfil' },
-  { key: 'seguidores', label: 'Seguidores' },
-  { key: 'er', label: 'ER' },
-  { key: 'fit', label: 'Fit' },
-  { key: 'estado', label: 'Estado' },
-  { key: 'aprobacion', label: 'Aprobación' },
-  { key: 'entregables', label: 'Entregables' },
-  { key: 'presupuesto', label: 'Presupuesto' },
-  { key: 'visible', label: 'Visible al cliente' },
+  { key: 'creador', clave: 'colCreador' },
+  { key: 'cluster', clave: 'colCluster' },
+  { key: 'perfil', clave: 'colPerfil' },
+  { key: 'seguidores', clave: 'colSeguidores' },
+  { key: 'er', clave: 'colEr' },
+  { key: 'fit', clave: 'colFit' },
+  { key: 'estado', clave: 'colEstado' },
+  { key: 'aprobacion', clave: 'colAprobacion' },
+  { key: 'entregables', clave: 'colEntregables' },
+  { key: 'presupuesto', clave: 'colPresupuesto' },
+  { key: 'visible', clave: 'colVisible' },
 ] as const
 
 type ColumnKey = (typeof ALL_COLUMNS)[number]['key']
@@ -81,6 +83,8 @@ export function CandidacyTable({
   permissions: Permissions
   filters: { estado: string; q: string }
 }) {
+  const t = useTranslations('candidaturas')
+  const idioma = useLocale()
   const router = useRouter()
   const params = useSearchParams()
   const [selected, setSelected] = React.useState<Set<string>>(new Set())
@@ -156,7 +160,11 @@ export function CandidacyTable({
         toast.error(result.message)
         return
       }
-      toast.success(value ? `${result.data.count} perfiles ahora los ve el cliente.` : `${result.data.count} perfiles ocultos.`)
+      toast.success(
+        value
+          ? t('ahoraLosVe', { cantidad: result.data.count })
+          : t('ahoraOcultos', { cantidad: result.data.count }),
+      )
       setSelected(new Set())
       router.refresh()
     })
@@ -176,8 +184,8 @@ export function CandidacyTable({
       // Los que no cambiaron se dicen: ya estaban así, o alguien los movió.
       toast.success(
         unchanged > 0
-          ? `${changed} pasaron a ${etiqueta}. ${unchanged} quedaron como estaban.`
-          : `${changed} pasaron a ${etiqueta}.`,
+          ? t('lotePasaronConResto', { cambiados: changed, estado: etiqueta, sinCambiar: unchanged })
+          : t('lotePasaron', { cambiados: changed, estado: etiqueta }),
       )
       setSelected(new Set())
       setEstadoEnLote('')
@@ -195,8 +203,8 @@ export function CandidacyTable({
       }
       toast.success(
         agregar
-          ? `${resultado.data.count} agregados a la shortlist.`
-          : `${resultado.data.count} sacados de la shortlist.`,
+          ? t('loteAShortlist', { cantidad: resultado.data.count })
+          : t('loteFueraShortlist', { cantidad: resultado.data.count }),
       )
       setSelected(new Set())
       router.refresh()
@@ -217,9 +225,9 @@ export function CandidacyTable({
         return
       }
       const etiqueta = STATUS_LABEL.get(statusKey) ?? statusKey
-      toast.success(`Estado: ${etiqueta}.`, {
+      toast.success(t('estadoCambiado', { estado: etiqueta }), {
         action: {
-          label: 'Deshacer',
+          label: t('deshacer'),
           onClick: () => changeStatus(candidacyId, anterior, statusKey),
         },
       })
@@ -233,16 +241,16 @@ export function CandidacyTable({
         <form onSubmit={applyFilters} className="flex flex-wrap items-end gap-3" role="search">
           <div className="w-56">
             <label htmlFor="q" className="mb-1 block text-xs font-medium text-ink-600">
-              Buscar creador
+              {t('buscarCreador')}
             </label>
-            <Input id="q" name="q" defaultValue={filters.q} placeholder="Nombre o handle" />
+            <Input id="q" name="q" defaultValue={filters.q} placeholder={t('buscarPista')} />
           </div>
           <div className="w-52">
             <label htmlFor="estado" className="mb-1 block text-xs font-medium text-ink-600">
-              Estado
+              {t('colEstado')}
             </label>
             <Select id="estado" name="estado" defaultValue={filters.estado}>
-              <option value="">Todos</option>
+              <option value="">{t('todos')}</option>
               {CANDIDACY_STATUS_SEED.map((status) => (
                 <option key={status.key} value={status.key}>
                   {status.label}
@@ -251,19 +259,19 @@ export function CandidacyTable({
             </Select>
           </div>
           <Button type="submit" variant="secondary">
-            Filtrar
+            {t('filtrar')}
           </Button>
         </form>
 
         <details className="relative">
           <summary className="cursor-pointer list-none rounded-lg border border-ink-300 bg-surface px-3 py-2 text-sm text-ink-700 hover:bg-ink-50">
-            Columnas
+            {t('columnas')}
           </summary>
           <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-ink-200 bg-surface p-2 shadow-lg">
             {ALL_COLUMNS.map((column) => (
               <label key={column.key} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-ink-50">
                 <Checkbox checked={shows(column.key)} onChange={() => toggleColumn(column.key)} />
-                {column.label}
+                {t(column.clave)}
               </label>
             ))}
           </div>
@@ -279,14 +287,14 @@ export function CandidacyTable({
             * scouting y volver a elegir el cliente y la campaña ahí.
             */
           <EmptyState
-            title="Todavía no hay perfiles en esta campaña"
-            description="Buscá creadores nuevos con el scouting, sumalos desde la base que ya tenés, o importá un Excel."
+            title={t('vacioTitulo')}
+            description={t('vacioBajada')}
             action={
               permissions.canRunScouting ? (
                 <Button asChild>
                   <Link href={`/influencers/buscar?cliente=${clientId}&campana=${campaignId}`}>
                     <Radar className="size-4" aria-hidden="true" />
-                    Buscar perfiles para esta campaña
+                    {t('buscarParaCampana')}
                   </Link>
                 </Button>
               ) : null
@@ -301,8 +309,8 @@ export function CandidacyTable({
                     {permissions.canManage ? (
                       <Th className="w-10">
                         <Checkbox
-                          aria-label={`Elegir los ${data.items.length} de esta página`}
-                          title={`Elegir los ${data.items.length} de esta página`}
+                          aria-label={t('elegirLosDeLaPagina', { cantidad: data.items.length })}
+                          title={t('elegirLosDeLaPagina', { cantidad: data.items.length })}
                           checked={selected.size === data.items.length && data.items.length > 0}
                           onChange={(event) =>
                             setSelected(event.target.checked ? new Set(data.items.map((item) => item.id)) : new Set())
@@ -310,18 +318,20 @@ export function CandidacyTable({
                         />
                       </Th>
                     ) : null}
-                    {shows('creador') ? <Th className={columnaFija}>Creador</Th> : null}
-                    {shows('cluster') ? <Th>Cluster</Th> : null}
-                    {shows('perfil') ? <Th>Perfil</Th> : null}
-                    {shows('seguidores') ? <Th className="text-right">Seguidores</Th> : null}
-                    {shows('er') ? <Th className="text-right">ER</Th> : null}
-                    {shows('fit') ? <Th>Fit</Th> : null}
-                    {shows('estado') ? <Th>Estado</Th> : null}
-                    {shows('aprobacion') ? <Th>Aprobación</Th> : null}
-                    {shows('entregables') ? <Th>Entregables</Th> : null}
-                    {shows('presupuesto') && permissions.canSeeBudget ? <Th className="text-right">Presupuesto</Th> : null}
-                    {shows('visible') ? <Th>Ve el cliente</Th> : null}
-                    <Th className="w-20"><span className="sr-only">Acciones</span></Th>
+                    {shows('creador') ? <Th className={columnaFija}>{t('colCreador')}</Th> : null}
+                    {shows('cluster') ? <Th>{t('colCluster')}</Th> : null}
+                    {shows('perfil') ? <Th>{t('colPerfil')}</Th> : null}
+                    {shows('seguidores') ? <Th className="text-right">{t('colSeguidores')}</Th> : null}
+                    {shows('er') ? <Th className="text-right">{t('colEr')}</Th> : null}
+                    {shows('fit') ? <Th>{t('colFit')}</Th> : null}
+                    {shows('estado') ? <Th>{t('colEstado')}</Th> : null}
+                    {shows('aprobacion') ? <Th>{t('colAprobacion')}</Th> : null}
+                    {shows('entregables') ? <Th>{t('colEntregables')}</Th> : null}
+                    {shows('presupuesto') && permissions.canSeeBudget ? (
+                      <Th className="text-right">{t('colPresupuesto')}</Th>
+                    ) : null}
+                    {shows('visible') ? <Th>{t('colVeElCliente')}</Th> : null}
+                    <Th className="w-20"><span className="sr-only">{t('colAcciones')}</span></Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -332,7 +342,7 @@ export function CandidacyTable({
                         {permissions.canManage ? (
                           <Td>
                             <Checkbox
-                              aria-label={`Seleccionar ${item.influencer.displayName}`}
+                              aria-label={t('seleccionarUno', { nombre: item.influencer.displayName })}
                               checked={selected.has(item.id)}
                               onChange={(event) => {
                                 setSelected((current) => {
@@ -382,7 +392,7 @@ export function CandidacyTable({
                                 {profile.handle ? `@${profile.handle}` : profile.platform}
                               </ExternalLink>
                             ) : (
-                              <span className="text-ink-400">sin perfil</span>
+                              <span className="text-ink-400">{t('sinPerfil')}</span>
                             )}
                           </Td>
                         ) : null}
@@ -399,13 +409,15 @@ export function CandidacyTable({
                                */
                               <span
                                 className="block text-[11px] font-medium text-amber-700"
-                                title={`Valor original: ${profile.followersRaw ?? ''}`}
+                                title={t('valorOriginal', { valor: profile.followersRaw ?? '' })}
                               >
-                                sin normalizar
+                                {t('sinNormalizar')}
                               </span>
                             ) : null}
                             {profile?.stale ? (
-                              <span className="block text-[11px] font-medium text-amber-700">sin actualizar</span>
+                              <span className="block text-[11px] font-medium text-amber-700">
+                                {t('sinActualizar')}
+                              </span>
                             ) : null}
                           </Td>
                         ) : null}
@@ -421,7 +433,7 @@ export function CandidacyTable({
                           <Td>
                             {permissions.canManage ? (
                               <Select
-                                aria-label={`Estado de ${item.influencer.displayName}`}
+                                aria-label={t('estadoDe', { nombre: item.influencer.displayName })}
                                 value={optimista[item.id] ?? item.statusKey}
                                 onChange={(event) =>
                                   changeStatus(item.id, event.target.value, optimista[item.id] ?? item.statusKey)
@@ -452,10 +464,10 @@ export function CandidacyTable({
                           <Td className="text-xs text-ink-600">
                             {item.deliverablesSummary ??
                               ([
-                                item.counts.stories ? `${item.counts.stories} stories` : null,
-                                item.counts.reels ? `${item.counts.reels} reels` : null,
-                                item.counts.posts ? `${item.counts.posts} posts` : null,
-                                item.counts.tiktoks ? `${item.counts.tiktoks} tiktoks` : null,
+                                item.counts.stories ? t('contStories', { cantidad: item.counts.stories }) : null,
+                                item.counts.reels ? t('contReels', { cantidad: item.counts.reels }) : null,
+                                item.counts.posts ? t('contPosts', { cantidad: item.counts.posts }) : null,
+                                item.counts.tiktoks ? t('contTiktoks', { cantidad: item.counts.tiktoks }) : null,
                               ]
                                 .filter(Boolean)
                                 .join(' · ') ||
@@ -464,17 +476,25 @@ export function CandidacyTable({
                         ) : null}
                         {shows('presupuesto') && permissions.canSeeBudget ? (
                           <Td className="text-right tabular-nums">
-                            {formatMoney(item.budget?.negotiated ?? item.budget?.requested, item.budget?.currency ?? currency)}
+                            {formatMoney(
+                              item.budget?.negotiated ?? item.budget?.requested,
+                              item.budget?.currency ?? currency,
+                              idioma,
+                            )}
                           </Td>
                         ) : null}
                         {shows('visible') ? (
                           <Td>
-                            {item.clientVisible ? <Badge tone="emerald">Sí</Badge> : <Badge tone="slate">No</Badge>}
+                            {item.clientVisible ? (
+                              <Badge tone="emerald">{t('si')}</Badge>
+                            ) : (
+                              <Badge tone="slate">{t('no')}</Badge>
+                            )}
                           </Td>
                         ) : null}
                         <Td>
                           <Button size="sm" variant="ghost" asChild>
-                            <Link href={`/influencers/${item.influencer.id}`}>Ver perfil</Link>
+                            <Link href={`/influencers/${item.influencer.id}`}>{t('verPerfil')}</Link>
                           </Button>
                         </Td>
                       </Tr>
@@ -489,7 +509,7 @@ export function CandidacyTable({
               page={data.page}
               pageCount={data.pageCount}
               total={data.total}
-              unidad="perfiles"
+              unidad={t('unidad')}
             />
           </>
         )}
@@ -502,16 +522,16 @@ export function CandidacyTable({
          */
         <div className="sticky bottom-4 z-30 mx-auto flex w-fit max-w-full flex-wrap items-center gap-2 rounded-xl border border-ink-300 bg-surface px-4 py-3 shadow-lg">
           <span className="text-sm font-medium text-ink-900">
-            {selected.size} {selected.size === 1 ? 'elegido' : 'elegidos'}
+            {t('elegidos', { cantidad: selected.size })}
           </span>
 
           <Select
-            aria-label="Pasar a estado"
+            aria-label={t('pasarAEstado')}
             value={estadoEnLote}
             onChange={(event) => setEstadoEnLote(event.target.value)}
             className="h-9 w-44"
           >
-            <option value="">Pasar a estado…</option>
+            <option value="">{t('pasarAEstadoVacio')}</option>
             {CANDIDACY_STATUS_SEED.map((status) => (
               <option key={status.key} value={status.key}>
                 {status.label}
@@ -519,29 +539,29 @@ export function CandidacyTable({
             ))}
           </Select>
           <Button size="sm" onClick={cambiarEstadoEnLote} disabled={pending || !estadoEnLote}>
-            Aplicar
+            {t('aplicar')}
           </Button>
 
           <span aria-hidden="true" className="h-6 w-px bg-ink-200" />
 
           <Button size="sm" variant="secondary" onClick={() => enShortlist(true)} disabled={pending}>
-            A shortlist
+            {t('aShortlist')}
           </Button>
           <Button size="sm" variant="secondary" onClick={() => enShortlist(false)} disabled={pending}>
-            Sacar de shortlist
+            {t('sacarDeShortlist')}
           </Button>
 
           <span aria-hidden="true" className="h-6 w-px bg-ink-200" />
 
           <Button size="sm" variant="secondary" onClick={() => setVisibility(true)} disabled={pending}>
-            Mostrar al cliente
+            {t('mostrarAlCliente')}
           </Button>
           <Button size="sm" variant="secondary" onClick={() => setVisibility(false)} disabled={pending}>
-            Ocultar
+            {t('ocultar')}
           </Button>
 
           <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())} disabled={pending}>
-            Quitar selección
+            {t('quitarSeleccion')}
           </Button>
         </div>
       ) : null}
@@ -578,6 +598,8 @@ function CandidacyDialog({
   permissions: Permissions
   onClose: () => void
 }) {
+  const t = useTranslations('candidaturas')
+  const idioma = useLocale()
   const router = useRouter()
   const [pending, startTransition] = React.useTransition()
   const [errors, setErrors] = React.useState<Record<string, string[]>>({})
@@ -591,7 +613,7 @@ function CandidacyDialog({
         return
       }
       if (result.data.status === 'FAILED') {
-        toast.error(result.data.errorMessage ?? 'No se pudo generar el análisis.')
+        toast.error(result.data.errorMessage ?? t('noSeGeneroAnalisis'))
       }
       setInsight(result.data)
     })
@@ -643,7 +665,7 @@ function CandidacyDialog({
         toast.error(result.message)
         return
       }
-      toast.success('Candidatura actualizada.')
+      toast.success(t('actualizada'))
       onClose()
       router.refresh()
     })
@@ -657,8 +679,12 @@ function CandidacyDialog({
         title={candidacy.influencer.displayName}
         description={
           profile
-            ? `${profile.platform} · ${profile.handle ? `@${profile.handle}` : ''} · ${formatFollowers(profile.followers)} seguidores`
-            : 'Sin perfil social cargado'
+            ? t('cabeceraPerfil', {
+                red: profile.platform,
+                handle: profile.handle ? `@${profile.handle}` : '—',
+                seguidores: formatFollowers(profile.followers, idioma),
+              })
+            : t('sinPerfilSocial')
         }
         className="w-[min(52rem,calc(100vw-2rem))]"
       >
@@ -666,10 +692,8 @@ function CandidacyDialog({
           <div className="mb-4 rounded-lg border border-ink-200 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-sm font-medium text-ink-800">Análisis del perfil contra el brief</p>
-                <p className="text-xs text-ink-500">
-                  Usa las métricas cargadas y el brief de la campaña. Si falta un dato, lo dice.
-                </p>
+                <p className="text-sm font-medium text-ink-800">{t('analisisTitulo')}</p>
+                <p className="text-xs text-ink-500">{t('analisisBajada')}</p>
               </div>
               <Button
                 type="button"
@@ -678,13 +702,11 @@ function CandidacyDialog({
                 onClick={analyze}
                 disabled={pending || !permissions.aiConfigured}
               >
-                {pending ? 'Analizando…' : 'Analizar con IA'}
+                {pending ? t('analizando') : t('analizarConIa')}
               </Button>
             </div>
             {!permissions.aiConfigured ? (
-              <p className="mt-2 text-xs text-amber-800">
-                Falta configurar ANTHROPIC_API_KEY para habilitar esta función.
-              </p>
+              <p className="mt-2 text-xs text-amber-800">{t('faltaClaveIa')}</p>
             ) : null}
             {insight ? (
               <div className="mt-3">
@@ -696,9 +718,9 @@ function CandidacyDialog({
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Cluster" htmlFor="clusterId">
+            <Field label={t('campoCluster')} htmlFor="clusterId">
               <Select id="clusterId" name="clusterId" defaultValue={candidacy.clusterId ?? ''}>
-                <option value="">Sin cluster</option>
+                <option value="">{t('sinCluster')}</option>
                 {clusters.map((cluster) => (
                   <option key={cluster.id} value={cluster.id}>
                     {cluster.label}
@@ -706,70 +728,72 @@ function CandidacyDialog({
                 ))}
               </Select>
             </Field>
-            <Field label="Orden" htmlFor="rank">
+            <Field label={t('campoOrden')} htmlFor="rank">
               <Input id="rank" name="rank" type="number" min={0} defaultValue={candidacy.rank ?? ''} />
             </Field>
-            <Field label="Fit (1 a 5)" htmlFor="fitScore">
+            <Field label={t('campoFit')} htmlFor="fitScore">
               <Input id="fitScore" name="fitScore" type="number" min={1} max={5} defaultValue={candidacy.fitScore ?? ''} />
             </Field>
           </div>
 
-          <Field label="Justificación de la agencia" htmlFor="agencyRationale" hint="La ve el cliente.">
+          <Field label={t('campoJustificacion')} htmlFor="agencyRationale" hint={t('laVeElCliente')}>
             <Textarea id="agencyRationale" name="agencyRationale" defaultValue={candidacy.agencyRationale ?? ''} />
           </Field>
-          <Field label="Idea de contenido" htmlFor="contentIdea" hint="La ve el cliente.">
+          <Field label={t('campoIdea')} htmlFor="contentIdea" hint={t('laVeElCliente')}>
             <Textarea id="contentIdea" name="contentIdea" defaultValue={candidacy.contentIdea ?? ''} />
           </Field>
-          <Field label="Entregables" htmlFor="deliverablesSummary">
+          <Field label={t('campoEntregables')} htmlFor="deliverablesSummary">
             <Input id="deliverablesSummary" name="deliverablesSummary" defaultValue={candidacy.deliverablesSummary ?? ''} />
           </Field>
 
           <fieldset className="grid gap-3 rounded-lg border border-ink-200 p-3 sm:grid-cols-5">
-            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-500">Cantidades</legend>
+            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-500">
+              {t('cantidades')}
+            </legend>
             {(
               [
-                ['storiesCount', 'Stories', candidacy.counts.stories],
-                ['reelsCount', 'Reels', candidacy.counts.reels],
-                ['postsCount', 'Posts', candidacy.counts.posts],
-                ['tiktoksCount', 'TikToks', candidacy.counts.tiktoks],
-                ['videosCount', 'Videos', candidacy.counts.videos],
+                ['storiesCount', 'cantStories', candidacy.counts.stories],
+                ['reelsCount', 'cantReels', candidacy.counts.reels],
+                ['postsCount', 'cantPosts', candidacy.counts.posts],
+                ['tiktoksCount', 'cantTiktoks', candidacy.counts.tiktoks],
+                ['videosCount', 'cantVideos', candidacy.counts.videos],
               ] as const
-            ).map(([name, label, value]) => (
-              <Field key={name} label={label} htmlFor={name}>
+            ).map(([name, clave, value]) => (
+              <Field key={name} label={t(clave)} htmlFor={name}>
                 <Input id={name} name={name} type="number" min={0} defaultValue={value} />
               </Field>
             ))}
           </fieldset>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Disponibilidad" htmlFor="availability">
+            <Field label={t('campoDisponibilidad')} htmlFor="availability">
               <Select id="availability" name="availability" defaultValue={candidacy.availability}>
-                <option value="UNKNOWN">Sin confirmar</option>
-                <option value="AVAILABLE">Disponible</option>
-                <option value="CONDITIONAL">Condicional</option>
-                <option value="UNAVAILABLE">No disponible</option>
+                <option value="UNKNOWN">{t('dispUNKNOWN')}</option>
+                <option value="AVAILABLE">{t('dispAVAILABLE')}</option>
+                <option value="CONDITIONAL">{t('dispCONDITIONAL')}</option>
+                <option value="UNAVAILABLE">{t('dispUNAVAILABLE')}</option>
               </Select>
             </Field>
-            <Field label="Contacto" htmlFor="contactStatus">
+            <Field label={t('campoContacto')} htmlFor="contactStatus">
               <Select id="contactStatus" name="contactStatus" defaultValue={candidacy.contactStatus}>
-                <option value="NOT_CONTACTED">Sin contactar</option>
-                <option value="CONTACTED">Contactado</option>
-                <option value="RESPONDED">Respondió</option>
-                <option value="NO_RESPONSE">Sin respuesta</option>
+                <option value="NOT_CONTACTED">{t('contactoNOT_CONTACTED')}</option>
+                <option value="CONTACTED">{t('contactoCONTACTED')}</option>
+                <option value="RESPONDED">{t('contactoRESPONDED')}</option>
+                <option value="NO_RESPONSE">{t('contactoNO_RESPONSE')}</option>
               </Select>
             </Field>
-            <Field label="Negociación" htmlFor="negotiationStatus">
+            <Field label={t('campoNegociacion')} htmlFor="negotiationStatus">
               <Select id="negotiationStatus" name="negotiationStatus" defaultValue={candidacy.negotiationStatus}>
-                <option value="NOT_STARTED">No arrancó</option>
-                <option value="IN_PROGRESS">En curso</option>
-                <option value="AGREED">Acordado</option>
-                <option value="ON_HOLD">En pausa</option>
-                <option value="DECLINED">Declinó</option>
+                <option value="NOT_STARTED">{t('negNOT_STARTED')}</option>
+                <option value="IN_PROGRESS">{t('negIN_PROGRESS')}</option>
+                <option value="AGREED">{t('negAGREED')}</option>
+                <option value="ON_HOLD">{t('negON_HOLD')}</option>
+                <option value="DECLINED">{t('negDECLINED')}</option>
               </Select>
             </Field>
-            <Field label="Responsable" htmlFor="ownerUserId" errors={errors.ownerUserId}>
+            <Field label={t('campoResponsable')} htmlFor="ownerUserId" errors={errors.ownerUserId}>
               <Select id="ownerUserId" name="ownerUserId" defaultValue={candidacy.ownerUserId ?? ''}>
-                <option value="">Sin asignar</option>
+                <option value="">{t('sinAsignar')}</option>
                 {team.map((member) => (
                   <option key={member.userId} value={member.userId}>
                     {member.name}
@@ -779,16 +803,17 @@ function CandidacyDialog({
             </Field>
           </div>
 
-          <Field label="Motivo de rechazo o baja" htmlFor="rejectionReason" hint="Sólo agencia.">
+          <Field label={t('campoMotivoRechazo')} htmlFor="rejectionReason" hint={t('soloAgencia')}>
             <Input id="rejectionReason" name="rejectionReason" defaultValue={candidacy.rejectionReason ?? ''} />
           </Field>
 
           {permissions.canSeeBudget ? (
             <fieldset className="grid gap-3 rounded-lg border border-ink-200 p-3 sm:grid-cols-2">
               <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-500">
-                Presupuesto {permissions.canEditBudget ? '' : '(sólo lectura)'}
+                {t('presupuestoLeyenda')}
+                {permissions.canEditBudget ? '' : t('soloLectura')}
               </legend>
-              <Field label="Moneda" htmlFor="currency">
+              <Field label={t('campoMoneda')} htmlFor="currency">
                 <Select id="currency" name="currency" defaultValue={candidacy.budget?.currency ?? currency} disabled={!permissions.canEditBudget}>
                   {['USD', 'ARS', 'EUR', 'BRL', 'MXN', 'COP', 'CLP'].map((code) => (
                     <option key={code} value={code}>
@@ -797,7 +822,7 @@ function CandidacyDialog({
                   ))}
                 </Select>
               </Field>
-              <Field label="Solicitado" htmlFor="budgetRequested">
+              <Field label={t('campoSolicitado')} htmlFor="budgetRequested">
                 <Input
                   id="budgetRequested"
                   name="budgetRequested"
@@ -808,7 +833,7 @@ function CandidacyDialog({
                   disabled={!permissions.canEditBudget}
                 />
               </Field>
-              <Field label="Negociado" htmlFor="budgetNegotiated">
+              <Field label={t('campoNegociado')} htmlFor="budgetNegotiated">
                 <Input
                   id="budgetNegotiated"
                   name="budgetNegotiated"
@@ -819,7 +844,7 @@ function CandidacyDialog({
                   disabled={!permissions.canEditBudget}
                 />
               </Field>
-              <Field label="Caché" htmlFor="cacheAmount">
+              <Field label={t('campoCache')} htmlFor="cacheAmount">
                 <Input
                   id="cacheAmount"
                   name="cacheAmount"
@@ -830,7 +855,7 @@ function CandidacyDialog({
                   disabled={!permissions.canEditBudget}
                 />
               </Field>
-              <Field label="Canje" htmlFor="barterDescription" className="sm:col-span-2">
+              <Field label={t('campoCanje')} htmlFor="barterDescription" className="sm:col-span-2">
                 <Input
                   id="barterDescription"
                   name="barterDescription"
@@ -839,9 +864,9 @@ function CandidacyDialog({
                 />
               </Field>
               <Field
-                label="Observación privada de presupuesto"
+                label={t('campoObsPresupuesto')}
                 htmlFor="budgetPrivateNotes"
-                hint="No sale nunca hacia el cliente."
+                hint={t('obsPresupuestoAyuda')}
                 className="sm:col-span-2"
               >
                 <Textarea
@@ -855,7 +880,7 @@ function CandidacyDialog({
           ) : null}
 
           {permissions.canSeeInternal ? (
-            <Field label="Notas internas" htmlFor="internalNotes" hint="Sólo agencia. No sale al cliente.">
+            <Field label={t('campoNotasInternas')} htmlFor="internalNotes" hint={t('notasInternasAyuda')}>
               <Textarea id="internalNotes" name="internalNotes" defaultValue={candidacy.internalNotes ?? ''} />
             </Field>
           ) : null}
@@ -863,12 +888,12 @@ function CandidacyDialog({
           <div className="flex justify-end gap-2">
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cerrar
+                {t('cerrar')}
               </Button>
             </DialogClose>
             {permissions.canManage ? (
               <Button type="submit" disabled={pending}>
-                {pending ? 'Guardando…' : 'Guardar'}
+                {pending ? t('guardando') : t('guardar')}
               </Button>
             ) : null}
           </div>

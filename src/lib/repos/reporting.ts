@@ -2,6 +2,7 @@ import 'server-only'
 import type { AuthContext } from '@/lib/authz/context'
 import { listarEntregas, type EntregaDto } from './entregas'
 import { listarLinks, type LinkDto } from './links'
+import type { Frase } from '@/lib/domain/dinero'
 
 /**
  * Lo que la campaña realmente midió.
@@ -44,7 +45,7 @@ export type ResumenDeResultados = {
   tasaDeInteraccion: number | null
   clics: { total: number; personas: number; bots: number; links: number }
   /** Lo que nadie cargó, en castellano. Es la parte que más se usa. */
-  huecos: string[]
+  huecos: Frase[]
   entregas: EntregaDto[]
   links: LinkDto[]
 }
@@ -114,18 +115,26 @@ export async function resumirResultados(ctx: AuthContext, campaignId: string): P
     links: activos.length,
   }
 
-  const huecos: string[] = []
+  /*
+   * Los huecos viajan como clave y valores, no como frase escrita: esto corre
+   * en el servidor y la frase terminaba tal cual en una pantalla en inglés.
+   */
+  const huecos: Frase[] = []
   if (entregas.length === 0) {
-    huecos.push('Todavía no se cargó ninguna publicación.')
+    huecos.push({ clave: 'huecoSinEntregas' })
   } else {
-    if (publicadas.length === 0) huecos.push('Ninguna de las entregas cargadas figura como publicada.')
-    if (views.sin > 0) huecos.push(`${views.sin} de ${publicadas.length} publicaciones no tienen visualizaciones cargadas.`)
-    if (interacciones.sin > 0) huecos.push(`${interacciones.sin} no tienen ninguna interacción cargada.`)
+    if (publicadas.length === 0) huecos.push({ clave: 'huecoNadaPublicado' })
+    if (views.sin > 0) {
+      huecos.push({ clave: 'huecoSinViews', valores: { sin: views.sin, de: publicadas.length } })
+    }
+    if (interacciones.sin > 0) {
+      huecos.push({ clave: 'huecoSinInteracciones', valores: { cantidad: interacciones.sin } })
+    }
     const sinLink = publicadas.filter((e) => !e.url).length
-    if (sinLink > 0) huecos.push(`${sinLink} no tienen el link de la publicación.`)
+    if (sinLink > 0) huecos.push({ clave: 'huecoSinLink', valores: { cantidad: sinLink } })
   }
   if (activos.length === 0) {
-    huecos.push('No hay links medidos, así que no se puede saber cuántas personas fueron al sitio.')
+    huecos.push({ clave: 'huecoSinLinksMedidos' })
   }
 
   return {
@@ -209,10 +218,33 @@ export function contextoDeResultados(resumen: ResumenDeResultados): string {
     }
   }
 
+  /*
+   * El prompt escribe su propia prosa en vez de reusar los huecos de la
+   * pantalla: aquéllos son claves de traducción, y acá hace falta algo que el
+   * modelo pueda leer. Sale de los mismos números, así que no puede divergir.
+   */
   if (resumen.huecos.length > 0) {
     partes.push('\n## Lo que NADIE cargó todavía')
     partes.push('Esto no es cero: es ausencia de dato. No lo trates como una caída ni lo completes.')
-    for (const hueco of resumen.huecos) partes.push(`- ${hueco}`)
+    if (resumen.publicaciones.total === 0) partes.push('- Todavía no se cargó ninguna publicación.')
+    else {
+      if (resumen.publicaciones.publicadas === 0) {
+        partes.push('- Ninguna de las entregas cargadas figura como publicada.')
+      }
+      if (resumen.views.sin > 0) {
+        partes.push(
+          `- ${resumen.views.sin} de ${resumen.publicaciones.publicadas} publicaciones no tienen visualizaciones cargadas.`,
+        )
+      }
+      if (resumen.interacciones.sin > 0) {
+        partes.push(`- ${resumen.interacciones.sin} no tienen ninguna interacción cargada.`)
+      }
+      const sinLink = resumen.publicaciones.publicadas - resumen.publicaciones.conLink
+      if (sinLink > 0) partes.push(`- ${sinLink} no tienen el link de la publicación.`)
+    }
+    if (resumen.clics.links === 0) {
+      partes.push('- No hay links medidos, así que no se puede saber cuántas personas fueron al sitio.')
+    }
   }
 
   return partes.join('\n')

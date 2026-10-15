@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -33,6 +34,8 @@ export function BriefPanel({
   /** Total de candidaturas de la campaña, para poder calcular el porcentaje real. */
   totalCandidaturas: number
 }) {
+  const t = useTranslations('campanas')
+  const idioma = useLocale()
   const router = useRouter()
   const [editing, setEditing] = React.useState(brief === null && canEdit)
   const [clusters, setClusters] = React.useState<ClusterDraft[]>(
@@ -53,9 +56,9 @@ export function BriefPanel({
     return (
       <Card>
         <EmptyState
-          title="Esta campaña todavía no tiene brief"
-          description="El brief define país, rango de seguidores, engagement, plataformas, nichos y la distribución del squad."
-          action={canEdit ? <Button onClick={() => setEditing(true)}>Cargar brief</Button> : undefined}
+          title={t('sinBriefTitulo')}
+          description={t('sinBriefBajada')}
+          action={canEdit ? <Button onClick={() => setEditing(true)}>{t('cargarBrief')}</Button> : undefined}
         />
       </Card>
     )
@@ -103,7 +106,7 @@ export function BriefPanel({
         toast.error(result.message)
         return
       }
-      toast.success('Brief guardado.')
+      toast.success(t('briefGuardado'))
       setEditing(false)
       router.refresh()
     })
@@ -114,44 +117,48 @@ export function BriefPanel({
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Criterios de selección</CardTitle>
+            <CardTitle>{t('criterios')}</CardTitle>
             {canEdit ? (
               <div className="pt-1">
                 <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
-                  Editar brief
+                  {t('editarBrief')}
                 </Button>
               </div>
             ) : null}
           </CardHeader>
           <CardBody>
             <dl className="grid gap-4 sm:grid-cols-2">
-              <Definition label="País" value={brief.country} />
-              <Definition label="Idioma" value={brief.language} />
+              <Definition label={t('briefPais')} value={brief.country} />
+              <Definition label={t('briefIdioma')} value={brief.language} />
               <Definition
-                label="Rango de seguidores"
+                label={t('briefRangoSeguidores')}
                 value={
                   brief.followersMin || brief.followersMax
-                    ? `${formatNumber(brief.followersMin)} – ${formatNumber(brief.followersMax)}`
+                    ? `${formatNumber(brief.followersMin, idioma)} – ${formatNumber(brief.followersMax, idioma)}`
                     : null
                 }
               />
               <Definition
-                label="Engagement rate mínimo"
+                label={t('briefErMinimo')}
                 value={brief.engagementRateMin != null ? `${brief.engagementRateMin}%` : null}
               />
               <Definition
-                label="Edad de audiencia"
+                label={t('briefEdadAudiencia')}
                 value={
                   brief.audienceAgeMin || brief.audienceAgeMax
-                    ? `${brief.audienceAgeMin ?? '?'} – ${brief.audienceAgeMax ?? '?'} años`
+                    ? t('briefAnios', { desde: brief.audienceAgeMin ?? '?', hasta: brief.audienceAgeMax ?? '?' })
                     : null
                 }
               />
               <Definition
-                label="Predominancia geográfica"
+                label={t('briefGeo')}
                 value={
                   brief.audienceGeoPredominance
-                    ? `${brief.audienceGeoPredominance}${brief.audienceGeoMinPercent ? ` (mín. ${brief.audienceGeoMinPercent}%)` : ''}`
+                    ? `${brief.audienceGeoPredominance}${
+                        brief.audienceGeoMinPercent
+                          ? t('briefGeoMinimo', { pct: brief.audienceGeoMinPercent })
+                          : ''
+                      }`
                     : null
                 }
               />
@@ -159,7 +166,7 @@ export function BriefPanel({
 
             {brief.platforms.length > 0 ? (
               <div className="mt-4">
-                <p className="mb-1 text-xs font-medium text-ink-500">Plataformas</p>
+                <p className="mb-1 text-xs font-medium text-ink-500">{t('briefPlataformas')}</p>
                 <div className="flex flex-wrap gap-1">
                   {brief.platforms.map((platform) => (
                     <Badge key={platform} tone="slate">
@@ -170,15 +177,15 @@ export function BriefPanel({
               </div>
             ) : null}
 
-            <TextBlock title="Perfil ideal" value={brief.idealProfile} />
-            <TextBlock title="Ideas de contenido" value={brief.contentIdeas} />
-            <TextBlock title="Usos reales del producto" value={brief.realProductUses} />
-            <TextBlock title="Criterios de inclusión" value={brief.inclusionCriteria} />
-            <TextBlock title="Criterios de exclusión" value={brief.exclusionCriteria} />
+            <TextBlock title={t('briefPerfilIdeal')} value={brief.idealProfile} />
+            <TextBlock title={t('briefIdeas')} value={brief.contentIdeas} />
+            <TextBlock title={t('briefUsos')} value={brief.realProductUses} />
+            <TextBlock title={t('briefInclusion')} value={brief.inclusionCriteria} />
+            <TextBlock title={t('briefExclusion')} value={brief.exclusionCriteria} />
             {canSeeInternal && brief.internalNotes ? (
               <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-800">
-                  Notas internas · no salen al cliente
+                  {t('briefNotasInternas')}
                 </p>
                 <p className="whitespace-pre-wrap text-sm text-amber-900">{brief.internalNotes}</p>
               </div>
@@ -189,14 +196,12 @@ export function BriefPanel({
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Distribución del squad</CardTitle>
-              <p className="text-xs text-ink-500">
-                Lo que buscás contra lo que hay. Configurable por campaña, no son valores fijos del sistema.
-              </p>
+              <CardTitle>{t('squad')}</CardTitle>
+              <p className="text-xs text-ink-500">{t('squadBajada')}</p>
             </CardHeader>
             <CardBody>
               {brief.clusters.length === 0 ? (
-                <p className="text-sm text-ink-500">Sin clusters definidos.</p>
+                <p className="text-sm text-ink-500">{t('sinClusters')}</p>
               ) : (
                 <ul className="space-y-3">
                   {brief.clusters.map((cluster) => {
@@ -212,11 +217,13 @@ export function BriefPanel({
                           <span className="whitespace-nowrap tabular-nums text-ink-700">
                             {/* El número real primero: es el que responde "¿cómo vamos?" */}
                             {real === null ? (
-                              <span className="text-ink-500">sin perfiles todavía</span>
+                              <span className="text-ink-500">{t('sinPerfilesTodavia')}</span>
                             ) : (
                               <>
                                 <span className="font-semibold text-ink-950">{real}%</span>
-                                <span className="text-ink-500"> de {cluster.targetPercent}% buscado</span>
+                                <span className="text-ink-500">
+                                  {t('deBuscado', { pct: cluster.targetPercent })}
+                                </span>
                               </>
                             )}
                           </span>
@@ -237,7 +244,7 @@ export function BriefPanel({
                           />
                         </div>
                         <p className="mt-0.5 text-[11px] text-ink-500">
-                          {cuantos === 1 ? '1 perfil' : `${cuantos} perfiles`}
+                          {t('perfilesCantidad', { cantidad: cuantos })}
                         </p>
                       </li>
                     )
@@ -250,7 +257,7 @@ export function BriefPanel({
           {brief.niches.length > 0 ? (
             <Card>
               <CardHeader>
-                <CardTitle>Nichos</CardTitle>
+                <CardTitle>{t('nichos')}</CardTitle>
               </CardHeader>
               <CardBody>
                 <ul className="space-y-2">
@@ -260,7 +267,7 @@ export function BriefPanel({
                         <span className={niche.mode === 'EXCLUDED' ? 'text-rose-700 line-through' : 'text-ink-800'}>
                           {niche.label}
                         </span>
-                        <span className="text-amber-600" aria-label={`Prioridad ${niche.priority} de 5`}>
+                        <span className="text-amber-600" aria-label={t('prioridadDeCinco', { valor: niche.priority })}>
                           {'★'.repeat(niche.priority)}
                         </span>
                       </div>
@@ -275,7 +282,7 @@ export function BriefPanel({
           {brief.keywords.length > 0 ? (
             <Card>
               <CardHeader>
-                <CardTitle>Palabras clave</CardTitle>
+                <CardTitle>{t('palabrasClave')}</CardTitle>
               </CardHeader>
               <CardBody className="space-y-3">
                 {Object.entries(
@@ -306,18 +313,18 @@ export function BriefPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{brief ? 'Editar brief' : 'Cargar brief'}</CardTitle>
+        <CardTitle>{brief ? t('editarBrief') : t('cargarBrief')}</CardTitle>
       </CardHeader>
       <CardBody>
         <form onSubmit={onSubmit} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="País" htmlFor="country">
+            <Field label={t('briefPais')} htmlFor="country">
               <Input id="country" name="country" defaultValue={brief?.country ?? ''} maxLength={60} />
             </Field>
-            <Field label="Idioma" htmlFor="language">
+            <Field label={t('briefIdioma')} htmlFor="language">
               <Input id="language" name="language" defaultValue={brief?.language ?? ''} maxLength={40} />
             </Field>
-            <Field label="ER mínimo (%)" htmlFor="engagementRateMin">
+            <Field label={t('campoErMinimoBrief')} htmlFor="engagementRateMin">
               <Input
                 id="engagementRateMin"
                 name="engagementRateMin"
@@ -328,13 +335,13 @@ export function BriefPanel({
                 defaultValue={brief?.engagementRateMin ?? ''}
               />
             </Field>
-            <Field label="Seguidores desde" htmlFor="followersMin">
+            <Field label={t('campoSegDesde')} htmlFor="followersMin">
               <Input id="followersMin" name="followersMin" type="number" min={0} defaultValue={brief?.followersMin ?? ''} />
             </Field>
-            <Field label="Seguidores hasta" htmlFor="followersMax" errors={errors.followersMax}>
+            <Field label={t('campoSegHasta')} htmlFor="followersMax" errors={errors.followersMax}>
               <Input id="followersMax" name="followersMax" type="number" min={0} defaultValue={brief?.followersMax ?? ''} />
             </Field>
-            <Field label="Plataformas" htmlFor="platforms" hint="Ctrl o Cmd para varias.">
+            <Field label={t('briefPlataformas')} htmlFor="platforms" hint={t('plataformasAyuda')}>
               <Select
                 id="platforms"
                 name="platforms"
@@ -350,13 +357,13 @@ export function BriefPanel({
                 ))}
               </Select>
             </Field>
-            <Field label="Edad audiencia desde" htmlFor="audienceAgeMin">
+            <Field label={t('campoEdadDesde')} htmlFor="audienceAgeMin">
               <Input id="audienceAgeMin" name="audienceAgeMin" type="number" min={0} max={120} defaultValue={brief?.audienceAgeMin ?? ''} />
             </Field>
-            <Field label="Edad audiencia hasta" htmlFor="audienceAgeMax">
+            <Field label={t('campoEdadHasta')} htmlFor="audienceAgeMax">
               <Input id="audienceAgeMax" name="audienceAgeMax" type="number" min={0} max={120} defaultValue={brief?.audienceAgeMax ?? ''} />
             </Field>
-            <Field label="Audiencia predominante" htmlFor="audienceGeoPredominance">
+            <Field label={t('campoAudienciaPredominante')} htmlFor="audienceGeoPredominance">
               <Input
                 id="audienceGeoPredominance"
                 name="audienceGeoPredominance"
@@ -364,7 +371,7 @@ export function BriefPanel({
                 maxLength={120}
               />
             </Field>
-            <Field label="% mínimo de esa audiencia" htmlFor="audienceGeoMinPercent">
+            <Field label={t('campoGeoMinimo')} htmlFor="audienceGeoMinPercent">
               <Input
                 id="audienceGeoMinPercent"
                 name="audienceGeoMinPercent"
@@ -376,39 +383,39 @@ export function BriefPanel({
             </Field>
           </div>
 
-          <Field label="Perfil ideal" htmlFor="idealProfile">
+          <Field label={t('briefPerfilIdeal')} htmlFor="idealProfile">
             <Textarea id="idealProfile" name="idealProfile" rows={4} defaultValue={brief?.idealProfile ?? ''} />
           </Field>
-          <Field label="Ideas de contenido" htmlFor="contentIdeas">
+          <Field label={t('briefIdeas')} htmlFor="contentIdeas">
             <Textarea id="contentIdeas" name="contentIdeas" rows={4} defaultValue={brief?.contentIdeas ?? ''} />
           </Field>
-          <Field label="Usos reales del producto" htmlFor="realProductUses">
+          <Field label={t('briefUsos')} htmlFor="realProductUses">
             <Textarea id="realProductUses" name="realProductUses" rows={3} defaultValue={brief?.realProductUses ?? ''} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Criterios de inclusión" htmlFor="inclusionCriteria">
+            <Field label={t('briefInclusion')} htmlFor="inclusionCriteria">
               <Textarea id="inclusionCriteria" name="inclusionCriteria" rows={4} defaultValue={brief?.inclusionCriteria ?? ''} />
             </Field>
-            <Field label="Criterios de exclusión" htmlFor="exclusionCriteria">
+            <Field label={t('briefExclusion')} htmlFor="exclusionCriteria">
               <Textarea id="exclusionCriteria" name="exclusionCriteria" rows={4} defaultValue={brief?.exclusionCriteria ?? ''} />
             </Field>
           </div>
           {canSeeInternal ? (
-            <Field label="Notas internas" htmlFor="internalNotes" hint="Sólo agencia. Nunca sale al cliente.">
+            <Field label={t('campoNotasInternas')} htmlFor="internalNotes" hint={t('notasInternasAyuda')}>
               <Textarea id="internalNotes" name="internalNotes" rows={3} defaultValue={brief?.internalNotes ?? ''} />
             </Field>
           ) : null}
 
           <fieldset className="rounded-lg border border-ink-200 p-3">
             <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-500">
-              Distribución del squad
+              {t('squad')}
             </legend>
             <div className="space-y-2">
               {clusters.map((cluster, index) => (
                 <div key={index} className="flex flex-wrap items-end gap-2">
                   <div className="w-14">
                     <label className="mb-1 block text-xs text-ink-600" htmlFor={`emoji-${index}`}>
-                      Emoji
+                      {t('campoEmoji')}
                     </label>
                     <Input
                       id={`emoji-${index}`}
@@ -423,7 +430,7 @@ export function BriefPanel({
                   </div>
                   <div className="min-w-44 flex-1">
                     <label className="mb-1 block text-xs text-ink-600" htmlFor={`label-${index}`}>
-                      Cluster
+                      {t('campoClusterLabel')}
                     </label>
                     <Input
                       id={`label-${index}`}
@@ -437,7 +444,7 @@ export function BriefPanel({
                   </div>
                   <div className="w-24">
                     <label className="mb-1 block text-xs text-ink-600" htmlFor={`percent-${index}`}>
-                      % objetivo
+                      {t('campoObjetivoPct')}
                     </label>
                     <Input
                       id={`percent-${index}`}
@@ -460,7 +467,7 @@ export function BriefPanel({
                     size="sm"
                     onClick={() => setClusters((current) => current.filter((_, i) => i !== index))}
                   >
-                    Quitar
+                    {t('quitar')}
                   </Button>
                 </div>
               ))}
@@ -472,10 +479,10 @@ export function BriefPanel({
                 size="sm"
                 onClick={() => setClusters((current) => [...current, { key: '', label: '', emoji: '', targetPercent: 0 }])}
               >
-                Agregar cluster
+                {t('agregarCluster')}
               </Button>
               <span className={totalPercent > 100 ? 'text-sm font-medium text-rose-600' : 'text-sm text-ink-500'}>
-                Suma: {totalPercent}%
+                {t('sumaPct', { pct: totalPercent })}
               </span>
             </div>
             {errors.clusters ? (
@@ -487,11 +494,11 @@ export function BriefPanel({
 
           <div className="flex gap-2">
             <Button type="submit" disabled={pending || totalPercent > 100}>
-              {pending ? 'Guardando…' : 'Guardar brief'}
+              {pending ? t('guardando') : t('guardarBrief')}
             </Button>
             {brief ? (
               <Button type="button" variant="secondary" onClick={() => setEditing(false)}>
-                Cancelar
+                {t('cancelar')}
               </Button>
             ) : null}
           </div>
