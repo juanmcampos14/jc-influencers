@@ -7,6 +7,7 @@ import {
   leerCreador,
   leerSobre,
   MAXIMO_POR_PAGINA,
+  motivoDelRechazo,
   redDe,
 } from './influencers-club-consulta'
 import {
@@ -289,21 +290,14 @@ export class InfluencersClubScoutingProvider implements ScoutingProvider {
       }
 
       /*
-       * Dos cosas distintas contestan 429 y hay que saber cuál es: el límite de
-       * 300 pedidos por minuto --se reintenta más tarde-- y el tope de
-       * descubrimiento del plan --no se reintenta, hay que esperar la
-       * renovación--. Decir "probá de nuevo" en el segundo caso manda a alguien
-       * a golpear una puerta cerrada.
+       * El estado se mira ANTES del cuerpo. Antes no se miraba --sólo el 429--,
+       * así que un rechazo entraba a `leerSobre`, no tenía `accounts`, y salía
+       * como "no devolvió resultados": la búsqueda aparecía vacía en vez de
+       * rechazada. Un plan sin acceso a la API se vio durante días como "no
+       * encontró a nadie".
        */
-      if (respuesta.status === 429) {
-        const detalle = typeof json === 'object' && json !== null ? (json as { error?: unknown }).error : null
-        const mensaje = typeof detalle === 'string' ? detalle : ''
-        throw new Error(
-          /credit limit/i.test(mensaje)
-            ? 'Se agotó el cupo de descubrimiento del plan de influencers.club. Se repone cuando renueva la suscripción.'
-            : 'influencers.club está recibiendo demasiados pedidos por minuto. Probá de nuevo en un rato.',
-        )
-      }
+      const motivo = motivoDelRechazo(respuesta.status, json)
+      if (motivo) throw new Error(motivo)
 
       return leerSobre(json)
     } finally {

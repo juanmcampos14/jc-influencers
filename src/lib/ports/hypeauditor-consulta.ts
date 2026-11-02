@@ -216,7 +216,12 @@ export function leerSobre(cuerpo: unknown): SobreLeido {
     return { ok: false, mensaje: descripcion ?? 'HypeAuditor rechazó la consulta y no dijo por qué.' }
   }
   if (typeof sobre.result !== 'object' || sobre.result === null) {
-    return { ok: false, mensaje: 'HypeAuditor no devolvió resultados.' }
+    /*
+     * No es "no encontró a nadie": una búsqueda vacía trae `result` con la
+     * lista vacía adentro. Sin `result` lo que falló es la lectura, y decir
+     * que no hay resultados manda a cambiar filtros que no tienen la culpa.
+     */
+    return { ok: false, mensaje: 'HypeAuditor contestó sin la lista de perfiles. No se pudo leer su respuesta.' }
   }
 
   const resultado = sobre.result as Record<string, unknown>

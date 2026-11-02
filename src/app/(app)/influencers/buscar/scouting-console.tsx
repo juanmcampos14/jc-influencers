@@ -150,11 +150,17 @@ export function ScoutingConsole({
         for (const runId of ids) {
           const result = await pollScoutingAction({ runId })
           if (result.ok && result.data.status !== 'RUNNING') {
-            toast.info(
-              result.data.status === 'COMPLETED'
-                ? t('terminadaConPerfiles', { cantidad: result.data.collected })
-                : t('terminadaConEstado', { estado: result.data.status }),
-            )
+            if (result.data.status === 'COMPLETED') {
+              toast.info(t('terminadaConPerfiles', { cantidad: result.data.collected }))
+            } else {
+              /*
+               * El motivo ya venía en la respuesta y se tiraba: el aviso decía
+               * "terminó con estado FAILED" --que no se puede accionar-- y el
+               * por qué había que ir a buscarlo en letra chica a la tabla. Si
+               * el proveedor explicó qué pasó, eso ES el aviso.
+               */
+              toast.error(result.data.message ?? t('terminadaConEstado', { estado: result.data.status }))
+            }
             router.refresh()
           }
         }

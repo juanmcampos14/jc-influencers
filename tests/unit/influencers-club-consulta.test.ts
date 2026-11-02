@@ -5,6 +5,7 @@ import {
   leerCreador,
   leerSobre,
   MAXIMO_POR_PAGINA,
+  motivoDelRechazo,
   redDe,
   urlDePerfil,
 } from '@/lib/ports/influencers-club-consulta'
@@ -311,5 +312,101 @@ describe('los errores que devuelve de verdad', () => {
 
   it('un arreglo vacío no se confunde con un error', () => {
     expect(leerSobre({ accounts: [], error: [] }).ok).toBe(true)
+  })
+})
+
+/**
+ * Lo que contesta cuando NO contesta.
+ *
+ * Importa porque el adaptador no miraba el código de estado --sólo el 429--,
+ * así que cualquier rechazo entraba a `leerSobre`, no tenía `accounts`, y salía
+ * convertido en "no devolvió resultados". Una búsqueda que nunca se hizo se
+ * veía como una búsqueda vacía: la persona se va a cambiar los filtros, los
+ * cambia diez veces, y el motivo real sigue tapado.
+ *
+ * Las respuestas de abajo son literales, pedidas a la API el 02/11/2026.
+ */
+describe('un rechazo no es una búsqueda sin resultados', () => {
+  it('un 200 se lee, no se rechaza', () => {
+    expect(motivoDelRechazo(200, { accounts: [] })).toBeNull()
+  })
+
+  /*
+   * El caso que estuvo tapado. La clave es correcta --una clave inventada
+   * contesta 401, probado-- pero el plan contratado no incluye la API. Ningún
+   * filtro lo arregla, así que el mensaje tiene que decir exactamente eso.
+   */
+  it('un plan sin API dice que falta el plan, no que falten resultados', () => {
+    const motivo = motivoDelRechazo(403, {
+      detail: 'API access requires a Pro or Enterprise plan. Upgrade at https://dashboard.influencers.club/plans',
+    })
+    expect(motivo).toContain('no incluye acceso por API')
+    expect(motivo).toContain('Pro o Enterprise')
+    expect(motivo).not.toContain('resultado')
+  })
+
+  it('una clave inválida se distingue de un plan insuficiente', () => {
+    const motivo = motivoDelRechazo(401, { detail: 'Token is invalid', code: 'authentication_failed' })
+    expect(motivo).toContain('clave')
+    expect(motivo).not.toContain('plan contratado')
+  })
+
+  it('el encabezado mal armado también es un problema de clave', () => {
+    const motivo = motivoDelRechazo(401, {
+      detail: 'Authorization header must contain two space-delimited values',
+      code: 'bad_authorization_header',
+    })
+    expect(motivo).toContain('clave')
+  })
+
+  /*
+   * Los dos 429 no se arreglan igual: uno se reintenta en un rato, el otro
+   * espera la renovación. Decir "probá de nuevo" en el segundo manda a golpear
+   * una puerta cerrada.
+   */
+  it('separa el límite por minuto del cupo agotado del plan', () => {
+    expect(motivoDelRechazo(429, { error: 'Request limit reached' })).toContain('pedidos por minuto')
+    expect(motivoDelRechazo(429, { error: 'Discovery credit limit reached' })).toContain('cupo de descubrimiento')
+  })
+
+  it('un filtro rechazado nombra el campo que no le gustó', () => {
+    const motivo = motivoDelRechazo(400, { error: [{ field: 'location', error: "Invalid location: 'AR'" }] })
+    expect(motivo).toContain('location')
+  })
+
+  it('si él no explica nada, lo dice en vez de inventar un motivo', () => {
+    expect(motivoDelRechazo(418, {})).toContain('418')
+  })
+
+  it('un problema suyo no se informa como un problema de la búsqueda', () => {
+    const motivo = motivoDelRechazo(503, { detail: 'Service Unavailable' })
+    expect(motivo).toContain('No es la búsqueda')
+  })
+
+  /*
+   * El rechazo también viaja en el cuerpo con otros nombres. `leerSobre` sólo
+   * entendía `error`, así que un `detail` se le escapaba y caía en el mensaje
+   * genérico.
+   */
+  it('leerSobre entiende el motivo venga como error, detail o message', () => {
+    expect(leerSobre({ detail: 'Token is invalid' })).toEqual({ ok: false, mensaje: 'Token is invalid' })
+    expect(leerSobre({ message: 'algo salió mal' })).toEqual({ ok: false, mensaje: 'algo salió mal' })
+  })
+
+  it('sin la lista de perfiles no dice que no haya resultados', () => {
+    const sobre = leerSobre({ total: 0 })
+    expect(sobre.ok).toBe(false)
+    expect(sobre.ok === false && sobre.mensaje).toContain('no se pudo leer su respuesta')
+  })
+
+  /*
+   * Y al revés: una búsqueda que de verdad no encontró a nadie trae la lista
+   * vacía, y eso NO es un error. Si esto se rompe, una búsqueda legítima sin
+   * resultados empieza a fallar.
+   */
+  it('una lista vacía sigue siendo una búsqueda válida sin resultados', () => {
+    const sobre = leerSobre({ accounts: [], total: 0, credits_left: '1000' })
+    expect(sobre.ok).toBe(true)
+    expect(sobre.ok === true && sobre.creadores).toEqual([])
   })
 })

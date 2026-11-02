@@ -293,8 +293,16 @@ export class HypeAuditorScoutingProvider implements ScoutingProvider {
        * El sobre se lee siempre, tenga el estado que tenga: HypeAuditor
        * devuelve el motivo adentro del cuerpo, y quedarse con el código de
        * estado convertiría "token inválido" en un error mudo.
+       *
+       * Pero si el cuerpo no explicó nada y el estado tampoco es 2xx, el
+       * estado es lo único que se sabe: va en el mensaje. Sin esto un rechazo
+       * sin motivo adentro se leía como una búsqueda sin resultados.
        */
-      return leerSobre(json)
+      const sobre = leerSobre(json)
+      if (!sobre.ok && !respuesta.ok) {
+        return { ...sobre, mensaje: `${sobre.mensaje} (código ${respuesta.status})` }
+      }
+      return sobre
     } finally {
       clearTimeout(timer)
     }

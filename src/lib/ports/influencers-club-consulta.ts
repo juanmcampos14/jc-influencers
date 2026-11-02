@@ -320,7 +320,15 @@ export function leerSobre(cuerpo: unknown): SobreLeido {
   if (typeof cuerpo !== 'object' || cuerpo === null) {
     return { ok: false, mensaje: 'influencers.club devolvió una respuesta que no se entiende.' }
   }
-  const sobre = cuerpo as { accounts?: unknown; total?: unknown; credits_left?: unknown; error?: unknown }
+  const sobre = cuerpo as {
+    accounts?: unknown
+    total?: unknown
+    credits_left?: unknown
+    error?: unknown
+    /* Los rechazos de autenticación y de plan vienen por acá, no por `error`. */
+    detail?: unknown
+    message?: unknown
+  }
 
   /*
    * Su error viene de dos formas y hay que leer las dos. El tope de
@@ -334,10 +342,20 @@ export function leerSobre(cuerpo: unknown): SobreLeido {
    * el motivo. El fallo mudo que estos mapeos tienen que evitar lo estaba
    * cometiendo el mapeo.
    */
-  const mensajeDeError = leerError(sobre.error)
+  const mensajeDeError = leerError(sobre.error) ?? texto(sobre.detail) ?? texto(sobre.message)
   if (mensajeDeError) return { ok: false, mensaje: mensajeDeError }
+  /*
+   * Acá NO se puede decir "no encontró a nadie". Una búsqueda sin resultados
+   * viene con `accounts: []`, que es un arreglo y pasa de largo. Si no hay
+   * arreglo, lo que falló es la lectura, no la búsqueda: decir que no hay
+   * resultados manda a cambiar los filtros cuando el problema está en otra
+   * parte. Es el error que tapó un plan sin acceso a la API durante días.
+   */
   if (!Array.isArray(sobre.accounts)) {
-    return { ok: false, mensaje: 'influencers.club no devolvió resultados.' }
+    return {
+      ok: false,
+      mensaje: 'influencers.club contestó sin la lista de perfiles. No es que no haya resultados: no se pudo leer su respuesta.',
+    }
   }
 
   const creditos = Number(sobre.credits_left)
@@ -348,4 +366,78 @@ export function leerSobre(cuerpo: unknown): SobreLeido {
     total: numero(sobre.total),
     creditosRestantes: Number.isFinite(creditos) ? creditos : null,
   }
+}
+
+/**
+ * Qué significa un código de estado que no es 200.
+ *
+ * Existe porque faltaba. El adaptador leía el cuerpo de la respuesta sin mirar
+ * nunca el estado, así que un rechazo --clave vencida, plan sin API, servidor
+ * caído-- llegaba a `leerSobre` como un JSON sin `accounts` y salía convertido
+ * en "no devolvió resultados". Eso le dice a una persona que su búsqueda no
+ * encontró a nadie cuando en realidad nunca se hizo: se va a cambiar los
+ * filtros, los cambia diez veces, y el motivo real sigue tapado.
+ *
+ * Devuelve null cuando la respuesta se puede leer, y el motivo en castellano
+ * cuando no. Está acá, y no en el adaptador, para poder probarla sin
+ * credenciales y sin gastar un crédito.
+ */
+export function motivoDelRechazo(status: number, cuerpo: unknown): string | null {
+  if (status >= 200 && status < 300) return null
+
+  const detalle = detalleDelRechazo(cuerpo)
+
+  if (status === 401) {
+    return 'La clave de influencers.club no es válida o fue revocada. Hay que generar una nueva en su panel y volver a cargarla.'
+  }
+
+  /*
+   * El caso que importa: la clave ES correcta --una clave inventada contesta
+   * 401-- pero el plan contratado no incluye la API. Ningún filtro lo arregla,
+   * así que la pantalla tiene que decir exactamente eso.
+   */
+  if (status === 403) {
+    if (/plan|upgrade|subscription/i.test(detalle ?? '')) {
+      return 'El plan contratado en influencers.club no incluye acceso por API: hace falta Pro o Enterprise. La clave está bien; lo que falta es el plan.'
+    }
+    return detalle
+      ? `influencers.club no autorizó el pedido: ${detalle}`
+      : 'influencers.club no autorizó el pedido y no dijo por qué.'
+  }
+
+  if (status === 402) {
+    return 'La suscripción a influencers.club está impaga o vencida. Se repone al regularizarla en su panel.'
+  }
+
+  /*
+   * Dos cosas distintas contestan 429 y hay que saber cuál es: el límite de
+   * 300 pedidos por minuto --se reintenta más tarde-- y el tope de
+   * descubrimiento del plan --no se reintenta, hay que esperar la renovación--.
+   * Decir "probá de nuevo" en el segundo caso manda a alguien a golpear una
+   * puerta cerrada.
+   */
+  if (status === 429) {
+    return /credit limit/i.test(detalle ?? '')
+      ? 'Se agotó el cupo de descubrimiento del plan de influencers.club. Se repone cuando renueva la suscripción.'
+      : 'influencers.club está recibiendo demasiados pedidos por minuto. Probá de nuevo en un rato.'
+  }
+
+  if (status >= 500) {
+    return 'influencers.club no está respondiendo. No es la búsqueda: hay que probar de nuevo más tarde.'
+  }
+
+  /*
+   * Un 400 con detalle casi siempre es un filtro que no le gustó, y el detalle
+   * nombra el campo. Vale más que cualquier texto nuestro.
+   */
+  return detalle
+    ? `influencers.club rechazó el pedido: ${detalle}`
+    : `influencers.club rechazó el pedido (código ${status}) y no dijo por qué.`
+}
+
+/** El motivo que viene en el cuerpo, con los tres nombres que le pone. */
+function detalleDelRechazo(cuerpo: unknown): string | null {
+  if (typeof cuerpo !== 'object' || cuerpo === null) return null
+  const fila = cuerpo as { detail?: unknown; error?: unknown; message?: unknown }
+  return texto(fila.detail) ?? leerError(fila.error) ?? texto(fila.message)
 }
