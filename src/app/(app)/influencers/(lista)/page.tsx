@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/states'
 import { columnaFija, Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { ThOrdenable } from '@/components/ui/ordenar'
 import { resolverOrden, type ColumnaOrdenable } from '@/lib/domain/orden'
+import { ContactoDirecto } from '@/components/contacto-directo'
 import { ExternalLink, InfluencerStatusBadge } from '@/components/status-badge'
 import { requireContext } from '@/lib/auth/current'
 import { loadPage } from '@/lib/actions/page-guard'
@@ -113,6 +114,7 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
   })
 
   const canManage = can(ctx, 'influencer.manage', null)
+  const verContactos = can(ctx, 'influencer.contact.view', null)
   const campanasElegibles = campanas.items
     .filter((campana) => can(ctx, 'candidate.manage', campana.clientId))
     .map((campana) => ({ id: campana.id, name: campana.name, clientName: campana.clientName }))
@@ -192,6 +194,11 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                       <ThOrdenable columna={columna('estado')} orden={orden} base="/influencers" params={params}>
                         {t('colEstado')}
                       </ThOrdenable>
+                      {/*
+                        * La columna sólo existe para quien puede ver contactos:
+                        * el teléfono no viaja al navegador de quien no puede.
+                        */}
+                      {verContactos ? <Th className="w-12">{t('colContacto')}</Th> : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -257,6 +264,16 @@ export default async function InfluencersPage({ searchParams }: { searchParams: 
                           <Td>
                             <InfluencerStatusBadge status={influencer.status} />
                           </Td>
+                          {verContactos ? (
+                            <Td>
+                              <ContactoDirecto
+                                compacto
+                                telefono={influencer.contact?.phone ?? null}
+                                pais={influencer.country}
+                                nombre={influencer.displayName}
+                              />
+                            </Td>
+                          ) : null}
                         </Tr>
                       )
                     })}

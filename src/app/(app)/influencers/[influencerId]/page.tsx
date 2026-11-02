@@ -15,6 +15,7 @@ import { NotFoundError } from '@/lib/authz/errors'
 import { getInfluencer } from '@/lib/repos/influencers'
 import { scoped } from '@/lib/repos/base'
 import { listCampaigns } from '@/lib/repos/campaigns'
+import { ContactoDirecto } from '@/components/contacto-directo'
 import { EditarFicha } from './editar-ficha'
 import { AgregarACampana } from './agregar-a-campana'
 import { formatDate, formatDateTime, formatFollowers, formatPercent } from '@/lib/util/format'
@@ -96,6 +97,14 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
                   representative: influencer.representative ?? null,
                   internalNotes: influencer.internalNotes ?? null,
                   nicheKeys: clavesDeNicho,
+                  contacto: influencer.contact
+                    ? {
+                        phone: influencer.contact.phone,
+                        email: influencer.contact.email,
+                        notes: influencer.contact.notes,
+                        legalBasis: influencer.contact.legalBasis,
+                      }
+                    : null,
                 }}
                 niches={niches.map((n) => ({ key: n.key, label: n.label }))}
               />
@@ -334,7 +343,13 @@ export default async function InfluencerDetailPage({ params }: { params: Promise
                   <CardTitle>{t('contacto')}</CardTitle>
                   <p className="text-xs text-ink-500">{t('contactoAyuda')}</p>
                 </CardHeader>
-                <CardBody>
+                <CardBody className="space-y-3">
+                  <ContactoDirecto
+                    telefono={influencer.contact.phone}
+                    email={influencer.contact.email}
+                    pais={influencer.country}
+                    nombre={influencer.displayName}
+                  />
                   <dl className="space-y-2 text-sm">
                     <Row label={t('campoEmail')} value={influencer.contact.email} />
                     <Row label={t('campoTelefono')} value={influencer.contact.phone} />

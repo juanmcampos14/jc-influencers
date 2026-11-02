@@ -26,6 +26,14 @@ export type FichaEditable = {
   representative: string | null
   internalNotes: string | null
   nicheKeys: string[]
+  /**
+   * El contacto llega sólo si esta persona lo puede ver.
+   *
+   * `null` significa "no tenés permiso", no "está vacío": en ese caso los
+   * campos no se dibujan y la acción tampoco los manda, así que un guardado no
+   * puede borrar un teléfono que quien edita nunca vio.
+   */
+  contacto: { phone: string | null; email: string | null; notes: string | null; legalBasis: string | null } | null
 }
 
 /**
@@ -70,6 +78,14 @@ export function EditarFicha({
         language: String(form.get('language') ?? '') || null,
         bio: String(form.get('bio') ?? '') || null,
         status: String(form.get('status') ?? ficha.status) as never,
+        ...(ficha.contacto
+          ? {
+              contactPhone: String(form.get('contactPhone') ?? '') || null,
+              contactEmail: String(form.get('contactEmail') ?? '') || null,
+              contactNotes: String(form.get('contactNotes') ?? '') || null,
+              contactLegalBasis: String(form.get('contactLegalBasis') ?? '') || null,
+            }
+          : {}),
         adultStatus: String(form.get('adultStatus') ?? ficha.adultStatus) as never,
         representative: String(form.get('representative') ?? '') || null,
         internalNotes: String(form.get('internalNotes') ?? '') || null,
@@ -152,6 +168,48 @@ export function EditarFicha({
               ))}
             </Select>
           </Field>
+
+          {ficha.contacto ? (
+            <fieldset className="space-y-3 rounded-lg border border-ink-200 p-3">
+              <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-500">
+                {t('datosDeContacto')}
+              </legend>
+              <p className="text-xs text-ink-500">{t('datosDeContactoAyuda')}</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label={t('campoTelefonoContacto')} htmlFor="contactPhone" hint={t('telefonoAyuda')}>
+                  <Input
+                    id="contactPhone"
+                    name="contactPhone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    defaultValue={ficha.contacto.phone ?? ''}
+                    placeholder="+34 612 345 678"
+                  />
+                </Field>
+                <Field label={t('campoEmailContacto')} htmlFor="contactEmail" errors={errors.contactEmail}>
+                  <Input
+                    id="contactEmail"
+                    name="contactEmail"
+                    type="email"
+                    autoComplete="email"
+                    defaultValue={ficha.contacto.email ?? ''}
+                  />
+                </Field>
+              </div>
+              <Field label={t('campoBaseLegalContacto')} htmlFor="contactLegalBasis" hint={t('baseLegalAyuda')}>
+                <Input
+                  id="contactLegalBasis"
+                  name="contactLegalBasis"
+                  defaultValue={ficha.contacto.legalBasis ?? ''}
+                  maxLength={400}
+                />
+              </Field>
+              <Field label={t('campoNotasContacto')} htmlFor="contactNotes">
+                <Textarea id="contactNotes" name="contactNotes" rows={2} defaultValue={ficha.contacto.notes ?? ''} />
+              </Field>
+            </fieldset>
+          ) : null}
 
           <Field label={t('campoBio')} htmlFor="bio">
             <Textarea id="bio" name="bio" defaultValue={ficha.bio ?? ''} rows={3} />

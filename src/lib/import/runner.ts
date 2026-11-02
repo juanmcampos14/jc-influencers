@@ -1,7 +1,7 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
 import type { AuthContext } from '@/lib/authz/context'
-import { assertCan, assertClientInScope } from '@/lib/authz/context'
+import { assertCan, assertClientInScope, can } from '@/lib/authz/context'
 import { NotFoundError, ValidationError } from '@/lib/authz/errors'
 import { AUDIT, recordAudit } from '@/lib/audit'
 import { consumeRateLimit } from '@/lib/auth/rate-limit'
@@ -307,6 +307,13 @@ export async function confirmImport(ctx: AuthContext, importRunId: string): Prom
 
   const parsed = await parseWorkbook(data)
   const clientId = run.clientId
+  /*
+   * Los datos de contacto tienen su propia capacidad, y la importación no la
+   * otorga: quien puede importar una planilla no necesariamente puede ver
+   * teléfonos. Si la planilla los trae y esta persona no los puede tocar, no se
+   * escriben --y se dice, en vez de perderlos en silencio.
+   */
+  const puedeContacto = can(ctx, 'influencer.contact.view', null)
 
   return scoped(
     ctx,
@@ -441,6 +448,14 @@ export async function confirmImport(ctx: AuthContext, importRunId: string): Prom
               city: person.city ?? undefined,
               bio: person.bio ?? undefined,
               primaryHandle: person.handle ?? undefined,
+              // `undefined` no escribe: una planilla sin teléfono no borra el
+              // que alguien cargó a mano.
+              ...(puedeContacto
+                ? {
+                    contactEmail: person.contactEmail ?? undefined,
+                    contactPhone: person.contactPhone ?? undefined,
+                  }
+                : {}),
             },
           })
           updated += 1
@@ -454,6 +469,9 @@ export async function confirmImport(ctx: AuthContext, importRunId: string): Prom
               bio: person.bio,
               status: person.campaignKey === 'backlog' ? 'BACKLOG' : 'NEW',
               adultStatus: 'NOT_CONFIRMED',
+              ...(puedeContacto
+                ? { contactEmail: person.contactEmail, contactPhone: person.contactPhone }
+                : {}),
               createdById: ctx.user.id,
             },
           })
@@ -561,7 +579,14 @@ export async function confirmImport(ctx: AuthContext, importRunId: string): Prom
               deliverablesSummary: person.deliverablesSummary,
               clientApproval: person.clientApproval,
               clientVisible: person.clientApproval !== 'PENDING' || person.statusKey === 'PROPUESTO',
-              currency: parsed.budget.currency ?? 'USD',
+              /*
+               * El precio de la planilla entra como SOLICITADO, no como
+               * negociado: es la tarifa de lista del creador, no algo que se
+               * haya acordado con nadie. La moneda sale del formato de la celda
+               * cuando lo declara; si no, la de la campaña.
+               */
+              currency: person.budgetCurrency ?? parsed.budget.currency ?? 'USD',
+              ...(person.budgetAmount != null ? { budgetRequested: String(person.budgetAmount) } : {}),
               sourceSheet: person.sheetName,
               sourceRow: person.rowNumber,
               importRunId: run.id,
@@ -576,6 +601,7 @@ export async function confirmImport(ctx: AuthContext, importRunId: string): Prom
               contentIdea: person.contentIdea ?? undefined,
               deliverablesSummary: person.deliverablesSummary ?? undefined,
               clientApproval: person.clientApproval,
+              ...(person.budgetAmount != null ? { budgetRequested: String(person.budgetAmount) } : {}),
               sourceSheet: person.sheetName,
               sourceRow: person.rowNumber,
               importRunId: run.id,

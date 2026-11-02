@@ -66,6 +66,13 @@ export type ParsedPerson = {
   deliverablesSummary: string | null
   fitScore: number | null
   budgetRaw: string | null
+  /** Importe leído del Excel, cuando la celda era un número. */
+  budgetAmount: number | null
+  /** Moneda del importe, cuando el formato de la celda la declaraba. */
+  budgetCurrency: string | null
+  /** Datos de contacto, cuando la planilla los traía. */
+  contactPhone: string | null
+  contactEmail: string | null
   rank: number | null
   sourceUrl: string | null
   rawValues: Record<string, unknown>
@@ -380,6 +387,10 @@ function parseCreatorSheet(sheet: ExcelJS.Worksheet, campaignKey: string, out: P
       deliverablesSummary: iDeliverable >= 0 ? nullIfEmpty(values[iDeliverable]) : null,
       fitScore: null,
       budgetRaw: iBudget >= 0 ? nullIfEmpty(values[iBudget]) : null,
+      budgetAmount: null,
+      budgetCurrency: null,
+      contactPhone: null,
+      contactEmail: null,
       rank: Number.isFinite(rank) ? rank : null,
       sourceUrl: null,
       rawValues: Object.fromEntries(headers.map((h, i) => [h || `col${i}`, values[i] ?? ''])),
@@ -544,6 +555,10 @@ function parseClusterSheet(sheet: ExcelJS.Worksheet, out: ParsedWorkbook): void 
       deliverablesSummary: null,
       fitScore: parseStars(values[iFit] ?? ''),
       budgetRaw: nullIfEmpty(values[iBudget] ?? ''),
+      budgetAmount: null,
+      budgetCurrency: null,
+      contactPhone: null,
+      contactEmail: null,
       rank: Number.isFinite(rank) ? rank : null,
       sourceUrl: null,
       rawValues: Object.fromEntries(headers.map((h, i) => [h || `col${i}`, values[i] ?? ''])),
@@ -673,6 +688,10 @@ function parseBlockScoutingSheet(sheet: ExcelJS.Worksheet, out: ParsedWorkbook):
       deliverablesSummary: null,
       fitScore: parseStars(values[iFit] ?? ''),
       budgetRaw: null,
+      budgetAmount: null,
+      budgetCurrency: null,
+      contactPhone: null,
+      contactEmail: null,
       rank: Number.isFinite(rank) ? rank : null,
       sourceUrl,
       rawValues: Object.fromEntries(headers.map((h, i) => [h || `col${i}`, values[i] ?? ''])),
@@ -743,6 +762,10 @@ function parseDatabaseSheet(sheet: ExcelJS.Worksheet, out: ParsedWorkbook): void
       deliverablesSummary: null,
       fitScore: null,
       budgetRaw: null,
+      budgetAmount: null,
+      budgetCurrency: null,
+      contactPhone: null,
+      contactEmail: null,
       rank: null,
       sourceUrl: null,
       rawValues: { nombre: name, nichos: values[1], pais: values[2], tier: values[3] },
@@ -896,6 +919,10 @@ function parseHistorySheet(sheet: ExcelJS.Worksheet, out: ParsedWorkbook): void 
       deliverablesSummary: null,
       fitScore: null,
       budgetRaw: null,
+      budgetAmount: null,
+      budgetCurrency: null,
+      contactPhone: null,
+      contactEmail: null,
       rank: null,
       sourceUrl: null,
       rawValues: { a, b, c },
@@ -959,6 +986,10 @@ function parseBacklogSheet(sheet: ExcelJS.Worksheet, out: ParsedWorkbook): void 
       deliverablesSummary: null,
       fitScore: null,
       budgetRaw: null,
+      budgetAmount: null,
+      budgetCurrency: null,
+      contactPhone: null,
+      contactEmail: null,
       rank: null,
       sourceUrl: null,
       rawValues: { value },
@@ -1129,6 +1160,254 @@ function parseSummarySheet(sheet: ExcelJS.Worksheet, out: ParsedWorkbook): void 
   out.sheetsSeen.push({ name: sheet.name, rows: sheet.rowCount, handled: true, note: `shortlist con ${out.shortlist.length} entradas` })
 }
 
+// ── Lector genérico: cualquier planilla con encabezados ──────────────────────
+
+/**
+ * El lector genérico.
+ *
+ * El resto de este archivo lee UNA planilla: la del scouting de la agencia,
+ * hoja por hoja, cada una con su forma. Eso dejó afuera cualquier otro Excel
+ * --una base de España, un media kit de un representante-- que entraba, se
+ * procesaba sin errores y no importaba a nadie: "formato no reconocido".
+ *
+ * Este lector no mira el NOMBRE de la hoja sino sus ENCABEZADOS, que es lo que
+ * hace una persona al abrir un archivo ajeno. Reconoce la fila de títulos esté
+ * donde esté --en el archivo de España está en la cuarta-- y mapea las columnas
+ * por su nombre, con sinónimos.
+ *
+ * Es deliberadamente exigente: pide un nombre y además una URL o un número de
+ * seguidores. Una hoja de brief o de resumen no tiene eso, así que sigue
+ * cayendo en su lector propio y no en éste.
+ */
+const SINONIMOS = {
+  nombre: ['INFLUENCER NOMBRE', 'NOMBRE', 'INFLUENCER', 'CREADOR', 'CREATOR', 'TALENTO', 'PERFIL NOMBRE'],
+  url: ['INFLUENCER (CON URL)', 'URL', 'PERFIL', 'LINK', 'ENLACE', 'CUENTA', 'INSTAGRAM', 'TIKTOK', 'YOUTUBE'],
+  handle: ['USUARIO', 'HANDLE', 'ARROBA'],
+  plataforma: ['PLATAFORMA', 'RED SOCIAL', 'RED', 'PLATFORM'],
+  nicho: ['VERTICAL', 'NICHO', 'NICHOS', 'CATEGORIA', 'CATEGORÍA', 'SEGMENTO', 'RUBRO', 'TEMATICA', 'TEMÁTICA'],
+  pais: ['PAIS', 'PAÍS', 'COUNTRY', 'MERCADO'],
+  ciudad: ['CIUDAD', 'CITY'],
+  seguidores: ['FOLLOWERS', 'SEGUIDORES', 'AUDIENCIA'],
+  engagement: ['AV. ER', 'AV ER', 'ER', 'ENGAGEMENT RATE', 'ENGAGEMENT'],
+  precio: ['PRECIO', 'COSTO', 'CACHET', 'CACHÉ', 'CACHE', 'TARIFA', 'FEE', 'PRESUPUESTO'],
+  telefono: ['TELEFONO', 'TELÉFONO', 'WHATSAPP', 'WHATS APP', 'WSP', 'CELULAR', 'MOVIL', 'MÓVIL', 'PHONE'],
+  email: ['EMAIL', 'E-MAIL', 'MAIL', 'CORREO'],
+  comentarios: ['COMENTARIOS', 'COMENTARIO', 'OBSERVACIONES', 'NOTAS', 'NOTES'],
+  entregable: ['TIPO POSTEO', 'ENTREGABLE', 'ENTREGABLES', 'DELIVERABLE'],
+} as const
+
+type Columnas = Partial<Record<keyof typeof SINONIMOS, number>>
+
+/** El encabezado de una hoja cualquiera, con las columnas que se reconocieron. */
+export function detectarEncabezado(
+  sheet: ExcelJS.Worksheet,
+): { fila: number; columnas: Columnas; headers: string[] } | null {
+  const maxCol = Math.min(Math.max(sheet.columnCount, 1), 40)
+  const limite = Math.min(sheet.rowCount, 20)
+  let mejor: { fila: number; columnas: Columnas; headers: string[]; puntos: number } | null = null
+
+  for (let r = 1; r <= limite; r += 1) {
+    const headers = rowValues(sheet.getRow(r), maxCol).map((value) => cleanText(value).toUpperCase())
+    if (headers.every((header) => header === '')) continue
+
+    const columnas: Columnas = {}
+    for (const [campo, agujas] of Object.entries(SINONIMOS) as Array<[keyof typeof SINONIMOS, readonly string[]]>) {
+      const index = headerIndex(headers, ...agujas)
+      if (index >= 0) columnas[campo] = index
+    }
+
+    const puntos = Object.keys(columnas).length
+    /*
+     * El mínimo: un nombre, y algo con que identificar a la persona o medirla.
+     * Sin esto una hoja de brief --"País: Argentina", "ER: ideal >3%"-- podría
+     * pasar por una tabla de creadores.
+     */
+    const sirve =
+      columnas.nombre !== undefined &&
+      (columnas.url !== undefined || columnas.seguidores !== undefined) &&
+      puntos >= 3
+    if (sirve && (!mejor || puntos > mejor.puntos)) mejor = { fila: r, columnas, headers, puntos }
+  }
+
+  return mejor ? { fila: mejor.fila, columnas: mejor.columnas, headers: mejor.headers } : null
+}
+
+/**
+ * El porcentaje de una celda.
+ *
+ * En Excel un porcentaje es una FRACCIÓN con formato: la celda vale 0,14 y se
+ * ve "14%". Leer el texto da "0.14", y normalizarlo daría 0,14% -- cien veces
+ * menos de lo que dice la planilla. El formato de la celda es lo único que
+ * distingue un caso del otro, así que se mira.
+ *
+ * Un número suelto sin formato de porcentaje NO se interpreta: se devuelve
+ * como texto para que el lector de siempre lo reporte como no normalizable.
+ */
+function porcentajeDeCelda(cell: ExcelJS.Cell | undefined): string {
+  if (!cell) return ''
+  const valor = cell.value
+  const formato = cell.numFmt ?? ''
+  if (typeof valor === 'number' && formato.includes('%')) {
+    const rate = valor * 100
+    return `${Number(rate.toFixed(2))}%`
+  }
+  return cellRaw(cell)
+}
+
+/** La moneda que declara el formato de la celda: `[$USD] #,##0.00` → USD. */
+function monedaDeCelda(cell: ExcelJS.Cell | undefined): string | null {
+  const formato = cell?.numFmt ?? ''
+  const match = formato.match(/\[\$([A-Za-z]{3})/)
+  return match ? (match[1] ?? '').toUpperCase() : null
+}
+
+function importeDeCelda(cell: ExcelJS.Cell | undefined): number | null {
+  const valor = cell?.value
+  if (typeof valor === 'number' && Number.isFinite(valor)) return Math.round(valor * 100) / 100
+  return null
+}
+
+function parseGenericSheet(sheet: ExcelJS.Worksheet, out: ParsedWorkbook): boolean {
+  const encabezado = detectarEncabezado(sheet)
+  if (!encabezado) return false
+
+  const { fila: filaEncabezado, columnas } = encabezado
+  const maxCol = Math.min(Math.max(sheet.columnCount, 1), 40)
+  const en = (campo: keyof typeof SINONIMOS, values: string[]): string =>
+    columnas[campo] === undefined ? '' : (values[columnas[campo]!] ?? '')
+  const celda = (campo: keyof typeof SINONIMOS, r: number): ExcelJS.Cell | undefined =>
+    columnas[campo] === undefined ? undefined : sheet.getRow(r).getCell(columnas[campo]! + 1)
+
+  let handled = 0
+  for (let r = filaEncabezado + 1; r <= sheet.rowCount; r += 1) {
+    const values = rowValues(sheet.getRow(r), maxCol)
+    if (isRowEmpty(values)) continue
+
+    const name = cleanText(en('nombre', values))
+    if (!name || isPlaceholder(name)) continue
+    // Una planilla larga repite el encabezado cada tanto, y a veces lleva
+    // subtítulos de bloque entre medio. Ninguno de los dos es una persona.
+    if (looksLikeSectionHeading(name)) {
+      out.issues.push({
+        sheetName: sheet.name,
+        rowNumber: r,
+        outcome: 'SECTION',
+        message: `Título de bloque: "${name}"`,
+        rawValues: { name },
+      })
+      continue
+    }
+    if (SINONIMOS.nombre.some((aguja) => name.toUpperCase() === aguja)) continue
+
+    if (looksLikeMultiplePeople(name)) {
+      out.issues.push({
+        sheetName: sheet.name,
+        rowNumber: r,
+        outcome: 'MULTI_PERSON',
+        message: `La fila describe a más de una persona ("${name}").`,
+        rawValues: { name },
+      })
+      continue
+    }
+
+    /*
+     * La URL puede estar en el texto de la celda o sólo en su hipervínculo: en
+     * el Excel de España el texto visible ES la URL, pero en otros archivos la
+     * celda dice "Instagram" y el link está detrás.
+     */
+    const celdaUrl = celda('url', r)
+    const urlTexto = cleanText(en('url', values))
+    const urlLink = cellHyperlink(celdaUrl)
+    const urlFinal = /\./.test(urlTexto) ? urlTexto : (urlLink ?? urlTexto)
+
+    const { profiles, problems } = buildProfiles(
+      urlFinal,
+      en('seguidores', values),
+      porcentajeDeCelda(celda('engagement', r)),
+    )
+    for (const problem of problems) {
+      out.issues.push({
+        sheetName: sheet.name,
+        rowNumber: r,
+        outcome: 'UNPARSEABLE',
+        message: `${name}: ${problem}`,
+        rawValues: { name },
+      })
+    }
+    if (profiles.length === 0) {
+      out.issues.push({
+        sheetName: sheet.name,
+        rowNumber: r,
+        outcome: 'INCOMPLETE',
+        message: `"${name}" no tiene URL utilizable: se importa sin perfil social.`,
+        rawValues: { name, url: urlFinal },
+      })
+    }
+
+    const celdaPrecio = celda('precio', r)
+    const comentario = nullIfEmpty(en('comentarios', values))
+
+    out.people.push({
+      sheetName: sheet.name,
+      rowNumber: r,
+      importKey: importKeyFor(profiles, name),
+      displayName: name,
+      handle: normalizeHandle(en('handle', values)),
+      country: nullIfEmpty(en('pais', values)),
+      city: nullIfEmpty(en('ciudad', values)),
+      niches: splitNiches(en('nicho', values)),
+      tierLabel: parseTierLabel(en('nicho', values)),
+      bio: comentario,
+      profiles,
+      /*
+       * Una planilla ajena no trae campaña: es un padrón, no una propuesta.
+       * Va a la base general para que exista en el padrón sin inventarle una
+       * campaña ni una decisión del cliente.
+       */
+      campaignKey: 'base-general',
+      clusterKey: null,
+      clusterLabel: null,
+      statusKey: 'EN_SCREENING',
+      clientApproval: 'PENDING',
+      clientFeedback: null,
+      agencyRationale: comentario,
+      contentIdea: null,
+      deliverablesSummary: nullIfEmpty(en('entregable', values)),
+      fitScore: null,
+      budgetRaw: nullIfEmpty(en('precio', values)),
+      budgetAmount: importeDeCelda(celdaPrecio),
+      budgetCurrency: monedaDeCelda(celdaPrecio),
+      contactPhone: nullIfEmpty(en('telefono', values)),
+      contactEmail: nullIfEmpty(en('email', values)),
+      rank: null,
+      sourceUrl: null,
+      rawValues: {
+        nombre: name,
+        url: urlFinal,
+        plataforma: en('plataforma', values),
+        vertical: en('nicho', values),
+        seguidores: en('seguidores', values),
+        er: porcentajeDeCelda(celda('engagement', r)),
+        precio: en('precio', values),
+        telefono: en('telefono', values),
+      },
+    })
+    handled += 1
+  }
+
+  const reconocidas = Object.keys(columnas).join(', ')
+  out.sheetsSeen.push({
+    name: sheet.name,
+    rows: sheet.rowCount,
+    handled: true,
+    note: `${handled} perfiles · encabezado en la fila ${filaEncabezado} · columnas: ${reconocidas}`,
+  })
+  out.decisions.push(
+    `La hoja "${sheet.name}" no tiene un formato conocido, así que se leyó por sus encabezados (fila ${filaEncabezado}): ${reconocidas}. Los perfiles entraron al padrón, sin campaña.`,
+  )
+  return true
+}
+
 // ── Punto de entrada ─────────────────────────────────────────────────────────
 
 export async function parseWorkbook(buffer: Buffer): Promise<ParsedWorkbook> {
@@ -1183,7 +1462,7 @@ export async function parseWorkbook(buffer: Buffer): Promise<ParsedWorkbook> {
     else if (/^Brief/i.test(name)) parseNarrativeBrief(sheet, out)
     else if (/^RESUMEN$/i.test(name)) parseSummarySheet(sheet, out)
     else if (/agregar si aplica|perfiles adicionales/i.test(name)) parseBacklogSheet(sheet, out)
-    else {
+    else if (!parseGenericSheet(sheet, out)) {
       const empty = sheet.rowCount <= 1
       out.sheetsSeen.push({
         name,

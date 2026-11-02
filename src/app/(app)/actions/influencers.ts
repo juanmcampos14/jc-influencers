@@ -32,8 +32,22 @@ const influencerFields = {
   tagKeys: z.array(z.string().trim().max(60)).max(30).optional(),
 }
 
+/**
+ * Un campo de texto vacío es "sin dato", no una cadena vacía.
+ *
+ * El formulario manda `''` cuando alguien borra el teléfono. Guardarlo así
+ * dejaría filas con `''` que no son ni un número ni la ausencia de uno.
+ */
+const vacioEsNulo = <T extends Record<string, unknown>>(input: T): T => ({
+  ...input,
+  contactEmail: (input.contactEmail as string | null) || null,
+  contactPhone: (input.contactPhone as string | null) || null,
+  contactNotes: (input.contactNotes as string | null) || null,
+  contactLegalBasis: (input.contactLegalBasis as string | null) || null,
+})
+
 export const createInfluencerAction = defineAction(z.object(influencerFields), async (input, ctx) => {
-  const result = await createInfluencer(ctx, { ...input, contactEmail: input.contactEmail || null })
+  const result = await createInfluencer(ctx, vacioEsNulo(input))
   revalidatePath('/influencers')
   return result
 })
@@ -42,7 +56,7 @@ export const updateInfluencerAction = defineAction(
   z.object({ influencerId: z.string().min(1).max(60), version: z.number().int().min(1), ...influencerFields }),
   async (input, ctx) => {
     const { influencerId, ...rest } = input
-    await updateInfluencer(ctx, influencerId, { ...rest, contactEmail: rest.contactEmail || null })
+    await updateInfluencer(ctx, influencerId, vacioEsNulo(rest))
     revalidatePath('/influencers')
     revalidatePath(`/influencers/${influencerId}`)
     return { ok: true }
