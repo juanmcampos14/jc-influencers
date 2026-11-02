@@ -2,6 +2,8 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import type { AuthContext } from '@/lib/authz/context'
 import { parseWorkbook } from '@/lib/import/excel'
 import { ajustarImportacion, confirmImport, previewImport } from '@/lib/import/runner'
+import { filasParaPreguntar, preverBusquedaDePaises } from '@/lib/import/paises'
+import { fraseDelError } from '@/lib/authz/errors'
 import { searchInfluencers } from '@/lib/repos/influencers'
 import { withSystemScope } from '@/lib/db/scope'
 import { buildGenericWorkbook } from '../helpers/build-generic-workbook'
@@ -194,6 +196,36 @@ describe('Importador: el país que falta', () => {
     // La única fila sin país en esa planilla sí toma el elegido.
     const ana = ajustado.personas.find((persona) => persona.name.startsWith('Ana Uno'))
     expect(ana).toBeUndefined() // se reporta como dos personas, no entra
+  })
+
+  /*
+   * "No hay a quién preguntarle" y "no hay nada que preguntar" se arreglan
+   * distinto: lo primero es una credencial que falta, lo segundo es que la
+   * planilla ya trae todos los países. Decir el equivocado manda a buscar el
+   * problema donde no está. En este entorno de test ningún proveedor sabe
+   * actualizar perfiles, que es exactamente el caso.
+   */
+  it('cuenta aparte las filas que ningún proveedor puede contestar', async () => {
+    const twitch = await buildGenericWorkbook({ conPais: false, red: 'twitch' })
+    const preview = await previewImport(admin, { clientId, filename: 'twitch.xlsx', data: twitch })
+    const filas = await filasParaPreguntar(admin, preview.importRunId)
+    expect(filas.total).toBe(0)
+    expect(filas.sinProveedor).toBeGreaterThan(0)
+  })
+
+  it('sin proveedor que actualice la red lo dice, en vez de decir que no falta ningún país', async () => {
+    const twitch = await buildGenericWorkbook({ conPais: false, red: 'twitch' })
+    const preview = await previewImport(admin, { clientId, filename: 'twitch.xlsx', data: twitch })
+    const error = await preverBusquedaDePaises(admin, preview.importRunId).catch((e: unknown) => e)
+    expect(fraseDelError(error)?.clave).toBe('ningunProveedorActualiza')
+  })
+
+  /* Y la cuenta tiene que cerrar: cada fila sin país cae en uno de los tres. */
+  it('cada fila sin país está en exactamente uno de los tres grupos', async () => {
+    const preview = await previewImport(admin, { clientId, filename: 'sin-pais.xlsx', data })
+    const filas = await filasParaPreguntar(admin, preview.importRunId)
+    const sinPais = preview.personas.filter((persona) => !persona.country).length
+    expect(filas.total + filas.sinProveedor + filas.sinUrl).toBe(sinPais)
   })
 
   it('la previsualización trae cada fila con lo que se leyó', async () => {

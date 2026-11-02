@@ -1997,6 +1997,7 @@
     "muralSinIdentidad": "Primero definí la identidad visual: el mural se dibuja con la paleta de la marca.",
     "nadaQuePreguntar": "No hay filas sin país a las que preguntarle al proveedor.",
     "necesitasIngresar": "Necesitás iniciar sesión",
+    "ningunProveedorActualiza": "Ninguno de los proveedores conectados puede averiguar el país en esa red, así que no hay a quién preguntarle por {cantidad, plural, one {# perfil} other {# perfiles}}. Elegí el país a mano, o pedile al equipo técnico que conecte un proveedor que actualice esa red.",
     "noCambiasTuRol": "No podés cambiarte tu propio rol.",
     "noCoincideConLaNueva": "No coincide con la contraseña nueva.",
     "noCreasUsuariosDeAgencia": "No podés crear usuarios de agencia.",

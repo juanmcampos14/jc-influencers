@@ -1997,6 +1997,7 @@
     "muralSinIdentidad": "Set the visual identity first: the mural is drawn with the brand's palette.",
     "nadaQuePreguntar": "There are no rows without a country to ask the provider about.",
     "necesitasIngresar": "You need to sign in",
+    "ningunProveedorActualiza": "None of the connected providers can look up the country on that network, so there is nobody to ask about {cantidad, plural, one {# profile} other {# profiles}}. Pick the country by hand, or ask the technical team to connect a provider that refreshes that network.",
     "noCambiasTuRol": "You cannot change your own role.",
     "noCoincideConLaNueva": "It does not match the new password.",
     "noCreasUsuariosDeAgencia": "You cannot create agency users.",

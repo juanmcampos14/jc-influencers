@@ -35,12 +35,22 @@ export type FilasPreguntables = {
   total: number
   /** Filas sin país que no tienen URL: a ésas no se les puede preguntar nada. */
   sinUrl: number
+  /**
+   * Filas con URL de una red que NINGÚN proveedor conectado sabe actualizar.
+   *
+   * Se cuenta aparte porque "no hay a quién preguntarle" y "no hay nada que
+   * preguntar" se arreglan distinto: lo primero es una credencial que falta,
+   * lo segundo es que la planilla ya tiene todos los países. Juntarlos haría
+   * que un proveedor sin configurar se leyera como una planilla completa.
+   */
+  sinProveedor: number
 }
 
 export async function filasParaPreguntar(ctx: AuthContext, importRunId: string): Promise<FilasPreguntables> {
   const summary = await resumenDe(ctx, importRunId)
   const porRed = new Map<Platform, string[]>()
   let sinUrl = 0
+  let sinProveedor = 0
 
   for (const persona of summary.personas) {
     if (persona.country) continue
@@ -58,12 +68,20 @@ export async function filasParaPreguntar(ctx: AuthContext, importRunId: string):
      * Sólo las redes que el proveedor sabe actualizar. Pedirle una que no
      * soporta gasta una corrida para volver con un error que ya se sabía.
      */
-    if (!scoutingProviderFor(platform, 'ENRICH').supports(platform, 'ENRICH')) continue
+    if (!scoutingProviderFor(platform, 'ENRICH').supports(platform, 'ENRICH')) {
+      sinProveedor += 1
+      continue
+    }
     porRed.set(platform, [...(porRed.get(platform) ?? []), parsed.value.url])
   }
 
   const lista = [...porRed.entries()].map(([platform, urls]) => ({ platform, urls }))
-  return { porRed: lista, total: lista.reduce((suma, entrada) => suma + entrada.urls.length, 0), sinUrl }
+  return {
+    porRed: lista,
+    total: lista.reduce((suma, entrada) => suma + entrada.urls.length, 0),
+    sinUrl,
+    sinProveedor,
+  }
 }
 
 /**
@@ -76,7 +94,18 @@ export async function filasParaPreguntar(ctx: AuthContext, importRunId: string):
 export async function preverBusquedaDePaises(ctx: AuthContext, importRunId: string) {
   const run = await corridaDe(ctx, importRunId)
   const filas = await filasParaPreguntar(ctx, importRunId)
-  if (filas.total === 0) throw new ValidationError({ clave: 'nadaQuePreguntar' })
+  if (filas.total === 0) {
+    /*
+     * Dos motivos distintos para no poder preguntar, y decir el equivocado
+     * manda a buscar el problema donde no está. Si hay filas con URL pero
+     * ningún proveedor conectado sabe actualizar esa red, el problema es la
+     * credencial, no la planilla.
+     */
+    throw new ValidationError({
+      clave: filas.sinProveedor > 0 ? 'ningunProveedorActualiza' : 'nadaQuePreguntar',
+      valores: { cantidad: filas.sinProveedor },
+    })
+  }
 
   /*
    * Una red por corrida. Con una planilla de una sola red --el caso normal--

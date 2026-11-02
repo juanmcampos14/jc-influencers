@@ -267,7 +267,17 @@ export class ApifyScoutingProvider implements ScoutingProvider {
       YOUTUBE: { discover: this.actors.youtubeDiscover, enrich: this.actors.youtubeProfiles },
     }
     const entrada = porRed[platform]
-    return (mode === 'DISCOVER' ? entrada?.discover : entrada?.enrich) ?? null
+    const actor = mode === 'DISCOVER' ? entrada?.discover : entrada?.enrich
+    /*
+     * Una variable de entorno VACÍA no es un actor. Con `?? null` el texto
+     * vacío pasaba de largo --`?? ` sólo atrapa null y undefined-- y
+     * `supports` contestaba que sí: la pantalla ofrecía una red que el
+     * proveedor no puede hacer, y la corrida recién fallaba al pedirle a Apify
+     * `/actors//runs`. Declarar una capacidad que no existe es peor que no
+     * tenerla.
+     */
+    const limpio = actor?.trim()
+    return limpio ? limpio : null
   }
 
   private async pedir(path: string, init: RequestInit = {}): Promise<Response> {

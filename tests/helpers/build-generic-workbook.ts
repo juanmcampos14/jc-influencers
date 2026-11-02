@@ -14,8 +14,22 @@ import ExcelJS from 'exceljs'
  * Suma además una columna de teléfono y una de email, que la de España no
  * tiene pero otras bases sí.
  */
-export async function buildGenericWorkbook(opciones: { conPais?: boolean } = {}): Promise<Buffer> {
+export async function buildGenericWorkbook(
+  opciones: {
+    conPais?: boolean
+    /**
+     * La red de los perfiles. Twitch sirve para un caso que Instagram no
+     * puede fijar: NINGÚN proveedor conectado sabe actualizar un perfil de
+     * Twitch, así que el test no depende de qué credenciales haya cargadas.
+     */
+    red?: 'instagram' | 'twitch'
+  } = {},
+): Promise<Buffer> {
   const conPais = opciones.conPais !== false
+  const red = opciones.red ?? 'instagram'
+  const plataforma = red === 'twitch' ? 'TWITCH' : 'INSTAGRAM'
+  const perfil = (usuario: string, extra = '') =>
+    red === 'twitch' ? `https://www.twitch.tv/${usuario}` : `https://www.instagram.com/${usuario}/${extra}`
   const workbook = new ExcelJS.Workbook()
   const hoja = workbook.addWorksheet('INTERNACIONALES')
 
@@ -38,8 +52,8 @@ export async function buildGenericWorkbook(opciones: { conPais?: boolean } = {})
 
   const uno = hoja.addRow([
     'Lucía Ficticia',
-    'https://www.instagram.com/lucia.ficticia/?hl=es',
-    'INSTAGRAM',
+    perfil('lucia.ficticia', '?hl=es'),
+    plataforma,
     'LIFESTYLE',
     960000,
     0.14,
@@ -55,8 +69,8 @@ export async function buildGenericWorkbook(opciones: { conPais?: boolean } = {})
   // El ER como texto, que es lo que pasa cuando alguien lo escribe a mano.
   const dos = hoja.addRow([
     'Mateo Inventado',
-    'https://www.instagram.com/mateo.inventado/',
-    'INSTAGRAM',
+    perfil('mateo.inventado'),
+    plataforma,
     'GAMING',
     428000,
     '4,5%',
@@ -70,21 +84,21 @@ export async function buildGenericWorkbook(opciones: { conPais?: boolean } = {})
 
   // Celda con hipervínculo y texto que no es la URL.
   const tres = hoja.addRow([
-    'Sofía Prueba', 'Instagram', 'INSTAGRAM', 'MODA', 150000, 0.032, null, '', '',
+    'Sofía Prueba', 'Instagram', plataforma, 'MODA', 150000, 0.032, null, '', '',
     ...(conPais ? ['ESPAÑA'] : []), '',
   ])
-  tres.getCell(2).value = { text: 'Instagram', hyperlink: 'https://www.instagram.com/sofia.prueba/' }
+  tres.getCell(2).value = { text: 'Instagram', hyperlink: perfil('sofia.prueba') }
   tres.getCell(6).numFmt = '0.0%'
 
   // Dos personas en una fila: se reporta, no se parte.
   hoja.addRow([
-    'Ana Uno + Beto Dos', 'https://www.instagram.com/ana.y.beto/', 'INSTAGRAM', '', 5000, null, null, '', '',
+    'Ana Uno + Beto Dos', perfil('ana.y.beto'), plataforma, '', 5000, null, null, '', '',
     ...(conPais ? [''] : []), '',
   ])
 
   // Sin URL: entra al padrón igual, y se dice que entró sin perfil.
   hoja.addRow([
-    'Nico SinLink', '', 'INSTAGRAM', 'DEPORTES', 90000, null, null, '', '',
+    'Nico SinLink', '', plataforma, 'DEPORTES', 90000, null, null, '', '',
     ...(conPais ? ['ESPAÑA'] : []), '',
   ])
 
