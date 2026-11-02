@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { AuthContext } from '@/lib/authz/context'
 import { parseWorkbook } from '@/lib/import/excel'
-import { confirmImport, previewImport } from '@/lib/import/runner'
+import { ajustarImportacion, confirmImport, previewImport } from '@/lib/import/runner'
 import { searchInfluencers } from '@/lib/repos/influencers'
 import { withSystemScope } from '@/lib/db/scope'
 import { buildGenericWorkbook } from '../helpers/build-generic-workbook'
@@ -132,5 +132,82 @@ describe('Importador: planilla con encabezados', () => {
     expect(Number(fila?.budgetRequested)).toBe(51415)
     expect(fila?.budgetNegotiated).toBeNull()
     expect(fila?.currency).toBe('USD')
+  })
+})
+
+/**
+ * Elegir el país que a la planilla le falta.
+ *
+ * Importa porque sin país un teléfono local no alcanza para abrir un WhatsApp,
+ * y porque la decisión se toma en la previsualización pero se aplica al
+ * confirmar, que vuelve a leer el archivo: si la decisión viviera sólo en la
+ * pantalla, confirmar la ignoraría en silencio.
+ */
+describe('Importador: el país que falta', () => {
+  let admin: AuthContext
+  let clientId: string
+  let data: Buffer
+
+  beforeAll(async () => {
+    await resetDatabase()
+    await seedCatalogs()
+    clientId = (await createClientTenant('Cliente Sin País')).id
+    admin = await contextFor((await createUser({ agencyRole: 'AGENCY_ADMIN' })).id)
+    data = await buildGenericWorkbook({ conPais: false })
+  })
+
+  it('dice cuántas filas quedaron sin país', async () => {
+    const summary = await previewImport(admin, { clientId, filename: 'sin-pais.xlsx', data })
+    expect(summary.sinPais).toBe(summary.personas.length)
+    expect(summary.personas.every((persona) => persona.country === null)).toBe(true)
+  })
+
+  it('el país elegido se aplica y se nota que fue elegido', async () => {
+    const preview = await previewImport(admin, { clientId, filename: 'sin-pais.xlsx', data })
+    const ajustado = await ajustarImportacion(admin, preview.importRunId, { paisPorDefecto: 'ESPAÑA' })
+    expect(ajustado.sinPais).toBe(0)
+    expect(ajustado.personas.every((persona) => persona.country === 'ESPAÑA')).toBe(true)
+    expect(ajustado.personas[0]?.countrySource).toBe('ELEGIDO')
+  })
+
+  it('confirmar respeta el país elegido en la previsualización', async () => {
+    const preview = await previewImport(admin, { clientId, filename: 'sin-pais.xlsx', data })
+    await ajustarImportacion(admin, preview.importRunId, { paisPorDefecto: 'ESPAÑA' })
+    await confirmImport(admin, preview.importRunId)
+
+    const page = await searchInfluencers(admin, { search: 'Lucía Ficticia' })
+    expect(page.items[0]?.country).toBe('ESPAÑA')
+  })
+
+  /*
+   * Lo que el archivo SÍ dice manda sobre la lista desplegable: elegir un país
+   * para las filas que faltan no puede reescribir las que el archivo sabía.
+   */
+  it('el país elegido no pisa el que trae la planilla', async () => {
+    const conPais = await buildGenericWorkbook()
+    const preview = await previewImport(admin, { clientId, filename: 'con-pais.xlsx', data: conPais })
+    const ajustado = await ajustarImportacion(admin, preview.importRunId, { paisPorDefecto: 'MEX' })
+
+    const lucia = ajustado.personas.find((persona) => persona.name === 'Lucía Ficticia')
+    expect(lucia?.country).toBe('ESPAÑA')
+    expect(lucia?.countrySource).toBe('ARCHIVO')
+    // La única fila sin país en esa planilla sí toma el elegido.
+    const ana = ajustado.personas.find((persona) => persona.name.startsWith('Ana Uno'))
+    expect(ana).toBeUndefined() // se reporta como dos personas, no entra
+  })
+
+  it('la previsualización trae cada fila con lo que se leyó', async () => {
+    const summary = await previewImport(admin, { clientId, filename: 'sin-pais.xlsx', data })
+    const lucia = summary.personas.find((persona) => persona.name === 'Lucía Ficticia')
+    expect(lucia).toMatchObject({
+      followers: 960000,
+      engagementRate: 14,
+      phone: '+34 612 345 678',
+      budgetAmount: 51415,
+      budgetCurrency: 'USD',
+    })
+    // Ya se confirmó una importación más arriba, así que la fila ahora
+    // reconoce a la persona en vez de darla de alta otra vez.
+    expect(lucia?.outcome).toBe('EXISTE')
   })
 })

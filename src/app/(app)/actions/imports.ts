@@ -3,12 +3,18 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { defineAction } from '@/lib/actions/define'
-import { fail, ok, type ActionResult } from '@/lib/actions/result'
+import { fail, ok, traducirFalla, type ActionResult } from '@/lib/actions/result'
 import { requireContext } from '@/lib/auth/current'
 import { assertCan, assertClientInScope } from '@/lib/authz/context'
 import { ValidationError } from '@/lib/authz/errors'
 import { assertUploadAllowed, MAX_UPLOAD_BYTES } from '@/lib/ports/storage'
-import { cancelImport, confirmImport, previewImport, type ImportSummary } from '@/lib/import/runner'
+import { ajustarImportacion, cancelImport, confirmImport, previewImport, type ImportSummary } from '@/lib/import/runner'
+import {
+  aplicarPaisesEncontrados,
+  ejecutarBusquedaDePaises,
+  filasParaPreguntar,
+  preverBusquedaDePaises,
+} from '@/lib/import/paises'
 
 const XLSX_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -41,7 +47,9 @@ export async function previewImportAction(formData: FormData): Promise<ActionRes
     revalidatePath('/importacion')
     return ok(summary)
   } catch (error) {
-    return fail(error)
+    // No pasa por `defineAction` --recibe un FormData-- así que traduce el
+    // error acá, como haría el camino de siempre.
+    return traducirFalla(fail(error), error)
   }
 }
 
@@ -62,5 +70,50 @@ export const cancelImportAction = defineAction(
     await cancelImport(ctx, input.importRunId)
     revalidatePath('/importacion')
     return { ok: true }
+  },
+)
+
+/** Cambiar el país que se aplica a las filas que no lo traen. */
+export const ajustarImportacionAction = defineAction(
+  z.object({
+    importRunId: z.string().min(1).max(60),
+    paisPorDefecto: z.string().trim().max(60).nullable(),
+  }),
+  async (input, ctx) => {
+    const summary = await ajustarImportacion(ctx, input.importRunId, {
+      paisPorDefecto: input.paisPorDefecto || null,
+    })
+    return summary
+  },
+)
+
+/** Cuántas filas se le pueden preguntar al proveedor, y cuántas no tienen URL. */
+export const contarFilasSinPaisAction = defineAction(
+  z.object({ importRunId: z.string().min(1).max(60) }),
+  async (input, ctx) => filasParaPreguntar(ctx, input.importRunId),
+)
+
+/** Paso 1: registrar la consulta al proveedor y decir cuánto sale. No gasta. */
+export const preverPaisesAction = defineAction(
+  z.object({ importRunId: z.string().min(1).max(60) }),
+  async (input, ctx) => preverBusquedaDePaises(ctx, input.importRunId),
+)
+
+/** Paso 2: ejecutarla. Acá sí se gasta, y queda en la lista de Búsquedas. */
+export const buscarPaisesAction = defineAction(
+  z.object({ scoutingRunId: z.string().min(1).max(60) }),
+  async (input, ctx) => ejecutarBusquedaDePaises(ctx, input.scoutingRunId),
+)
+
+/** Paso 3: traer a la importación los países que contestó. */
+export const aplicarPaisesAction = defineAction(
+  z.object({
+    importRunId: z.string().min(1).max(60),
+    scoutingRunId: z.string().min(1).max(60),
+  }),
+  async (input, ctx) => {
+    const resultado = await aplicarPaisesEncontrados(ctx, input)
+    revalidatePath('/importacion')
+    return resultado
   },
 )

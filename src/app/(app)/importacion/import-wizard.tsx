@@ -13,7 +13,19 @@ import { InfoNote } from '@/components/ui/states'
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table'
 import { formatNumber } from '@/lib/util/format'
 import type { ImportSummary } from '@/lib/import/runner'
-import { cancelImportAction, confirmImportAction, previewImportAction } from '../actions/imports'
+import { MARKET_SEED } from '@/lib/domain/statuses'
+import { formatMoney, formatPercent } from '@/lib/util/format'
+import {
+  ajustarImportacionAction,
+  aplicarPaisesAction,
+  buscarPaisesAction,
+  cancelImportAction,
+  confirmImportAction,
+  contarFilasSinPaisAction,
+  preverPaisesAction,
+  previewImportAction,
+} from '../actions/imports'
+import { pollScoutingAction } from '../actions/scouting'
 
 /*
  * Qué le pasó a esa fila. Salía el valor del enum en mayúsculas -- CONFLICT,
@@ -24,6 +36,13 @@ import { cancelImportAction, confirmImportAction, previewImportAction } from '..
  * --se arma una sola vez al cargar el módulo-- y ahí todavía no se sabe en qué
  * idioma se va a leer. Se traduce al dibujar.
  */
+/** Qué va a pasar con cada fila del archivo. */
+const RESULTADOS: Record<string, string> = {
+  ALTA: 'emerald',
+  EXISTE: 'slate',
+  POSIBLE_DUPLICADO: 'amber',
+}
+
 const OUTCOMES: Record<string, { clave: string; tone: string }> = {
   CONFLICT: { clave: 'contradiccionOrigen', tone: 'rose' },
   UNPARSEABLE: { clave: 'valorSinNormalizar', tone: 'amber' },
@@ -44,6 +63,100 @@ export function ImportWizard({
   const router = useRouter()
   const [summary, setSummary] = React.useState<ImportSummary | null>(null)
   const [pending, startTransition] = React.useTransition()
+  const [pais, setPais] = React.useState('')
+  /** Lo que el proveedor va a cobrar por completar los países. Null = sin preguntar. */
+  const [consulta, setConsulta] = React.useState<{ cantidad: number; costo: string; sinUrl: number } | null>(null)
+  const [buscando, setBuscando] = React.useState(false)
+  /** La corrida de scouting ya registrada, lista para ejecutar. */
+  const [pendienteDeEjecutar, setPendienteDeEjecutar] = React.useState<string | null>(null)
+
+  /** Aplica el país elegido a las filas que no lo traen. */
+  function aplicarPais() {
+    if (!summary) return
+    startTransition(async () => {
+      const result = await ajustarImportacionAction({
+        importRunId: summary.importRunId,
+        paisPorDefecto: pais || null,
+      })
+      if (!result.ok) {
+        toast.error(result.message)
+        return
+      }
+      setSummary(result.data)
+      toast.success(t('paisAplicado', { cantidad: result.data.personas.filter((p) => p.country).length }))
+    })
+  }
+
+  /** Paso 1: cuánto costaría preguntarle al proveedor. No gasta nada. */
+  function consultarCosto() {
+    if (!summary) return
+    startTransition(async () => {
+      const [filas, preview] = await Promise.all([
+        contarFilasSinPaisAction({ importRunId: summary.importRunId }),
+        preverPaisesAction({ importRunId: summary.importRunId }),
+      ])
+      if (!filas.ok || !preview.ok) {
+        toast.error(filas.ok ? (preview.ok ? '' : preview.message) : filas.message)
+        return
+      }
+      if (!preview.data.puedeEjecutar) {
+        toast.error(preview.data.bloqueos[0] ?? '')
+        return
+      }
+      setConsulta({
+        cantidad: preview.data.requestedRecords,
+        costo: formatMoney(preview.data.estimatedCostUsd, 'USD', idioma),
+        sinUrl: filas.data.sinUrl,
+      })
+      setPendienteDeEjecutar(preview.data.runId)
+    })
+  }
+
+  /**
+   * Paso 2: ejecutarla y esperar.
+   *
+   * El proveedor tarda, así que se consulta cada cinco segundos en vez de
+   * dejar la pantalla quieta sin decir nada.
+   */
+  function preguntarAlProveedor() {
+    if (!summary || !pendienteDeEjecutar) return
+    const scoutingRunId = pendienteDeEjecutar
+    setBuscando(true)
+    startTransition(async () => {
+      const arranque = await buscarPaisesAction({ scoutingRunId })
+      if (!arranque.ok) {
+        setBuscando(false)
+        toast.error(arranque.message)
+        return
+      }
+
+      const limite = Date.now() + 3 * 60_000
+      while (Date.now() < limite) {
+        await new Promise((resolve) => setTimeout(resolve, 5_000))
+        const progreso = await pollScoutingAction({ runId: scoutingRunId })
+        if (!progreso.ok) break
+        if (progreso.data.status === 'RUNNING') continue
+
+        const aplicado = await aplicarPaisesAction({ importRunId: summary.importRunId, scoutingRunId })
+        setBuscando(false)
+        setConsulta(null)
+        setPendienteDeEjecutar(null)
+        if (!aplicado.ok) {
+          toast.error(aplicado.message)
+          return
+        }
+        setSummary(aplicado.data.summary)
+        toast.success(
+          t('paisesEncontrados', {
+            encontrados: aplicado.data.encontrados,
+            sinRespuesta: aplicado.data.sinRespuesta,
+          }),
+        )
+        return
+      }
+      setBuscando(false)
+    })
+  }
 
   function upload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -158,6 +271,130 @@ export function ImportWizard({
               <Stat label={t('contradicciones')} value={counts.conflictRows} tone="warn" />
               <Stat label={t('filasConMasDeUna')} value={counts.multiPersonRows} />
             </StatStrip>
+          </div>
+
+          {/*
+            * El país que falta, antes que nada: es lo que habilita el WhatsApp
+            * y lo único de esta pantalla que se puede arreglar sin volver a
+            * tocar el archivo.
+            */}
+          {summary.sinPais > 0 ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-medium text-amber-900">{t('faltaElPais', { cantidad: summary.sinPais })}</p>
+              <p className="mt-0.5 text-xs text-amber-800">{t('faltaElPaisAyuda')}</p>
+
+              <div className="mt-3 flex flex-wrap items-end gap-3">
+                <Field label={t('usarEstePais')} htmlFor="paisPorDefecto" className="w-52">
+                  <Select id="paisPorDefecto" value={pais} onChange={(evento) => setPais(evento.target.value)}>
+                    <option value="">{t('sinElegir')}</option>
+                    {MARKET_SEED.map((mercado) => (
+                      <option key={mercado} value={mercado}>
+                        {mercado}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Button size="sm" variant="secondary" onClick={aplicarPais} disabled={pending || !pais}>
+                  {t('aplicarPais')}
+                </Button>
+
+                <span aria-hidden="true" className="h-9 w-px bg-amber-300" />
+
+                {consulta ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-amber-900">
+                      {t('preguntarAyuda', { cantidad: consulta.cantidad, costo: consulta.costo })}
+                    </span>
+                    <Button size="sm" onClick={preguntarAlProveedor} disabled={pending || buscando}>
+                      {buscando ? t('preguntando') : t('preguntarAlProveedor')}
+                    </Button>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="secondary" onClick={consultarCosto} disabled={pending}>
+                    {t('preguntarAlProveedor')}
+                  </Button>
+                )}
+              </div>
+              {consulta && consulta.sinUrl > 0 ? (
+                <p className="mt-2 text-xs text-amber-800">{t('sinUrlParaPreguntar', { cantidad: consulta.sinUrl })}</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* Fila por fila: antes esto era "21 altas nuevas" y a confirmar a ciegas. */}
+          <div>
+            <h3 className="mb-1 text-sm font-semibold text-ink-900">{t('loQueVaAEntrar')}</h3>
+            <p className="mb-2 text-xs text-ink-500">{t('loQueVaAEntrarAyuda')}</p>
+            <TableWrap>
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>{t('colFila')}</Th>
+                    <Th>{t('colNombre')}</Th>
+                    <Th>{t('colPerfil')}</Th>
+                    <Th className="text-right">{t('colSeguidores')}</Th>
+                    <Th className="text-right">{t('colEr')}</Th>
+                    <Th>{t('colPais')}</Th>
+                    <Th>{t('colTelefono')}</Th>
+                    <Th className="text-right">{t('colPrecio')}</Th>
+                    <Th>{t('colQuePasa')}</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.personas.map((persona) => (
+                    <Tr key={`${persona.sheetName}-${persona.rowNumber}`}>
+                      <Td className="text-xs text-ink-500">{persona.rowNumber}</Td>
+                      <Td className="font-medium text-ink-900">{persona.name}</Td>
+                      <Td className="text-xs">
+                        {persona.url ? (
+                          <span className="text-ink-600">{persona.handle ?? persona.url}</span>
+                        ) : (
+                          <span className="text-amber-700">{t('filaIncompleta')}</span>
+                        )}
+                      </Td>
+                      <Td className="text-right tabular-nums">
+                        {formatNumber(persona.followers, idioma)}
+                        {persona.followersUnparsed ? (
+                          <span className="block text-[11px] text-amber-700">{persona.followersRaw}</span>
+                        ) : null}
+                      </Td>
+                      <Td className="text-right tabular-nums">{formatPercent(persona.engagementRate, idioma)}</Td>
+                      <Td className="text-xs">
+                        {persona.country ? (
+                          <>
+                            {persona.country}
+                            {persona.countrySource && persona.countrySource !== 'ARCHIVO' ? (
+                              <span className="block text-[11px] text-ink-500">
+                                {t(`origen${persona.countrySource}`)}
+                              </span>
+                            ) : null}
+                          </>
+                        ) : (
+                          <span className="text-amber-700">{t('sinDato')}</span>
+                        )}
+                      </Td>
+                      <Td className="text-xs text-ink-600">{persona.phone ?? t('sinDato')}</Td>
+                      <Td className="text-right tabular-nums text-xs">
+                        {persona.budgetAmount != null
+                          ? formatMoney(persona.budgetAmount, persona.budgetCurrency ?? 'USD', idioma)
+                          : t('sinDato')}
+                      </Td>
+                      <Td>
+                        <Badge tone={RESULTADOS[persona.outcome] ?? 'slate'}>{t(`resultado${persona.outcome}`)}</Badge>
+                        {persona.outcomeDetail ? (
+                          <p className="mt-0.5 max-w-64 text-[11px] text-ink-500">{persona.outcomeDetail}</p>
+                        ) : null}
+                      </Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            </TableWrap>
+            {summary.personasOcultas > 0 ? (
+              <p className="mt-1 text-xs text-ink-500">
+                {t('filasOcultas', { mostradas: summary.personas.length, ocultas: summary.personasOcultas })}
+              </p>
+            ) : null}
           </div>
 
           <div>

@@ -14,7 +14,8 @@ import ExcelJS from 'exceljs'
  * Suma además una columna de teléfono y una de email, que la de España no
  * tiene pero otras bases sí.
  */
-export async function buildGenericWorkbook(): Promise<Buffer> {
+export async function buildGenericWorkbook(opciones: { conPais?: boolean } = {}): Promise<Buffer> {
+  const conPais = opciones.conPais !== false
   const workbook = new ExcelJS.Workbook()
   const hoja = workbook.addWorksheet('INTERNACIONALES')
 
@@ -31,7 +32,7 @@ export async function buildGenericWorkbook(): Promise<Buffer> {
     'PRECIO (Sin IVA)',
     'TELÉFONO',
     'EMAIL',
-    'PAÍS',
+    ...(conPais ? ['PAÍS'] : []),
     'COMENTARIOS',
   ])
 
@@ -45,7 +46,7 @@ export async function buildGenericWorkbook(): Promise<Buffer> {
     51415,
     '+34 612 345 678',
     'lucia@ejemplo.test',
-    'ESPAÑA',
+    ...(conPais ? ['ESPAÑA'] : []),
     'Trabajó con la marca en 2024',
   ])
   uno.getCell(6).numFmt = '0%'
@@ -62,21 +63,30 @@ export async function buildGenericWorkbook(): Promise<Buffer> {
     29380,
     '612345678',
     '',
-    'ESPAÑA',
+    ...(conPais ? ['ESPAÑA'] : []),
     '',
   ])
   dos.getCell(7).numFmt = '[$EUR] #,##0.00'
 
   // Celda con hipervínculo y texto que no es la URL.
-  const tres = hoja.addRow(['Sofía Prueba', 'Instagram', 'INSTAGRAM', 'MODA', 150000, 0.032, null, '', '', 'ESPAÑA', ''])
+  const tres = hoja.addRow([
+    'Sofía Prueba', 'Instagram', 'INSTAGRAM', 'MODA', 150000, 0.032, null, '', '',
+    ...(conPais ? ['ESPAÑA'] : []), '',
+  ])
   tres.getCell(2).value = { text: 'Instagram', hyperlink: 'https://www.instagram.com/sofia.prueba/' }
   tres.getCell(6).numFmt = '0.0%'
 
   // Dos personas en una fila: se reporta, no se parte.
-  hoja.addRow(['Ana Uno + Beto Dos', 'https://www.instagram.com/ana.y.beto/', 'INSTAGRAM', '', 5000, null, null, '', '', '', ''])
+  hoja.addRow([
+    'Ana Uno + Beto Dos', 'https://www.instagram.com/ana.y.beto/', 'INSTAGRAM', '', 5000, null, null, '', '',
+    ...(conPais ? [''] : []), '',
+  ])
 
   // Sin URL: entra al padrón igual, y se dice que entró sin perfil.
-  hoja.addRow(['Nico SinLink', '', 'INSTAGRAM', 'DEPORTES', 90000, null, null, '', '', 'ESPAÑA', ''])
+  hoja.addRow([
+    'Nico SinLink', '', 'INSTAGRAM', 'DEPORTES', 90000, null, null, '', '',
+    ...(conPais ? ['ESPAÑA'] : []), '',
+  ])
 
   const buffer = await workbook.xlsx.writeBuffer()
   return Buffer.from(buffer)

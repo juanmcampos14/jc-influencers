@@ -10,8 +10,41 @@ import { cleanText, nameSimilarity, normalizeHandle, parseProfileUrl, slugify } 
 import { detectDuplicates } from '@/lib/repos/influencers'
 import { actorOf, scoped, type Tx } from '@/lib/repos/base'
 import { parseWorkbook, type ParsedPerson, type ParsedWorkbook } from './excel'
+import {
+  aplicarOpciones,
+  claveDeFila,
+  opcionesDelResumen,
+  SIN_OPCIONES,
+  type OpcionesDeImportacion,
+} from './opciones'
 
 const IMPORT_TIMEOUT_MS = 300_000
+
+/** Una fila del archivo, tal como va a quedar si se aplica. */
+export type PersonaDelPreview = {
+  sheetName: string
+  rowNumber: number
+  name: string
+  handle: string | null
+  url: string | null
+  platform: string | null
+  followers: number | null
+  followersRaw: string | null
+  followersUnparsed: boolean
+  engagementRate: number | null
+  country: string | null
+  /** De dónde salió el país: la planilla, el proveedor o la lista desplegable. */
+  countrySource: 'ARCHIVO' | 'PROVEEDOR' | 'ELEGIDO' | null
+  phone: string | null
+  email: string | null
+  budgetAmount: number | null
+  budgetCurrency: string | null
+  niches: string[]
+  campaignKey: string
+  /** Qué va a pasar con esta fila. */
+  outcome: 'ALTA' | 'EXISTE' | 'POSIBLE_DUPLICADO'
+  outcomeDetail: string | null
+}
 
 export type ImportSummary = {
   importRunId: string
@@ -19,6 +52,20 @@ export type ImportSummary = {
   fileHash: string
   sheets: ParsedWorkbook['sheetsSeen']
   decisions: string[]
+  /** Las decisiones ya tomadas sobre esta corrida. */
+  opciones: OpcionesDeImportacion
+  /**
+   * TODAS las filas que se van a aplicar, no un recuento.
+   *
+   * Antes la previsualización decía "21 altas nuevas" y había que confirmar a
+   * ciegas: con el país o el teléfono mal leídos no se notaba hasta después, y
+   * deshacer una importación es a mano.
+   */
+  personas: PersonaDelPreview[]
+  /** Si la lista de arriba se recortó, cuántas quedaron afuera. */
+  personasOcultas: number
+  /** Cuántas filas siguen sin país. Lo que habilita completarlo. */
+  sinPais: number
   counts: {
     totalRows: number
     newInfluencers: number
@@ -143,9 +190,181 @@ function registerSeen(seen: Map<string, ParsedPerson>, person: ParsedPerson): vo
  * Fase 1: leer el archivo y construir el reporte previo.
  * No escribe ninguna entidad de negocio; sólo el registro de importación.
  */
+/** Cuántas filas viajan a la pantalla. Más que esto no se lee, y pesa. */
+const TOPE_DE_PREVIEW = 500
+
+/**
+ * Arma el resumen de una corrida.
+ *
+ * Lo usan la previsualización y el ajuste --cambiar el país, completarlo con el
+ * proveedor-- para que las dos lleguen al MISMO resumen. Tenerlo dos veces
+ * escrito terminaba en una pantalla que decía una cosa y una confirmación que
+ * aplicaba otra.
+ */
+async function construirResumen(
+  tx: Tx,
+  input: {
+    parsed: ParsedWorkbook
+    importRunId: string
+    clientId: string
+    filename: string
+    fileHash: string
+    opciones: OpcionesDeImportacion
+    /** Las filas se registran una sola vez, al previsualizar. */
+    registrarFilas: boolean
+  },
+): Promise<ImportSummary> {
+  const { parsed: crudo, opciones } = input
+  const parsed = aplicarOpciones(crudo, opciones)
+  const paisOriginal = new Map(crudo.people.map((person) => [claveDeFila(person), person.country]))
+
+  const seen = new Map<string, ParsedPerson>()
+  const duplicates: ImportSummary['duplicates'] = []
+  const personas: PersonaDelPreview[] = []
+  let newInfluencers = 0
+  let existingInfluencers = 0
+
+  for (const person of parsed.people) {
+    const existing = await resolveExistingInfluencer(tx, person)
+    const duplicate = await findPossibleDuplicate(tx, person, seen)
+    registerSeen(seen, person)
+
+    if (duplicate) {
+      duplicates.push({
+        sheetName: person.sheetName,
+        rowNumber: person.rowNumber,
+        name: person.displayName,
+        reason: duplicate.reason,
+        existingName: duplicate.existingName,
+      })
+    }
+    if (existing) existingInfluencers += 1
+    else newInfluencers += 1
+
+    const clave = claveDeFila(person)
+    const perfil = person.profiles[0]
+    const origenDelPais = paisOriginal.get(clave)
+      ? ('ARCHIVO' as const)
+      : opciones.paisPorFila[clave]
+        ? ('PROVEEDOR' as const)
+        : person.country
+          ? ('ELEGIDO' as const)
+          : null
+
+    personas.push({
+      sheetName: person.sheetName,
+      rowNumber: person.rowNumber,
+      name: person.displayName,
+      handle: person.handle ?? perfil?.url.split('/').filter(Boolean).pop() ?? null,
+      url: perfil?.url ?? null,
+      platform: perfil ? (parseProfileUrl(perfil.url).kind === 'value' ? platformOf(perfil.url) : null) : null,
+      followers: perfil?.followers ?? null,
+      followersRaw: perfil?.followersRaw ?? null,
+      followersUnparsed: perfil?.followersUnparsed ?? false,
+      engagementRate: perfil?.engagementRate ?? null,
+      country: person.country,
+      countrySource: origenDelPais,
+      phone: person.contactPhone,
+      email: person.contactEmail,
+      budgetAmount: person.budgetAmount,
+      budgetCurrency: person.budgetCurrency,
+      niches: person.niches,
+      campaignKey: person.campaignKey,
+      outcome: duplicate ? 'POSIBLE_DUPLICADO' : existing ? 'EXISTE' : 'ALTA',
+      outcomeDetail: duplicate?.reason ?? existing?.displayName ?? null,
+    })
+
+    if (input.registrarFilas) {
+      await tx.importRowLog.create({
+        data: {
+          importRunId: input.importRunId,
+          clientId: input.clientId,
+          sheetName: person.sheetName,
+          rowNumber: person.rowNumber,
+          outcome: duplicate ? 'POSSIBLE_DUPLICATE' : existing ? 'UNCHANGED' : 'CREATED',
+          entityType: 'Influencer',
+          entityId: existing?.id ?? null,
+          message: duplicate?.reason ?? (existing ? `Coincide con "${existing.displayName}"` : 'Alta nueva'),
+          rawValues: person.rawValues as never,
+        },
+      })
+    }
+  }
+
+  if (input.registrarFilas) {
+    for (const issue of parsed.issues) {
+      await tx.importRowLog.create({
+        data: {
+          importRunId: input.importRunId,
+          clientId: input.clientId,
+          sheetName: issue.sheetName,
+          rowNumber: issue.rowNumber,
+          outcome: issue.outcome,
+          message: issue.message,
+          rawValues: issue.rawValues as never,
+        },
+      })
+    }
+  }
+
+  const campaignCounts = new Map<string, number>()
+  for (const person of parsed.people) {
+    campaignCounts.set(person.campaignKey, (campaignCounts.get(person.campaignKey) ?? 0) + 1)
+  }
+
+  return {
+    importRunId: input.importRunId,
+    filename: input.filename,
+    fileHash: input.fileHash,
+    sheets: parsed.sheetsSeen,
+    decisions: parsed.decisions,
+    opciones,
+    personas: personas.slice(0, TOPE_DE_PREVIEW),
+    personasOcultas: Math.max(0, personas.length - TOPE_DE_PREVIEW),
+    sinPais: personas.filter((persona) => !persona.country).length,
+    counts: {
+      totalRows: parsed.people.length,
+      newInfluencers,
+      existingInfluencers,
+      possibleDuplicates: duplicates.length,
+      incompleteRows: parsed.issues.filter((i) => i.outcome === 'INCOMPLETE').length,
+      unparseableValues: parsed.issues.filter((i) => i.outcome === 'UNPARSEABLE').length,
+      sectionRows: parsed.issues.filter((i) => i.outcome === 'SECTION').length,
+      multiPersonRows: parsed.issues.filter((i) => i.outcome === 'MULTI_PERSON').length,
+      conflictRows: parsed.issues.filter((i) => i.outcome === 'CONFLICT').length,
+      campaigns: parsed.campaigns.filter((c) => (campaignCounts.get(c.key) ?? 0) > 0).length,
+      shortlist: parsed.shortlist.length,
+    },
+    duplicates: duplicates.slice(0, 200),
+    issues: parsed.issues.slice(0, 500).map((i) => ({
+      sheetName: i.sheetName,
+      rowNumber: i.rowNumber,
+      outcome: i.outcome,
+      message: i.message,
+    })),
+    campaigns: parsed.campaigns
+      .filter((c) => (campaignCounts.get(c.key) ?? 0) > 0)
+      .map((c) => ({ key: c.key, name: c.name, people: campaignCounts.get(c.key) ?? 0 })),
+    brief: {
+      followersMin: parsed.brief.followersMin,
+      followersMax: parsed.brief.followersMax,
+      engagementRateMin: parsed.brief.engagementRateMin,
+      clusters: parsed.brief.clusters.map((c) => ({ label: c.label, targetPercent: c.targetPercent })),
+      keywords: parsed.brief.keywords.length,
+      niches: parsed.brief.niches.length,
+    },
+  }
+}
+
+/** La red de una URL ya validada, para mostrarla en la previsualización. */
+function platformOf(url: string): string | null {
+  const parsed = parseProfileUrl(url)
+  return parsed.kind === 'value' ? parsed.value.platform : null
+}
+
 export async function previewImport(
   ctx: AuthContext,
-  input: { clientId: string; filename: string; data: Buffer },
+  input: { clientId: string; filename: string; data: Buffer; opciones?: OpcionesDeImportacion },
 ): Promise<ImportSummary> {
   assertClientInScope(ctx, input.clientId)
   assertCan(ctx, 'import.run', input.clientId)
@@ -153,6 +372,7 @@ export async function previewImport(
 
   const parsed = await parseWorkbook(input.data)
   const fileHash = createHash('sha256').update(input.data).digest('hex')
+  const opciones = input.opciones ?? SIN_OPCIONES
 
   const stored = await fileStorage().put({
     filename: input.filename,
@@ -177,100 +397,15 @@ export async function previewImport(
         },
       })
 
-      const seen = new Map<string, ParsedPerson>()
-      const duplicates: ImportSummary['duplicates'] = []
-      let newInfluencers = 0
-      let existingInfluencers = 0
-
-      for (const person of parsed.people) {
-        const existing = await resolveExistingInfluencer(tx, person)
-        const duplicate = await findPossibleDuplicate(tx, person, seen)
-        registerSeen(seen, person)
-
-        if (duplicate) {
-          duplicates.push({
-            sheetName: person.sheetName,
-            rowNumber: person.rowNumber,
-            name: person.displayName,
-            reason: duplicate.reason,
-            existingName: duplicate.existingName,
-          })
-        }
-        if (existing) existingInfluencers += 1
-        else newInfluencers += 1
-
-        await tx.importRowLog.create({
-          data: {
-            importRunId: run.id,
-            clientId: input.clientId,
-            sheetName: person.sheetName,
-            rowNumber: person.rowNumber,
-            outcome: duplicate ? 'POSSIBLE_DUPLICATE' : existing ? 'UNCHANGED' : 'CREATED',
-            entityType: 'Influencer',
-            entityId: existing?.id ?? null,
-            message: duplicate?.reason ?? (existing ? `Coincide con "${existing.displayName}"` : 'Alta nueva'),
-            rawValues: person.rawValues as never,
-          },
-        })
-      }
-
-      for (const issue of parsed.issues) {
-        await tx.importRowLog.create({
-          data: {
-            importRunId: run.id,
-            clientId: input.clientId,
-            sheetName: issue.sheetName,
-            rowNumber: issue.rowNumber,
-            outcome: issue.outcome,
-            message: issue.message,
-            rawValues: issue.rawValues as never,
-          },
-        })
-      }
-
-      const campaignCounts = new Map<string, number>()
-      for (const person of parsed.people) {
-        campaignCounts.set(person.campaignKey, (campaignCounts.get(person.campaignKey) ?? 0) + 1)
-      }
-
-      const summary: ImportSummary = {
+      const summary = await construirResumen(tx, {
+        parsed,
         importRunId: run.id,
+        clientId: input.clientId,
         filename: stored.filename,
         fileHash,
-        sheets: parsed.sheetsSeen,
-        decisions: parsed.decisions,
-        counts: {
-          totalRows: parsed.people.length,
-          newInfluencers,
-          existingInfluencers,
-          possibleDuplicates: duplicates.length,
-          incompleteRows: parsed.issues.filter((i) => i.outcome === 'INCOMPLETE').length,
-          unparseableValues: parsed.issues.filter((i) => i.outcome === 'UNPARSEABLE').length,
-          sectionRows: parsed.issues.filter((i) => i.outcome === 'SECTION').length,
-          multiPersonRows: parsed.issues.filter((i) => i.outcome === 'MULTI_PERSON').length,
-          conflictRows: parsed.issues.filter((i) => i.outcome === 'CONFLICT').length,
-          campaigns: parsed.campaigns.filter((c) => (campaignCounts.get(c.key) ?? 0) > 0).length,
-          shortlist: parsed.shortlist.length,
-        },
-        duplicates: duplicates.slice(0, 200),
-        issues: parsed.issues.slice(0, 500).map((i) => ({
-          sheetName: i.sheetName,
-          rowNumber: i.rowNumber,
-          outcome: i.outcome,
-          message: i.message,
-        })),
-        campaigns: parsed.campaigns
-          .filter((c) => (campaignCounts.get(c.key) ?? 0) > 0)
-          .map((c) => ({ key: c.key, name: c.name, people: campaignCounts.get(c.key) ?? 0 })),
-        brief: {
-          followersMin: parsed.brief.followersMin,
-          followersMax: parsed.brief.followersMax,
-          engagementRateMin: parsed.brief.engagementRateMin,
-          clusters: parsed.brief.clusters.map((c) => ({ label: c.label, targetPercent: c.targetPercent })),
-          keywords: parsed.brief.keywords.length,
-          niches: parsed.brief.niches.length,
-        },
-      }
+        opciones,
+        registrarFilas: true,
+      })
 
       await tx.importRun.update({ where: { id: run.id }, data: { summary: summary as never, finishedAt: new Date() } })
       await recordAudit(tx, actorOf(ctx), {
@@ -281,6 +416,59 @@ export async function previewImport(
         metadata: { filename: stored.filename, rows: parsed.people.length },
       })
 
+      return summary
+    },
+    IMPORT_TIMEOUT_MS,
+  )
+}
+
+/**
+ * Cambia una decisión sobre una corrida ya previsualizada y rehace el resumen.
+ *
+ * No vuelve a subir el archivo ni crea otra corrida: lee el que ya está
+ * guardado. Elegir el país y volver a empezar la importación entera sería la
+ * otra forma, y obliga a subir el archivo de nuevo para cambiar una lista
+ * desplegable.
+ */
+export async function ajustarImportacion(
+  ctx: AuthContext,
+  importRunId: string,
+  cambios: Partial<OpcionesDeImportacion>,
+): Promise<ImportSummary> {
+  const run = await scoped(ctx, (tx) => tx.importRun.findUnique({ where: { id: importRunId } }))
+  if (!run) throw new NotFoundError()
+  assertClientInScope(ctx, run.clientId)
+  assertCan(ctx, 'import.run', run.clientId)
+  if (run.status !== 'PREVIEW') throw new ValidationError({ clave: 'importacionResuelta' })
+  if (!run.storageKey) throw new ValidationError({ clave: 'sinArchivoOriginal' })
+
+  const data = await fileStorage().get(run.storageKey, { clientId: run.clientId })
+  if (createHash('sha256').update(data).digest('hex') !== run.fileHash) {
+    throw new ValidationError({ clave: 'archivoCambio' })
+  }
+
+  const anteriores = opcionesDelResumen(run.summary)
+  const opciones: OpcionesDeImportacion = {
+    paisPorDefecto: cambios.paisPorDefecto !== undefined ? cambios.paisPorDefecto : anteriores.paisPorDefecto,
+    paisPorFila: { ...anteriores.paisPorFila, ...(cambios.paisPorFila ?? {}) },
+  }
+
+  const parsed = await parseWorkbook(data)
+  return scoped(
+    ctx,
+    async (tx) => {
+      const summary = await construirResumen(tx, {
+        parsed,
+        importRunId: run.id,
+        clientId: run.clientId,
+        filename: run.filename,
+        fileHash: run.fileHash,
+        opciones,
+        // Las filas ya se registraron al previsualizar: volver a escribirlas
+        // duplicaría el renglón de cada una en el log de la corrida.
+        registrarFilas: false,
+      })
+      await tx.importRun.update({ where: { id: run.id }, data: { summary: summary as never } })
       return summary
     },
     IMPORT_TIMEOUT_MS,
@@ -305,7 +493,12 @@ export async function confirmImport(ctx: AuthContext, importRunId: string): Prom
   const fileHash = createHash('sha256').update(data).digest('hex')
   if (fileHash !== run.fileHash) throw new ValidationError({ clave: 'archivoCambio' })
 
-  const parsed = await parseWorkbook(data)
+  /*
+   * Las decisiones de la previsualización viajan con la corrida, no con la
+   * pantalla: confirmar vuelve a leer el archivo guardado, así que sin esto
+   * aplicaría el archivo crudo e ignoraría en silencio el país elegido.
+   */
+  const parsed = aplicarOpciones(await parseWorkbook(data), opcionesDelResumen(run.summary))
   const clientId = run.clientId
   /*
    * Los datos de contacto tienen su propia capacidad, y la importación no la
