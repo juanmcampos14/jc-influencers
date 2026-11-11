@@ -6,6 +6,8 @@ import { assertCan, assertClientInScope } from '@/lib/authz/context'
 import { NotFoundError } from '@/lib/authz/errors'
 import { scoped } from '@/lib/repos/base'
 import { searchInfluencers } from '@/lib/repos/influencers'
+import { agregarPorEnlace, crearYAgregarPorNombre, resolverEnlaces } from '@/lib/repos/altas-en-campana'
+import { revalidatePath } from 'next/cache'
 
 /** Buscador para agregar influencers a una campaña. Excluye los que ya están. */
 export const searchInfluencersForCampaign = defineAction(
@@ -34,5 +36,43 @@ export const searchInfluencersForCampaign = defineAction(
         followers: item.profiles[0]?.followers ?? null,
         country: item.country,
       }))
+  },
+)
+
+/**
+ * Qué pasaría con los enlaces que se pegaron. No escribe ni gasta nada.
+ *
+ * El navegador manda el texto crudo y nada más: quién es cada enlace lo decide
+ * el servidor, acá y otra vez al agregar. Mandar el `influencerId` resuelto
+ * desde la pantalla sería confiar en que nadie lo cambia en el camino.
+ */
+export const resolverEnlacesAction = defineAction(
+  z.object({ campaignId: z.string().min(1).max(60), texto: z.string().max(4000) }),
+  async (input, ctx) => resolverEnlaces(ctx, input.campaignId, input.texto),
+)
+
+export const agregarPorEnlaceAction = defineAction(
+  z.object({
+    campaignId: z.string().min(1).max(60),
+    texto: z.string().min(1).max(4000),
+    clusterId: z.string().max(60).nullish(),
+  }),
+  async (input, ctx) => {
+    const resultado = await agregarPorEnlace(ctx, input)
+    revalidatePath(`/campanas/${input.campaignId}`)
+    return resultado
+  },
+)
+
+export const crearYAgregarAction = defineAction(
+  z.object({
+    campaignId: z.string().min(1).max(60),
+    displayName: z.string().trim().min(2).max(200),
+    clusterId: z.string().max(60).nullish(),
+  }),
+  async (input, ctx) => {
+    const resultado = await crearYAgregarPorNombre(ctx, input)
+    revalidatePath(`/campanas/${input.campaignId}`)
+    return resultado
   },
 )

@@ -5,6 +5,7 @@ import type { AuthContext } from '@/lib/authz/context'
 import { assertCan, capabilitiesFor } from '@/lib/authz/context'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/authz/errors'
 import { AUDIT, recordAudit } from '@/lib/audit'
+import { leerEnlacesPegados } from '@/lib/domain/enlaces-pegados'
 import { motivoPorHandle, motivoPorNombre, motivoPorUrl } from '@/lib/domain/parecido'
 import { fieldPermissionsFor, toInfluencerDto, type InfluencerDto } from '@/lib/domain/dto'
 import { nameSimilarity, normalizeHandle, parseProfileUrl } from '@/lib/domain/normalize'
@@ -88,19 +89,35 @@ export async function searchInfluencers(
   }
   const hasProfileFilter = Object.keys(profileConditions).length > 0
 
+  /*
+   * Pegar el link del perfil es la forma más natural de buscar a alguien: es
+   * lo que se tiene a mano cuando se lo vio en Instagram. Pero el buscador
+   * comparaba el texto contra el nombre y el handle, y
+   * `instagram.com/moyanoflor` no CONTIENE a `moyanoflor` al revés -- así que
+   * una persona que SÍ estaba en la base aparecía como "no hay resultados", y
+   * el camino que eso sugiere es darla de alta otra vez. Un duplicado nacido
+   * de una búsqueda que falló.
+   *
+   * Con un enlace se busca por la dirección normalizada --que es como se
+   * guarda, sin parámetros de tracking-- y además por el handle que trae.
+   */
+  const comoEnlace = filters.search ? (leerEnlacesPegados(filters.search).enlaces[0] ?? null) : null
+  const texto = comoEnlace?.handle ?? filters.search
+
   const where = {
     ...(filters.statuses?.length ? { status: { in: filters.statuses } } : {}),
     ...(filters.countries?.length ? { country: { in: filters.countries } } : {}),
     ...(filters.nicheKeys?.length ? { niches: { some: { niche: { key: { in: filters.nicheKeys } } } } } : {}),
     ...(filters.tagKeys?.length ? { tags: { some: { tag: { key: { in: filters.tagKeys } } } } } : {}),
     ...(hasProfileFilter ? { profiles: { some: profileConditions } } : {}),
-    ...(filters.search
+    ...(texto
       ? {
           OR: [
-            { displayName: { contains: filters.search, mode: 'insensitive' as const } },
-            { realName: { contains: filters.search, mode: 'insensitive' as const } },
-            { primaryHandle: { contains: filters.search, mode: 'insensitive' as const } },
-            { profiles: { some: { handle: { contains: filters.search.replace(/^@/, ''), mode: 'insensitive' as const } } } },
+            { displayName: { contains: texto, mode: 'insensitive' as const } },
+            { realName: { contains: texto, mode: 'insensitive' as const } },
+            { primaryHandle: { contains: texto, mode: 'insensitive' as const } },
+            { profiles: { some: { handle: { contains: texto.replace(/^@/, ''), mode: 'insensitive' as const } } } },
+            ...(comoEnlace ? [{ profiles: { some: { urlNormalized: comoEnlace.urlNormalized } } }] : []),
           ],
         }
       : {}),
