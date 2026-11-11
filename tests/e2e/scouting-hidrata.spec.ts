@@ -33,7 +33,13 @@ test.describe('Scouting', () => {
     await page.goto('/scouting')
 
     await page.getByLabel('Tema o nicho').fill('finanzas')
-    await page.getByRole('button', { name: 'Ver cuánto cuesta' }).click()
+    /*
+     * El botón lleva el costo adentro --"Buscar · hasta US$ 0,07"-- porque lo
+     * que sale se dice ANTES de apretar. El nombre fijo de antes quedó viejo
+     * con un rediseño y este test falló en silencio hasta que alguien volvió a
+     * correr los E2E: por eso ahora se busca por el principio del texto.
+     */
+    await page.getByRole('button', { name: /^Buscar( ·|$)/ }).click()
 
     // Con el formulario vivo, la respuesta llega sin navegar. Si hubiera hecho
     // submit nativo, los campos aparecerían en la URL.

@@ -272,6 +272,9 @@ model Campaign {
   updatedAt           DateTime       @updatedAt
   createdById         String?
   version             Int            @default(1)
+  /// Archivada: no aparece en la lista ni la ve el cliente. Nulo = a la vista.
+  /// Es otro eje que `status`: ese dice cómo terminó, éste si se quiere ver.
+  archivedAt          DateTime?
 
   client      Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
   brief       CampaignBrief?
@@ -292,6 +295,7 @@ model Campaign {
   /// Clave sobre la que cuelgan las FK compuestas de las entidades hijas.
   @@unique([id, clientId])
   @@index([clientId, status])
+  @@index([clientId, archivedAt])
   @@map("campaigns")
 }
 

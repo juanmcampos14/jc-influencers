@@ -41,6 +41,15 @@ export type CampaignFilters = {
   clientId?: string | null
   status?: CampaignStatus[] | null
   search?: string | null
+  /**
+   * Ver las archivadas en vez de las que están a la vista.
+   *
+   * Es un cambio de lista, no un filtro que se suma: archivar significa
+   * "sacala de ahí", y mezclarlas devolvería justo lo que alguien pidió no
+   * ver. Para un usuario del cliente este campo no existe: las archivadas no
+   * se le muestran de ninguna manera.
+   */
+  archivadas?: boolean | null
 }
 
 export type CampaignListItem = CampaignDto & {
@@ -71,9 +80,17 @@ export async function listCampaigns(
   assertCan(ctx, 'campaign.view', scopeClientId)
 
   const pagination = normalizePagination(pageInput)
+  /*
+   * El cliente NUNCA ve una archivada, pida lo que pida. Archivar es la forma
+   * de sacar una campaña de su portal, así que dejar que un parámetro de la
+   * URL las traiga de vuelta vaciaría la función entera.
+   */
+  const verArchivadas = ctx.side !== 'CLIENT' && filters.archivadas === true
+
   const where = {
     ...(filters.clientId ? { clientId: filters.clientId } : {}),
     ...(filters.status && filters.status.length > 0 ? { status: { in: filters.status } } : {}),
+    archivedAt: verArchivadas ? { not: null } : null,
     ...(filters.search
       ? { OR: [{ name: { contains: filters.search, mode: 'insensitive' as const } }, { description: { contains: filters.search, mode: 'insensitive' as const } }] }
       : {}),
@@ -133,6 +150,12 @@ export async function getCampaign(ctx: AuthContext, campaignId: string): Promise
   if (!row) throw new NotFoundError()
   assertClientInScope(ctx, row.clientId)
   assertCan(ctx, 'campaign.view', row.clientId)
+  /*
+   * Sacarla de la lista no alcanza: el cliente pudo haber guardado el enlace,
+   * o tenerlo en un mail. Para él una campaña archivada no existe, y 404 --no
+   * 403-- para no confirmarle que existió.
+   */
+  if (ctx.side === 'CLIENT' && row.archivedAt !== null) throw new NotFoundError()
 
   const perms = fieldPermissionsFor(ctx, row.clientId)
   return {
@@ -539,6 +562,94 @@ export async function upsertBrief(ctx: AuthContext, campaignId: string, input: B
  * Propuesta → Cerrada -- y además es lo que ordena la lista. No tenía forma de
  * hacerse: el estado se elegía en el alta y quedaba congelado ahí.
  */
+/**
+ * Qué se llevaría por delante eliminar una campaña.
+ *
+ * En la base TODO lo que cuelga de una campaña está en cascada, así que un
+ * `delete` se lleva candidaturas, pagos, entregas y los clics de los enlaces
+ * medidos sin preguntar. Quien aprieta el botón tiene que ver eso ANTES, con
+ * números, no después.
+ */
+export type LoQueSePierde = {
+  nombre: string
+  candidaturas: number
+  pagos: number
+  entregas: number
+  enlacesMedidos: number
+  /** Falso cuando hay plata o trabajo registrado: para eso está archivar. */
+  sePuedeEliminar: boolean
+}
+
+export async function loQueSePierdeAlEliminar(ctx: AuthContext, campaignId: string): Promise<LoQueSePierde> {
+  const campaign = await scoped(ctx, (tx) =>
+    tx.campaign.findUnique({
+      where: { id: campaignId },
+      select: {
+        name: true,
+        clientId: true,
+        _count: { select: { candidacies: true, payments: true, trackedLinks: true } },
+      },
+    }),
+  )
+  if (!campaign) throw new NotFoundError()
+  assertClientInScope(ctx, campaign.clientId)
+  assertCan(ctx, 'campaign.delete', campaign.clientId)
+
+  const entregas = await scoped(ctx, (tx) => tx.deliverable.count({ where: { clientId: campaign.clientId, candidacy: { campaignId } } }))
+
+  return {
+    nombre: campaign.name,
+    candidaturas: campaign._count.candidacies,
+    pagos: campaign._count.payments,
+    entregas,
+    enlacesMedidos: campaign._count.trackedLinks,
+    /*
+     * Pagos y entregas son plata que se movió y trabajo que se hizo. Eso no se
+     * borra para ordenar una lista: se archiva. Es la misma decisión que toma
+     * `deleteInfluencer` con alguien que participó de una campaña.
+     */
+    sePuedeEliminar: campaign._count.payments === 0 && entregas === 0,
+  }
+}
+
+/**
+ * Elimina una campaña, de verdad y para siempre.
+ *
+ * Existe para lo que archivar no resuelve: una campaña creada por error, una
+ * prueba, un duplicado. Se niega cuando hay pagos o entregas registradas --ahí
+ * la respuesta es archivar-- porque borrar plata que se movió para dejar una
+ * lista prolija es el tipo de operación que nadie puede deshacer.
+ */
+export async function eliminarCampana(ctx: AuthContext, campaignId: string): Promise<{ nombre: string }> {
+  const resumen = await loQueSePierdeAlEliminar(ctx, campaignId)
+  if (!resumen.sePuedeEliminar) {
+    throw new ValidationError({
+      clave: 'campanaConHistoria',
+      valores: { pagos: resumen.pagos, entregas: resumen.entregas },
+    })
+  }
+
+  return scoped(ctx, async (tx) => {
+    const campaign = await tx.campaign.findUnique({ where: { id: campaignId }, select: { name: true, clientId: true } })
+    if (!campaign) throw new NotFoundError()
+
+    /*
+     * La auditoría se escribe ANTES del borrado: después la campaña ya no
+     * existe y la fila quedaría apuntando a la nada. Lo que se perdió queda
+     * anotado con sus números.
+     */
+    await recordAudit(tx, actorOf(ctx), {
+      action: AUDIT.CAMPAIGN_DELETED,
+      entityType: 'Campaign',
+      entityId: campaignId,
+      clientId: campaign.clientId,
+      before: { nombre: campaign.name, candidaturas: resumen.candidaturas, enlacesMedidos: resumen.enlacesMedidos },
+    })
+    await tx.campaign.delete({ where: { id: campaignId } })
+    return { nombre: campaign.name }
+  })
+}
+
 export async function changeCampaignStatus(
   ctx: AuthContext,
   campaignId: string,

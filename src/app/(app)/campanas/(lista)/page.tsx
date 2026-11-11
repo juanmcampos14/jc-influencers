@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { getLocale, getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 import { PageHeader } from '@/components/app-shell'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Pagination } from '@/components/ui/pagination'
 import { EmptyState } from '@/components/ui/states'
@@ -28,7 +29,15 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export const dynamic = 'force-dynamic'
 
-type SearchParams = { q?: string; estado?: string; cliente?: string; pagina?: string; orden?: string; dir?: string }
+type SearchParams = {
+  q?: string
+  estado?: string
+  cliente?: string
+  pagina?: string
+  orden?: string
+  dir?: string
+  archivadas?: string
+}
 
 type Clave = 'nombre' | 'cliente' | 'estado' | 'perfiles' | 'fechas'
 
@@ -55,6 +64,13 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   // El cliente del filtro se valida contra el alcance dentro del repositorio.
   const clientFilter = params.cliente && ctx.clients.some((c) => c.id === params.cliente) ? params.cliente : null
 
+  /*
+   * Las archivadas son OTRA lista, no un filtro que se suma: archivar es
+   * "sacala de ahí", y mezclarlas devolvería justo lo que alguien pidió no
+   * ver. Se entra con `?archivadas=1` y la pantalla lo dice.
+   */
+  const verArchivadas = params.archivadas === '1'
+
   const campaigns = await loadPage(() =>
     listCampaigns(
     ctx,
@@ -62,6 +78,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
       search: params.q?.trim() || null,
       status: statusFilter as never,
       clientId: clientFilter,
+      archivadas: verArchivadas,
     },
       { page: Number(params.pagina ?? 1) || 1, pageSize: 25 },
       // Sin `orden` en la URL, el repositorio usa su orden natural: vivas
@@ -72,13 +89,25 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
 
   const canCreate = ctx.clients.some((client) => can(ctx, 'campaign.create', client.id))
   const canManage = campaigns.items.some((campaign) => can(ctx, 'campaign.update', campaign.clientId))
+  const puedeArchivar = campaigns.items.some((campaign) => can(ctx, 'campaign.delete', campaign.clientId))
 
   return (
     <>
       <PageHeader
-        title={t('titulo')}
-        description={t('bajada')}
-        actions={canCreate ? <NewCampaignDialog clients={ctx.clients.map((c) => ({ id: c.id, name: c.name }))} /> : null}
+        title={verArchivadas ? t('tituloArchivadas') : t('titulo')}
+        description={verArchivadas ? t('bajadaArchivadas') : t('bajada')}
+        actions={
+          <>
+            <Button asChild variant="secondary" size="sm">
+              <Link href={verArchivadas ? '/campanas' : '/campanas?archivadas=1'}>
+                {verArchivadas ? t('verActivas') : t('verArchivadas')}
+              </Link>
+            </Button>
+            {canCreate && !verArchivadas ? (
+              <NewCampaignDialog clients={ctx.clients.map((c) => ({ id: c.id, name: c.name }))} />
+            ) : null}
+          </>
+        }
       />
       <div className="space-y-4 px-5 py-6 sm:px-8">
         <CampaignFilters clients={ctx.clients.map((c) => ({ id: c.id, name: c.name }))} />
@@ -91,7 +120,11 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
             />
           ) : (
             <>
-              <SeleccionDeCampanas idsDeLaPagina={canManage ? campaigns.items.map((c) => c.id) : []}>
+              <SeleccionDeCampanas
+                idsDeLaPagina={canManage ? campaigns.items.map((c) => c.id) : []}
+                archivadas={verArchivadas}
+                puedeArchivar={puedeArchivar}
+              >
               <TableWrap>
                 <Table>
                   <thead>

@@ -83,6 +83,65 @@ export async function archivarClientes(
 // ── Campañas ────────────────────────────────────────────────────────────────
 
 /** Cierra o cancela campañas. Ninguna de las dos borra nada. */
+/**
+ * Archivar campañas: que no aparezcan más en la lista y que el cliente no las vea.
+ *
+ * Es OTRO eje que cerrar o cancelar, y por eso es un campo aparte. `status`
+ * dice qué pasó con la campaña --terminó, o no llegó a pasar--, y eso lo
+ * necesita el reporte de fin de año. Archivar dice "no la quiero ver más".
+ * Si fueran el mismo campo habría que elegir entre esconder una campaña y
+ * registrar cómo terminó.
+ *
+ * No borra nada: la plata, los perfiles y la historia siguen ahí, y
+ * desarchivar la devuelve entera. Para que deje de existir está `eliminarCampana`.
+ */
+export async function archivarCampanas(
+  ctx: AuthContext,
+  ids: string[],
+  archivar: boolean,
+): Promise<ResultadoDeLote> {
+  const omitidos: ResultadoDeLote['omitidos'] = []
+  let hechos = 0
+
+  for (const id of acotar(ids)) {
+    try {
+      await scoped(ctx, async (tx) => {
+        const antes = await tx.campaign.findUnique({
+          where: { id },
+          select: { name: true, clientId: true, archivedAt: true },
+        })
+        if (!antes) throw new Error('Ya no existe.')
+        assertClientInScope(ctx, antes.clientId)
+        assertCan(ctx, 'campaign.delete', antes.clientId)
+
+        const yaEstaba = archivar ? antes.archivedAt !== null : antes.archivedAt === null
+        if (yaEstaba) {
+          omitidos.push({ nombre: antes.name, motivo: archivar ? 'Ya estaba archivada.' : 'No estaba archivada.' })
+          return
+        }
+
+        await tx.campaign.update({
+          where: { id },
+          data: { archivedAt: archivar ? new Date() : null, version: { increment: 1 } },
+        })
+        await recordAudit(tx, actorOf(ctx), {
+          action: archivar ? AUDIT.CAMPAIGN_ARCHIVED : AUDIT.CAMPAIGN_RESTORED,
+          entityType: 'Campaign',
+          entityId: id,
+          clientId: antes.clientId,
+          before: { archivedAt: antes.archivedAt?.toISOString() ?? null },
+          after: { archivedAt: archivar ? new Date().toISOString() : null },
+        })
+        hechos += 1
+      })
+    } catch (error) {
+      omitidos.push({ nombre: id, motivo: motivoDe(error) })
+    }
+  }
+
+  return { hechos, omitidos }
+}
+
 export async function cerrarCampanas(
   ctx: AuthContext,
   ids: string[],

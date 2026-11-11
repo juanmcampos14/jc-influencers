@@ -3,7 +3,13 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { defineAction } from '@/lib/actions/define'
-import { changeCampaignStatus, createCampaign, updateCampaign, upsertBrief } from '@/lib/repos/campaigns'
+import {
+  changeCampaignStatus,
+  createCampaign,
+  eliminarCampana,
+  updateCampaign,
+  upsertBrief,
+} from '@/lib/repos/campaigns'
 
 const CAMPAIGN_STATUS = z.enum([
   'DRAFT',
@@ -16,6 +22,8 @@ const CAMPAIGN_STATUS = z.enum([
   'CLOSED',
   'CANCELLED',
 ])
+
+const id = z.string().min(1).max(60)
 
 const dateField = z
   .string()
@@ -139,3 +147,17 @@ export const changeCampaignStatusAction = defineAction(
     return { ok: true }
   },
 )
+
+/**
+ * Eliminar una campaña, de verdad y para siempre.
+ *
+ * El repositorio se niega solo cuando hay pagos o entregas: la pantalla no es
+ * la que decide eso. Acá sólo se revalida lo que deja de existir.
+ */
+export const eliminarCampanaAction = defineAction(z.object({ campaignId: id }), async (input, ctx) => {
+  const resultado = await eliminarCampana(ctx, input.campaignId)
+  revalidatePath('/campanas')
+  revalidatePath('/panel')
+  revalidatePath('/portal')
+  return resultado
+})

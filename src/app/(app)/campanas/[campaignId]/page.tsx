@@ -18,8 +18,14 @@ import { scoped } from '@/lib/repos/base'
 import { requireContext } from '@/lib/auth/current'
 import { can } from '@/lib/authz/context'
 import { NotFoundError } from '@/lib/authz/errors'
-import { getBrief, getCampaign } from '@/lib/repos/campaigns'
-import { candidacySummary, duplicateWarnings, listCandidacies, perfilesPorCluster } from '@/lib/repos/candidacies'
+import { getBrief, getCampaign, loQueSePierdeAlEliminar } from '@/lib/repos/campaigns'
+import {
+  candidacySummary,
+  duplicateWarnings,
+  listCandidacies,
+  perfilesPorCluster,
+  resumenDePresupuesto,
+} from '@/lib/repos/candidacies'
 import { listComments } from '@/lib/repos/comments'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { platformLabel } from '@/lib/domain/labels'
@@ -34,6 +40,7 @@ import { InsightsPanel } from './insights-panel'
 import { aiSpendThisMonth, listInsights } from '@/lib/repos/ai'
 import { aiProvider } from '@/lib/ports/ai'
 import { AddCandidacyDialog } from './add-candidacy-dialog'
+import { EliminarCampana } from './eliminar-campana'
 
 /**
  * El título de la pestaña también está traducido: se lee en el navegador, en
@@ -91,11 +98,24 @@ export default async function CampaignDetailPage({
   const canSeeBudget = can(ctx, 'budget.view', clientId)
   const canEditBudget = can(ctx, 'budget.manage', clientId)
 
-  const [summary, brief, duplicates] = await Promise.all([
+  const [summary, brief, duplicates, presupuesto] = await Promise.all([
     candidacySummary(ctx, campaignId),
     getBrief(ctx, campaignId),
     duplicateWarnings(ctx, campaignId),
+    /*
+     * La plata sólo se calcula para quien puede verla. Traerla igual y
+     * esconderla en la pantalla la deja viajando en el HTML, que es donde
+     * alguien la encuentra sin buscarla.
+     */
+    canSeeBudget ? resumenDePresupuesto(ctx, campaignId) : Promise.resolve([]),
   ])
+
+  /*
+   * Qué se llevaría puesto eliminarla. Se calcula sólo para quien puede
+   * eliminar: es una consulta de más para todos los demás.
+   */
+  const puedeEliminar = can(ctx, 'campaign.delete', clientId)
+  const loQueSePierde = puedeEliminar ? await loQueSePierdeAlEliminar(ctx, campaignId) : null
 
   const candidacies =
     tab === 'perfiles' || tab === 'funnel' || tab === 'shortlist'
@@ -227,6 +247,9 @@ export default async function CampaignDetailPage({
               </Button>
             ) : null}
             {canManage ? <AddCandidacyDialog campaignId={campaign.id} clusters={brief?.clusters ?? []} /> : null}
+            {loQueSePierde ? (
+              <EliminarCampana campaignId={campaign.id} loQueSePierde={loQueSePierde} />
+            ) : null}
           </>
         }
       />
@@ -249,6 +272,50 @@ export default async function CampaignDetailPage({
           <Stat label={t('statShortlist')} value={summary.shortlist} />
         </StatStrip>
 
+        {/*
+          * La plata, en su propia tira y debajo de los perfiles.
+          *
+          * Una fila por moneda: sumar pesos con dólares da un número que no
+          * existe, y es justo el tipo de cifra que alguien repite en una
+          * reunión. Si hay una sola moneda --el caso normal-- se ve una tira
+          * sola y la moneda no hace ruido.
+          */}
+        {presupuesto.map((total) => (
+          <StatStrip key={total.currency} className="mt-3">
+            <Stat
+              label={t('statPresupuestoPedido')}
+              value={formatMoney(total.pedido, total.currency, idioma)}
+              hint={t('statSobrePerfiles', { cantidad: total.perfiles })}
+            />
+            <Stat
+              label={t('statPresupuestoCerrado')}
+              value={total.cerrado > 0 ? formatMoney(total.cerrado, total.currency, idioma) : '—'}
+              hint={total.cerrado > 0 ? undefined : t('statNadaNegociado')}
+            />
+            <Stat
+              label={t('statPresupuestoAprobado')}
+              value={formatMoney(total.aprobado, total.currency, idioma)}
+              tone="good"
+              hint={t('statAprobadoAyuda')}
+            />
+            <Stat
+              label={t('statPresupuestoDeLaCampana')}
+              value={
+                campaign.budget?.estimated == null
+                  ? '—'
+                  : formatMoney(campaign.budget.estimated, campaign.currency, idioma)
+              }
+              hint={
+                campaign.budget?.estimated == null
+                  ? t('statSinTope')
+                  : t('statRestante', {
+                      monto: formatMoney(campaign.budget.estimated - total.aprobado, campaign.currency, idioma),
+                    })
+              }
+            />
+          </StatStrip>
+        ))}
+
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-ink-600">
           <span>
             {campaign.startDate || campaign.endDate ? (
@@ -259,18 +326,26 @@ export default async function CampaignDetailPage({
               <span className="text-ink-500">{t('sinFechas')}</span>
             )}
           </span>
-          {canSeeBudget && campaign.budget && campaign.budget.estimated != null ? (
+          {/*
+            * El presupuesto de la campaña ya está en su tarjeta, arriba y con
+            * cuánto queda. Acá sólo queda lo que la tarjeta no dice: el cachet
+            * y el canje. Repetir la misma cifra dos veces en la misma pantalla
+            * hace dudar de si son dos cosas distintas.
+            */}
+          {canSeeBudget &&
+          campaign.budget &&
+          (campaign.budget.cache != null || campaign.budget.barterDescription) ? (
             <span>
-              {t('presupuestoEstimado')}{' '}
-              <strong className="text-ink-900">
-                {formatMoney(campaign.budget.estimated, campaign.currency, idioma)}
-              </strong>
-              {campaign.budget.cache != null
-                ? t('cache', { monto: formatMoney(campaign.budget.cache, campaign.currency, idioma) })
-                : null}
-              {campaign.budget.barterDescription
-                ? t('canje', { detalle: campaign.budget.barterDescription })
-                : null}
+              {[
+                campaign.budget.cache != null
+                  ? t('cache', { monto: formatMoney(campaign.budget.cache, campaign.currency, idioma) })
+                  : null,
+                campaign.budget.barterDescription
+                  ? t('canje', { detalle: campaign.budget.barterDescription })
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </span>
           ) : null}
           {campaign.platforms.length > 0 ? (

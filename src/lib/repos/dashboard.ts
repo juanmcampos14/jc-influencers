@@ -69,6 +69,8 @@ export async function dashboard(ctx: AuthContext, clientId?: string | null): Pro
       where: {
         ...(clientId ? { clientId } : {}),
         status: { notIn: ['CLOSED', 'CANCELLED'] },
+        // Archivada es "no la quiero ver más", y el panel es lo primero que se ve.
+        archivedAt: null,
       },
       orderBy: { updatedAt: 'desc' },
       take: 25,
@@ -94,7 +96,7 @@ export async function dashboard(ctx: AuthContext, clientId?: string | null): Pro
         ...(clientId ? { clientId } : {}),
         clientApproval: { in: ['PENDING', 'NEEDS_REVIEW'] },
         clientVisible: true,
-        campaign: { status: { notIn: ['CLOSED', 'CANCELLED'] } },
+        campaign: { status: { notIn: ['CLOSED', 'CANCELLED'] }, archivedAt: null },
       },
       orderBy: { proposedAt: 'asc' },
       take: 20,
@@ -117,13 +119,13 @@ export async function dashboard(ctx: AuthContext, clientId?: string | null): Pro
     // página que se muestra.
     const enCampanasVivas: Prisma.CandidacyWhereInput = {
       ...(clientId ? { clientId } : {}),
-      campaign: { status: { notIn: ['CLOSED', 'CANCELLED'] } },
+      campaign: { status: { notIn: ['CLOSED', 'CANCELLED'] }, archivedAt: null },
       ...(ctx.side === 'CLIENT' ? { clientVisible: true } : {}),
     }
 
     const [activeCampaigns, proposedProfiles, awaitingClient, approved, notSharedYet] = await Promise.all([
       tx.campaign.count({
-        where: { ...(clientId ? { clientId } : {}), status: { notIn: ['CLOSED', 'CANCELLED'] } },
+        where: { ...(clientId ? { clientId } : {}), status: { notIn: ['CLOSED', 'CANCELLED'] }, archivedAt: null },
       }),
       tx.candidacy.count({ where: enCampanasVivas }),
       tx.candidacy.count({

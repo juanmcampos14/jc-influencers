@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { defineAction } from '@/lib/actions/define'
 import {
+  archivarCampanas,
   archivarClientes,
   borrarInfluencers,
   cambiarEstadoDeInfluencers,
@@ -26,6 +27,18 @@ export const archivarClientesAction = defineAction(
     const resultado = await archivarClientes(ctx, input.ids, input.destino)
     revalidatePath('/clientes')
     revalidatePath('/panel')
+    return resultado
+  },
+)
+
+export const archivarCampanasAction = defineAction(
+  z.object({ ids, archivar: z.boolean() }),
+  async (input, ctx) => {
+    const resultado = await archivarCampanas(ctx, input.ids, input.archivar)
+    revalidatePath('/campanas')
+    revalidatePath('/panel')
+    // El portal del cliente también cambia: archivar es cómo deja de verla.
+    revalidatePath('/portal')
     return resultado
   },
 )

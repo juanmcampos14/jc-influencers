@@ -378,6 +378,8 @@ export type CampaignDto = {
   endDate: string | null
   currency: string
   version: number
+  /** Cuándo se archivó. Nulo = a la vista. */
+  archivedAt: string | null
   /** Sólo con `budget.view`. */
   budget?: { estimated: number | null; cache: number | null; barterDescription: string | null }
 }
@@ -395,6 +397,7 @@ type CampaignRow = {
   startDate: Date | null
   endDate: Date | null
   currency: string
+  archivedAt: Date | null
   budgetEstimated: Prisma.Decimal | null
   budgetCache: Prisma.Decimal | null
   barterDescription: string | null
@@ -416,6 +419,7 @@ export function toCampaignDto(row: CampaignRow, perms: FieldPermissions): Campai
     endDate: row.endDate ? row.endDate.toISOString() : null,
     currency: row.currency,
     version: row.version,
+    archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
   }
   if (perms.canViewBudget) {
     dto.budget = {

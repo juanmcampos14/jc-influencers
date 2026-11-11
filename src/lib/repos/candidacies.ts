@@ -119,6 +119,66 @@ export async function getCandidacy(ctx: AuthContext, candidacyId: string): Promi
   return toCandidacyDto(row, fieldPermissionsFor(ctx, row.clientId))
 }
 
+/**
+ * Lo que suma la plata de una campaña, por moneda.
+ *
+ * Tres números distintos que la gente junta en la cabeza y que no son lo
+ * mismo, así que se muestran separados:
+ *
+ *  - **Pedido**: lo que cada creador pide. Es un número que cambia.
+ *  - **Cerrado**: lo que se negoció. Sólo cuenta a quien ya tiene un número
+ *    acordado, no a quien todavía está en "lo que pidió".
+ *  - **Aprobado**: lo que el cliente dijo que sí. Es el único que se puede
+ *    comprometer.
+ *
+ * **No se suman monedas distintas.** Mezclar pesos y dólares da un número que
+ * no existe, y es exactamente el tipo de cifra que alguien repite en una
+ * reunión. Se devuelve una fila por moneda y la pantalla las muestra todas.
+ *
+ * Para el aprobado se usa lo CERRADO si está, y si no lo pedido: aprobar sin
+ * haber negociado es aprobar el precio de lista, y esconderlo mostraría cero
+ * donde hay plata comprometida.
+ */
+export type TotalPorMoneda = { currency: string; pedido: number; cerrado: number; aprobado: number; perfiles: number }
+
+export async function resumenDePresupuesto(ctx: AuthContext, campaignId: string): Promise<TotalPorMoneda[]> {
+  const clientId = await resolveCampaignClient(ctx, campaignId)
+  // La plata es de la agencia: el portal del cliente no la ve ni por acá.
+  assertCan(ctx, 'budget.view', clientId)
+  const where = baseWhere(ctx, campaignId, clientId)
+
+  const filas = await scoped(ctx, (tx) =>
+    tx.candidacy.findMany({
+      where,
+      select: { currency: true, budgetRequested: true, budgetNegotiated: true, clientApproval: true },
+    }),
+  )
+
+  const porMoneda = new Map<string, TotalPorMoneda>()
+  for (const fila of filas) {
+    const moneda = fila.currency || 'USD'
+    const entrada = porMoneda.get(moneda) ?? { currency: moneda, pedido: 0, cerrado: 0, aprobado: 0, perfiles: 0 }
+    const pedido = fila.budgetRequested === null ? null : Number(fila.budgetRequested)
+    const cerrado = fila.budgetNegotiated === null ? null : Number(fila.budgetNegotiated)
+
+    if (pedido !== null) entrada.pedido += pedido
+    if (cerrado !== null) entrada.cerrado += cerrado
+    if (fila.clientApproval === 'APPROVED') entrada.aprobado += cerrado ?? pedido ?? 0
+    if (pedido !== null || cerrado !== null) entrada.perfiles += 1
+
+    porMoneda.set(moneda, entrada)
+  }
+
+  /*
+   * Una campaña sin un solo número no devuelve una fila en cero: cero y "no
+   * se cargó nada" no son lo mismo, y la pantalla tiene que poder decir cuál
+   * de los dos es.
+   */
+  return [...porMoneda.values()]
+    .filter((entrada) => entrada.perfiles > 0)
+    .sort((a, b) => b.pedido - a.pedido)
+}
+
 /** Resumen por estado, para el funnel y el panel. */
 export async function candidacySummary(
   ctx: AuthContext,
